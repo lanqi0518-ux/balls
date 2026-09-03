@@ -87,6 +87,7 @@ function App() {
             winningNumber: currentDraw.winningNumber,
             winnersCount: currentDraw.winnersCount,
             prizePool: currentDraw.prizePool,
+            winners: currentDraw.winners,
           }}
           onClose={() => setShowDrawAnimation(false)}
         />
