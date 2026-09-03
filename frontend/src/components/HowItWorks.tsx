@@ -43,23 +43,24 @@ export function HowItWorks() {
         ))}
       </div>
       
-      {/* 税费说明 */}
+      {/* Tax distribution */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="p-6 rounded-lg" style={{ background: 'var(--bg-dark)' }}>
           <h4 className="font-bold mb-4" style={{ color: 'var(--green-primary)' }}>
-            Tax Mechanism
+            Tax Distribution
           </h4>
           <div className="space-y-3">
             <div className="flex justify-between">
               <span className="text-[var(--text-muted)]">Transaction Tax</span>
               <span className="font-bold">4%</span>
             </div>
+            <div className="h-px bg-white/10" />
             <div className="flex justify-between">
               <span className="text-[var(--text-muted)]">→ Prize Pool</span>
               <span style={{ color: 'var(--green-primary)' }}>3%</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[var(--text-muted)]">→ Team</span>
+              <span className="text-[var(--text-muted)]">→ Developer</span>
               <span>1%</span>
             </div>
           </div>

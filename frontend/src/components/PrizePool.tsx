@@ -57,7 +57,7 @@ export function PrizePool({ prizePool, prizePoolWallet }: Props) {
         <div className="mt-6 flex items-center justify-center gap-2">
           <span className="text-[var(--text-muted)] text-xs">Prize Pool:</span>
           <a 
-            href={`https://explorer.robinhoodchain.com/address/${prizePoolWallet}`}
+            href={`https://robinhoodchain.blockscout.com/address/${prizePoolWallet}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs font-mono hover:underline"

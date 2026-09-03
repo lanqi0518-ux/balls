@@ -21,6 +21,7 @@ interface DrawResult {
   timestamp: number;
   winningNumber: number;
   prizePool: string;
+  devFee: string;
   winnersCount: number;
   totalWinnerBalance: string;
   winners: WinnerShare[];
@@ -30,21 +31,26 @@ interface DrawResult {
 
 /**
  * Automated Lottery Service
- * Draws at second :01 of every minute
+ * - Tax split: 1% to dev, 3% to prize pool
+ * - Draws at second :01 of every minute
  */
 export class AutoLottery {
   private provider: ethers.JsonRpcProvider | null = null;
-  private prizePoolWallet: ethers.Wallet | null = null;
+  private taxReceiverWallet: ethers.Wallet | null = null;
   private tokenContract: ethers.Contract | null = null;
   private holderTracker: HolderTracker;
   
-  // Prize pool
-  private prizePoolAddress: string;
+  // Wallets
+  private taxReceiverAddress: string;
+  private devWalletAddress: string;
+  
+  // Prize pool (3% portion only)
   private currentPrizePool = 0n;
+  private totalTaxBalance = 0n;
   
   // Demo mode
   private demoMode = false;
-  private demoPrizePool = 100000n * 10n ** 18n;
+  private demoPrizePool = 75000n * 10n ** 18n; // 75k (3/4 of 100k)
   
   // Lottery state
   private currentDrawId = 0;
@@ -71,13 +77,18 @@ export class AutoLottery {
   private lastDrawMinute = -1;
   private snapshotTakenForMinute = -1;
   
+  // Stats
+  private totalDevPaid = 0n;
+  private totalPrizePaid = 0n;
+  
   // Event callbacks
   public onDraw: ((result: DrawResult) => void) | null = null;
   public onSnapshot: ((snapshot: any) => void) | null = null;
 
   constructor(holderTracker: HolderTracker) {
     this.holderTracker = holderTracker;
-    this.prizePoolAddress = config.prizePoolWallet;
+    this.taxReceiverAddress = config.taxReceiverWallet;
+    this.devWalletAddress = config.devWallet;
     
     if (!config.tokenAddress) {
       console.log('🎮 Lottery running in demo mode');
@@ -85,16 +96,18 @@ export class AutoLottery {
     } else {
       this.provider = new ethers.JsonRpcProvider(config.rpcUrl);
       
-      if (config.prizePoolPrivateKey) {
-        this.prizePoolWallet = new ethers.Wallet(config.prizePoolPrivateKey, this.provider);
+      if (config.taxReceiverPrivateKey) {
+        this.taxReceiverWallet = new ethers.Wallet(config.taxReceiverPrivateKey, this.provider);
         this.autoTransferEnabled = true;
         console.log('✅ Auto transfer enabled');
+        console.log(`📤 Dev wallet: ${this.devWalletAddress}`);
+        console.log(`💰 Tax split: ${config.devSharePercent}% dev / ${100 - config.devSharePercent}% prize`);
       }
       
       this.tokenContract = new ethers.Contract(
         config.tokenAddress,
         ERC20_ABI,
-        this.prizePoolWallet || this.provider
+        this.taxReceiverWallet || this.provider
       );
     }
   }
@@ -115,18 +128,19 @@ export class AutoLottery {
     this.isRunning = true;
     
     console.log('\n🎱 Starting Balls Lottery');
-    console.log(`Prize Pool: ${this.prizePoolAddress}`);
+    console.log(`Tax Receiver: ${this.taxReceiverAddress}`);
+    console.log(`Dev Wallet: ${this.devWalletAddress}`);
     console.log(`Draw Time: Every minute at :01`);
     console.log(`Mode: ${this.demoMode ? 'Demo' : 'Live'}`);
     
-    // Check every 500ms for more accuracy
+    // Check every 500ms
     this.intervalTimer = setInterval(() => {
       this.tick();
     }, 500);
     
     if (!this.demoMode) {
-      this.updatePrizePool();
-      setInterval(() => this.updatePrizePool(), 5000);
+      this.updateBalances();
+      setInterval(() => this.updateBalances(), 5000);
     }
   }
 
@@ -142,12 +156,17 @@ export class AutoLottery {
     console.log('Lottery stopped');
   }
 
-  private async updatePrizePool() {
+  /**
+   * Update tax receiver balance and calculate prize pool (75%)
+   */
+  private async updateBalances() {
     if (!this.tokenContract || this.demoMode) return;
     
     try {
-      const balance = await this.tokenContract.balanceOf(this.prizePoolAddress);
-      this.currentPrizePool = balance;
+      const balance = await this.tokenContract.balanceOf(this.taxReceiverAddress);
+      this.totalTaxBalance = balance;
+      // Prize pool is 75% of total (3% out of 4%)
+      this.currentPrizePool = (balance * 75n) / 100n;
     } catch (error) {
       // Silent
     }
@@ -158,10 +177,9 @@ export class AutoLottery {
     const currentMinute = now.getMinutes();
     const currentSecond = now.getSeconds();
     
-    // Next minute for draw
     const nextDrawMinute = (currentSecond >= 1) ? (currentMinute + 1) % 60 : currentMinute;
     
-    // Take snapshot at :50-:59 (10 seconds before draw)
+    // Take snapshot at :50-:59
     if (currentSecond >= 50 && currentSecond <= 59) {
       if (this.snapshotTakenForMinute !== nextDrawMinute) {
         this.snapshotTakenForMinute = nextDrawMinute;
@@ -169,11 +187,10 @@ export class AutoLottery {
       }
     }
     
-    // Execute draw at :01 or :02 (small window for reliability)
+    // Execute draw at :01 or :02
     if ((currentSecond === 1 || currentSecond === 2) && currentMinute !== this.lastDrawMinute) {
       this.lastDrawMinute = currentMinute;
       
-      // Take snapshot now if we don't have one
       if (!this.currentSnapshot) {
         this.takeSnapshot();
       }
@@ -214,7 +231,7 @@ export class AutoLottery {
     console.log('\n📸 Snapshot Locked');
     console.log(`Draw: #${nextDrawId}`);
     console.log(`Eligible: ${holders.length}`);
-    console.log(`Prize Pool: ${ethers.formatUnits(prizePool, 18)}`);
+    console.log(`Prize Pool (3%): ${ethers.formatUnits(prizePool, 18)}`);
     
     if (this.onSnapshot) {
       this.onSnapshot({
@@ -227,7 +244,6 @@ export class AutoLottery {
   }
 
   private async executeDraw() {
-    // Always ensure we have a snapshot
     if (!this.currentSnapshot) {
       this.takeSnapshot();
     }
@@ -238,14 +254,41 @@ export class AutoLottery {
     
     console.log('\n🎱 DRAWING NOW!');
     
-    const winningNumber = this.generateWinningNumber(drawId);
+    // Step 1: Send 1% (25% of tax) to dev wallet FIRST
+    let devFee = 0n;
+    if (this.autoTransferEnabled && !this.demoMode && this.totalTaxBalance > 0n) {
+      devFee = (this.totalTaxBalance * BigInt(config.devSharePercent)) / 100n;
+      if (devFee > 0n) {
+        try {
+          console.log(`\n📤 Sending dev fee: ${ethers.formatUnits(devFee, 18)} tokens`);
+          const tx = await this.tokenContract!.transfer(this.devWalletAddress, devFee);
+          await tx.wait();
+          this.totalDevPaid += devFee;
+          console.log(`✅ Dev fee sent to ${this.devWalletAddress}`);
+        } catch (error: any) {
+          console.error(`❌ Dev fee transfer failed: ${error.message}`);
+          devFee = 0n;
+        }
+      }
+    }
     
+    // Step 2: Get remaining prize pool (75% of tax = 3%)
+    const winningNumber = this.generateWinningNumber(drawId);
     const winnersData = snapshot.holders.filter(h => h.number === winningNumber);
     const totalWinnerBalance = winnersData.reduce((sum, h) => sum + h.balance, 0n);
-    const prizePool = this.demoMode ? this.demoPrizePool : this.currentPrizePool;
+    
+    // Recalculate prize pool after dev fee
+    let prizePool: bigint;
+    if (this.demoMode) {
+      prizePool = this.demoPrizePool;
+    } else {
+      await this.updateBalances();
+      prizePool = this.currentPrizePool;
+    }
     
     const winners: WinnerShare[] = [];
     
+    // Step 3: Distribute prizes to winners
     if (totalWinnerBalance > 0n && prizePool > 0n) {
       for (const winner of winnersData) {
         const prize = (winner.balance * prizePool) / totalWinnerBalance;
@@ -260,9 +303,11 @@ export class AutoLottery {
         
         if (this.autoTransferEnabled && !this.demoMode && prize > 0n) {
           try {
-            const txHash = await this.transferPrize(winner.address, prize);
-            winnerShare.txHash = txHash;
-            console.log(`  ✅ Sent to ${winner.address.slice(0, 10)}...`);
+            const tx = await this.tokenContract!.transfer(winner.address, prize);
+            const receipt = await tx.wait();
+            winnerShare.txHash = receipt.hash;
+            this.totalPrizePaid += prize;
+            console.log(`  ✅ Sent ${ethers.formatUnits(prize, 18)} to ${winner.address.slice(0, 10)}...`);
           } catch (error: any) {
             console.error(`  ❌ Transfer failed: ${error.message}`);
           }
@@ -277,6 +322,7 @@ export class AutoLottery {
       timestamp: Math.floor(Date.now() / 1000),
       winningNumber,
       prizePool: ethers.formatUnits(prizePool, 18),
+      devFee: ethers.formatUnits(devFee, 18),
       winnersCount: winners.length,
       totalWinnerBalance: ethers.formatUnits(totalWinnerBalance, 18),
       winners,
@@ -289,36 +335,23 @@ export class AutoLottery {
       this.drawHistory.pop();
     }
     
-    // Clear snapshot for next round
     this.currentSnapshot = null;
     
     console.log('\n🎉 DRAW COMPLETE!');
     console.log(`Draw #${drawId}`);
     console.log(`Winning Number: ${winningNumber}`);
+    console.log(`Dev Fee (1%): ${result.devFee}`);
+    console.log(`Prize Pool (3%): ${result.prizePool}`);
     console.log(`Winners: ${winners.length}`);
-    console.log(`Prize Pool: ${result.prizePool}`);
     
     if (!this.demoMode) {
-      await this.updatePrizePool();
+      await this.updateBalances();
     }
     
-    // IMPORTANT: Trigger the draw event!
     if (this.onDraw) {
       console.log('📢 Broadcasting draw event...');
       this.onDraw(result);
-    } else {
-      console.log('⚠️ No onDraw handler registered!');
     }
-  }
-
-  private async transferPrize(to: string, amount: bigint): Promise<string> {
-    if (!this.tokenContract || !this.prizePoolWallet) {
-      throw new Error('Transfer not configured');
-    }
-    
-    const tx = await this.tokenContract.transfer(to, amount);
-    const receipt = await tx.wait();
-    return receipt.hash;
   }
 
   private generateWinningNumber(drawId: number): number {
@@ -337,6 +370,7 @@ export class AutoLottery {
 
   getStatus() {
     const timeUntilDraw = this.getTimeUntilDraw();
+    // Show only prize pool (3%), not total tax (4%)
     const prizePool = this.demoMode ? this.demoPrizePool : this.currentPrizePool;
     
     return {
@@ -345,8 +379,11 @@ export class AutoLottery {
       timeUntilNextDraw: timeUntilDraw,
       hasSnapshot: !!this.currentSnapshot,
       prizePool: ethers.formatUnits(prizePool, 18),
-      prizePoolWallet: this.prizePoolAddress,
+      taxReceiverWallet: this.taxReceiverAddress,
+      devWallet: this.devWalletAddress,
       demoMode: this.demoMode,
+      totalDevPaid: ethers.formatUnits(this.totalDevPaid, 18),
+      totalPrizePaid: ethers.formatUnits(this.totalPrizePaid, 18),
       snapshot: this.currentSnapshot ? {
         drawId: this.currentSnapshot.drawId,
         eligibleCount: this.currentSnapshot.holders.length,

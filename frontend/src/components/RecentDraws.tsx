@@ -143,7 +143,7 @@ export function RecentDraws({ draws }: Props) {
                           <div className="text-right w-16">
                             {winner.txHash ? (
                               <a 
-                                href={`https://explorer.robinhoodchain.com/tx/${winner.txHash}`}
+                                href={`https://robinhoodchain.blockscout.com/tx/${winner.txHash}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-xs"
