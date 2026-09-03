@@ -80,7 +80,7 @@ export function useRealtimeStatus() {
   // SSE connection with auto-reconnect
   useEffect(() => {
     let eventSource: EventSource | null = null;
-    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
     const connect = () => {
       eventSource = new EventSource(`${API_URL}/events`);
