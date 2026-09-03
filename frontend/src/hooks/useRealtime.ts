@@ -63,16 +63,13 @@ function getTimeUntilNextDraw(): number {
   const now = new Date();
   const seconds = now.getSeconds();
   
-  if (seconds === 0) {
-    return 1; // 1 second until :01
-  } else if (seconds >= 1) {
-    return 60 - seconds + 1; // Seconds until next :01
-  }
+  if (seconds === 0) return 1;
+  if (seconds >= 1) return 60 - seconds + 1;
   return 1;
 }
 
 /**
- * Real-time status hook with local time-based countdown
+ * Real-time status hook
  */
 export function useRealtimeStatus() {
   const [status, setStatus] = useState<LotteryStatus | null>(null);
@@ -80,42 +77,55 @@ export function useRealtimeStatus() {
   const [latestDraw, setLatestDraw] = useState<DrawResult | null>(null);
   const [localCountdown, setLocalCountdown] = useState(getTimeUntilNextDraw());
 
-  // Local countdown based on actual time
+  // Local countdown - update every 500ms for smooth display
   useEffect(() => {
     const timer = setInterval(() => {
       setLocalCountdown(getTimeUntilNextDraw());
-    }, 100); // Update frequently for accuracy
+    }, 500);
     return () => clearInterval(timer);
   }, []);
 
-  // SSE connection with auto-reconnect
+  // SSE connection
   useEffect(() => {
     let eventSource: EventSource | null = null;
     let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+    let retryCount = 0;
 
     const connect = () => {
-      eventSource = new EventSource(`${API_URL}/events`);
+      try {
+        eventSource = new EventSource(`${API_URL}/events`);
 
-      eventSource.onopen = () => {
-        setIsConnected(true);
-        console.log('SSE connected');
-      };
+        eventSource.onopen = () => {
+          setIsConnected(true);
+          retryCount = 0;
+        };
 
-      eventSource.onerror = () => {
-        setIsConnected(false);
-        eventSource?.close();
+        eventSource.onerror = () => {
+          setIsConnected(false);
+          eventSource?.close();
+          
+          // Exponential backoff: 1s, 2s, 4s, max 10s
+          const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
+          retryCount++;
+          reconnectTimeout = setTimeout(connect, delay);
+        };
+
+        eventSource.addEventListener('status', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            setStatus(data);
+          } catch (e) {}
+        });
+
+        eventSource.addEventListener('draw', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            setLatestDraw(data);
+          } catch (e) {}
+        });
+      } catch (e) {
         reconnectTimeout = setTimeout(connect, 3000);
-      };
-
-      eventSource.addEventListener('status', (event) => {
-        const data = JSON.parse(event.data);
-        setStatus(data);
-      });
-
-      eventSource.addEventListener('draw', (event) => {
-        const data = JSON.parse(event.data);
-        setLatestDraw(data);
-      });
+      }
     };
 
     connect();
@@ -126,7 +136,7 @@ export function useRealtimeStatus() {
     };
   }, []);
 
-  // Return local countdown for smooth, accurate display
+  // Combine server status with local countdown
   const effectiveStatus = status ? {
     ...status,
     timeUntilNextDraw: localCountdown
@@ -136,7 +146,7 @@ export function useRealtimeStatus() {
 }
 
 /**
- * Get recent draws
+ * Get recent draws - with caching
  */
 export function useRecentDraws(count: number = 10) {
   const [draws, setDraws] = useState<DrawResult[]>([]);
@@ -145,12 +155,14 @@ export function useRecentDraws(count: number = 10) {
   const refetch = useCallback(async () => {
     try {
       const res = await fetch(`${API_URL}/draws?count=${count}`);
-      const data = await res.json();
-      if (data.success) {
-        setDraws(data.data);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setDraws(data.data);
+        }
       }
     } catch (error) {
-      console.error('Failed to fetch draws:', error);
+      // Silent fail
     } finally {
       setIsLoading(false);
     }
@@ -158,7 +170,8 @@ export function useRecentDraws(count: number = 10) {
 
   useEffect(() => {
     refetch();
-    const interval = setInterval(refetch, 10000);
+    // Refresh every 30 seconds instead of 10
+    const interval = setInterval(refetch, 30000);
     return () => clearInterval(interval);
   }, [refetch]);
 
@@ -181,12 +194,14 @@ export function useUserInfo(address: string | null) {
     setIsLoading(true);
     try {
       const res = await fetch(`${API_URL}/user/${address}`);
-      const data = await res.json();
-      if (data.success) {
-        setUserInfo(data.data);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setUserInfo(data.data);
+        }
       }
     } catch (error) {
-      console.error('Failed to fetch user info:', error);
+      // Silent fail
     } finally {
       setIsLoading(false);
     }
@@ -209,13 +224,14 @@ export function useNumberLookup() {
     setIsLoading(true);
     try {
       const res = await fetch(`${API_URL}/number/${address}`);
-      const data = await res.json();
-      if (data.success) {
-        return data.data.number;
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          return data.data.number;
+        }
       }
       return null;
     } catch (error) {
-      console.error('Failed to lookup number:', error);
       return null;
     } finally {
       setIsLoading(false);
@@ -226,7 +242,7 @@ export function useNumberLookup() {
 }
 
 /**
- * Get number distribution
+ * Get number distribution - with longer cache
  */
 export function useNumberDistribution() {
   const [distribution, setDistribution] = useState<Record<number, {count: number; totalBalance: string}>>({});
@@ -235,12 +251,14 @@ export function useNumberDistribution() {
   const refetch = useCallback(async () => {
     try {
       const res = await fetch(`${API_URL}/distribution`);
-      const data = await res.json();
-      if (data.success) {
-        setDistribution(data.data);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setDistribution(data.data);
+        }
       }
     } catch (error) {
-      console.error('Failed to fetch distribution:', error);
+      // Silent fail
     } finally {
       setIsLoading(false);
     }
@@ -248,7 +266,8 @@ export function useNumberDistribution() {
 
   useEffect(() => {
     refetch();
-    const interval = setInterval(refetch, 30000);
+    // Refresh every 60 seconds instead of 30
+    const interval = setInterval(refetch, 60000);
     return () => clearInterval(interval);
   }, [refetch]);
 

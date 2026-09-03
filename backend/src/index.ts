@@ -14,6 +14,25 @@ async function main() {
   const holderTracker = new HolderTracker();
   const autoLottery = new AutoLottery(holderTracker);
   
+  // SSE clients management
+  const sseClients: Set<express.Response> = new Set();
+  
+  // Broadcast to all SSE clients
+  const broadcast = (event: string, data: any) => {
+    const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    sseClients.forEach(client => {
+      try {
+        client.write(message);
+      } catch (e) {
+        sseClients.delete(client);
+      }
+    });
+  };
+  
+  // Set up lottery event handlers
+  autoLottery.onDraw = (result) => broadcast('draw', result);
+  autoLottery.onSnapshot = (snapshot) => broadcast('snapshot', snapshot);
+  
   // Create Express app
   const app = express();
   app.use(cors());
@@ -26,6 +45,7 @@ async function main() {
     res.json({ 
       name: 'Balls Lottery API',
       status: 'running',
+      clients: sseClients.size,
       endpoints: ['/health', '/api/status', '/api/draws', '/api/events']
     });
   });
@@ -99,48 +119,37 @@ async function main() {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
     
-    // Send current status
-    const sendStatus = () => {
-      const status = autoLottery.getStatus();
-      res.write(`event: status\ndata: ${JSON.stringify(status)}\n\n`);
-    };
+    // Add to clients
+    sseClients.add(res);
+    console.log(`SSE client connected. Total: ${sseClients.size}`);
     
-    // Send status every second
-    const interval = setInterval(sendStatus, 1000);
+    // Send initial status
+    const status = autoLottery.getStatus();
+    res.write(`event: status\ndata: ${JSON.stringify(status)}\n\n`);
     
-    // Draw event
-    const onDraw = (result: any) => {
-      res.write(`event: draw\ndata: ${JSON.stringify(result)}\n\n`);
-    };
-    
-    // Snapshot event
-    const onSnapshot = (snapshot: any) => {
-      res.write(`event: snapshot\ndata: ${JSON.stringify(snapshot)}\n\n`);
-    };
-    
-    autoLottery.onDraw = onDraw;
-    autoLottery.onSnapshot = onSnapshot;
-    
-    // Cleanup
+    // Cleanup on disconnect
     req.on('close', () => {
-      clearInterval(interval);
-      autoLottery.onDraw = null;
-      autoLottery.onSnapshot = null;
+      sseClients.delete(res);
+      console.log(`SSE client disconnected. Total: ${sseClients.size}`);
     });
   });
   
+  // Broadcast status every 3 seconds
+  setInterval(() => {
+    if (sseClients.size > 0) {
+      broadcast('status', autoLottery.getStatus());
+    }
+  }, 3000);
+  
   // Start server
-  app.listen(config.port, () => {
-    console.log(`\n🚀 API running at http://localhost:${config.port}`);
+  const port = config.port || 10000;
+  app.listen(port, () => {
+    console.log(`\n🚀 API running at http://localhost:${port}`);
     console.log('\nEndpoints:');
-    console.log('  GET  /health              - Health check');
     console.log('  GET  /api/status          - Lottery status');
     console.log('  GET  /api/draws           - Recent draws');
-    console.log('  GET  /api/user/:address   - User info');
-    console.log('  GET  /api/distribution    - Number distribution');
-    console.log('  GET  /api/holders         - All holders');
-    console.log('  GET  /api/number/:address - Lookup number');
     console.log('  GET  /api/events          - SSE real-time');
   });
   
