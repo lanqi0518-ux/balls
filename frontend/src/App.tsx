@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { PrizePool } from './components/PrizePool'
 import { Countdown } from './components/Countdown'
 import { RecentDraws } from './components/RecentDraws'
@@ -13,10 +13,15 @@ function App() {
   const { status, isConnected, latestDraw } = useRealtimeStatus()
   const { draws, refetch: refetchDraws } = useRecentDraws(10)
   const [showDrawAnimation, setShowDrawAnimation] = useState(false)
+  const [currentDraw, setCurrentDraw] = useState<typeof latestDraw>(null)
   const [notifications, setNotifications] = useState<string[]>([])
+  const lastDrawId = useRef(0)
 
+  // Show animation when new draw comes in
   useEffect(() => {
-    if (latestDraw) {
+    if (latestDraw && latestDraw.drawId > lastDrawId.current) {
+      lastDrawId.current = latestDraw.drawId
+      setCurrentDraw(latestDraw)
       setShowDrawAnimation(true)
       refetchDraws()
       addNotification(`🎱 Draw #${latestDraw.drawId} complete! Winning number: ${latestDraw.winningNumber}`)
@@ -49,6 +54,12 @@ function App() {
               {isConnected ? 'LIVE' : 'CONNECTING...'}
             </div>
             
+            {status?.demoMode && (
+              <span className="text-xs px-2 py-1 rounded bg-yellow-500/20 text-yellow-400">
+                DEMO
+              </span>
+            )}
+            
             {status && (
               <div className="text-sm text-[var(--text-secondary)]">
                 {status.stats.eligibleHolders} participants
@@ -68,14 +79,14 @@ function App() {
       </div>
       
       {/* Draw Animation */}
-      {latestDraw && showDrawAnimation && (
+      {currentDraw && (
         <LiveDrawAnimation
           isVisible={showDrawAnimation}
           result={{
-            drawId: latestDraw.drawId,
-            winningNumber: latestDraw.winningNumber,
-            winnersCount: latestDraw.winnersCount,
-            prizePool: latestDraw.prizePool,
+            drawId: currentDraw.drawId,
+            winningNumber: currentDraw.winningNumber,
+            winnersCount: currentDraw.winnersCount,
+            prizePool: currentDraw.prizePool,
           }}
           onClose={() => setShowDrawAnimation(false)}
         />
@@ -115,6 +126,16 @@ function App() {
               <p className="mt-4 text-sm" style={{ color: 'var(--green-primary)' }}>
                 ✓ Snapshot Locked
               </p>
+            )}
+            
+            {/* Last winning number */}
+            {draws.length > 0 && (
+              <div className="mt-4 text-center">
+                <p className="text-xs text-[var(--text-muted)] mb-2">Last Winner</p>
+                <div className="ball ball-small ball-winning">
+                  {draws[0].winningNumber}
+                </div>
+              </div>
             )}
           </div>
         </div>
