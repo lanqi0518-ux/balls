@@ -21,6 +21,15 @@ async function main() {
   
   // ============ API Routes ============
   
+  // Root
+  app.get('/', (_req, res) => {
+    res.json({ 
+      name: 'Balls Lottery API',
+      status: 'running',
+      endpoints: ['/health', '/api/status', '/api/draws', '/api/events']
+    });
+  });
+
   // Health check
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
