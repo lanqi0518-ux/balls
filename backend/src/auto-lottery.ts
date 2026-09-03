@@ -97,7 +97,9 @@ export class AutoLottery {
       );
     }
     
-    this.lastDrawTime = Math.floor(Date.now() / 1000);
+    // Calculate last draw time based on fixed interval (so it doesn't reset on restart)
+    const now = Math.floor(Date.now() / 1000);
+    this.lastDrawTime = now - (now % this.drawInterval);
   }
 
   start() {

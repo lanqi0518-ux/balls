@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 const API_URL = import.meta.env.VITE_API_URL 
   ? `${import.meta.env.VITE_API_URL}/api`
@@ -9,11 +9,10 @@ interface LotteryStatus {
   currentDrawId: number;
   lastDrawTime: number;
   timeUntilNextDraw: number;
-  timeUntilSnapshot: number;
   hasSnapshot: boolean;
-  // 实时奖池（从奖池钱包读取）
   prizePool: string;
   prizePoolWallet: string;
+  demoMode?: boolean;
   snapshot: {
     drawId: number;
     eligibleCount: number;
@@ -31,6 +30,7 @@ interface WinnerShare {
   balance: string;
   sharePercent: number;
   prize: string;
+  txHash?: string;
 }
 
 interface DrawResult {
@@ -51,58 +51,85 @@ interface UserInfo {
   balance: string;
   holdingSince?: number;
   isEligible: boolean;
-  pendingPrize: string;
+  pendingPrize?: string;
   shareInNumber?: number;
   sameNumberHolders?: number;
 }
 
 /**
- * 实时状态 Hook
+ * Real-time status hook with auto-reconnect and local countdown
  */
 export function useRealtimeStatus() {
   const [status, setStatus] = useState<LotteryStatus | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [latestDraw, setLatestDraw] = useState<DrawResult | null>(null);
+  const [localCountdown, setLocalCountdown] = useState(60);
+  const lastServerTime = useRef<number>(60);
 
+  // Local countdown timer
   useEffect(() => {
-    const eventSource = new EventSource(`${API_URL}/events`);
+    const timer = setInterval(() => {
+      setLocalCountdown(prev => {
+        if (prev <= 0) return lastServerTime.current;
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
-    eventSource.onopen = () => {
-      setIsConnected(true);
-      console.log('SSE 连接已建立');
+  // SSE connection with auto-reconnect
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+
+    const connect = () => {
+      eventSource = new EventSource(`${API_URL}/events`);
+
+      eventSource.onopen = () => {
+        setIsConnected(true);
+        console.log('SSE connected');
+      };
+
+      eventSource.onerror = () => {
+        setIsConnected(false);
+        eventSource?.close();
+        // Reconnect after 3 seconds
+        reconnectTimeout = setTimeout(connect, 3000);
+      };
+
+      eventSource.addEventListener('status', (event) => {
+        const data = JSON.parse(event.data);
+        setStatus(data);
+        // Sync local countdown with server
+        lastServerTime.current = data.timeUntilNextDraw;
+        setLocalCountdown(data.timeUntilNextDraw);
+      });
+
+      eventSource.addEventListener('draw', (event) => {
+        const data = JSON.parse(event.data);
+        setLatestDraw(data);
+      });
     };
 
-    eventSource.onerror = () => {
-      setIsConnected(false);
-      console.log('SSE 连接断开');
-    };
-
-    eventSource.addEventListener('status', (event) => {
-      const data = JSON.parse(event.data);
-      setStatus(data);
-    });
-
-    eventSource.addEventListener('draw', (event) => {
-      const data = JSON.parse(event.data);
-      setLatestDraw(data);
-      console.log('新开奖:', data);
-    });
-
-    eventSource.addEventListener('snapshot', (event) => {
-      const data = JSON.parse(event.data);
-      console.log('新快照:', data);
-    });
+    connect();
 
     return () => {
-      eventSource.close();
+      eventSource?.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
   }, []);
 
-  return { status, isConnected, latestDraw };
+  // Return local countdown for smooth display
+  const effectiveStatus = status ? {
+    ...status,
+    timeUntilNextDraw: localCountdown
+  } : null;
+
+  return { status: effectiveStatus, isConnected, latestDraw };
 }
 
 /**
- * 获取最近开奖记录
+ * Get recent draws
  */
 export function useRecentDraws(count: number = 10) {
   const [draws, setDraws] = useState<DrawResult[]>([]);
@@ -116,7 +143,7 @@ export function useRecentDraws(count: number = 10) {
         setDraws(data.data);
       }
     } catch (error) {
-      console.error('获取开奖记录失败:', error);
+      console.error('Failed to fetch draws:', error);
     } finally {
       setIsLoading(false);
     }
@@ -124,7 +151,6 @@ export function useRecentDraws(count: number = 10) {
 
   useEffect(() => {
     refetch();
-    // 每10秒刷新一次
     const interval = setInterval(refetch, 10000);
     return () => clearInterval(interval);
   }, [refetch]);
@@ -133,7 +159,7 @@ export function useRecentDraws(count: number = 10) {
 }
 
 /**
- * 查询用户信息
+ * Get user info
  */
 export function useUserInfo(address: string | null) {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
@@ -153,7 +179,7 @@ export function useUserInfo(address: string | null) {
         setUserInfo(data.data);
       }
     } catch (error) {
-      console.error('获取用户信息失败:', error);
+      console.error('Failed to fetch user info:', error);
     } finally {
       setIsLoading(false);
     }
@@ -167,7 +193,7 @@ export function useUserInfo(address: string | null) {
 }
 
 /**
- * 查询号码
+ * Lookup number
  */
 export function useNumberLookup() {
   const [isLoading, setIsLoading] = useState(false);
@@ -182,7 +208,7 @@ export function useNumberLookup() {
       }
       return null;
     } catch (error) {
-      console.error('查询号码失败:', error);
+      console.error('Failed to lookup number:', error);
       return null;
     } finally {
       setIsLoading(false);
@@ -193,7 +219,7 @@ export function useNumberLookup() {
 }
 
 /**
- * 获取号码分布
+ * Get number distribution
  */
 export function useNumberDistribution() {
   const [distribution, setDistribution] = useState<Record<number, {count: number; totalBalance: string}>>({});
@@ -207,7 +233,7 @@ export function useNumberDistribution() {
         setDistribution(data.data);
       }
     } catch (error) {
-      console.error('获取号码分布失败:', error);
+      console.error('Failed to fetch distribution:', error);
     } finally {
       setIsLoading(false);
     }
