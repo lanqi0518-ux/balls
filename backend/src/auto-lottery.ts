@@ -68,6 +68,9 @@ export class AutoLottery {
   // Auto transfer
   private autoTransferEnabled = false;
   
+  // Track last draw to prevent duplicates
+  private lastDrawMinute = -1;
+  
   // Event callbacks
   public onDraw: ((result: DrawResult) => void) | null = null;
   public onSnapshot: ((snapshot: any) => void) | null = null;
@@ -167,16 +170,20 @@ export class AutoLottery {
   }
 
   private tick() {
-    const timeUntil = this.getTimeUntilDraw();
-    const snapshotTime = this.snapshotLeadTime;
+    const now = new Date();
+    const currentMinute = now.getMinutes();
+    const currentSecond = now.getSeconds();
     
-    // Take snapshot 10 seconds before draw
-    if (!this.currentSnapshot && timeUntil <= snapshotTime && timeUntil > 0) {
+    const timeUntil = this.getTimeUntilDraw();
+    
+    // Take snapshot 10 seconds before draw (at :51)
+    if (!this.currentSnapshot && currentSecond >= 51 && currentSecond <= 59) {
       this.takeSnapshot();
     }
     
-    // Execute draw at :01
-    if (timeUntil === 0 && this.currentSnapshot) {
+    // Execute draw at :01 (only once per minute)
+    if (currentSecond === 1 && currentMinute !== this.lastDrawMinute && this.currentSnapshot) {
+      this.lastDrawMinute = currentMinute;
       this.executeDraw();
     }
   }
