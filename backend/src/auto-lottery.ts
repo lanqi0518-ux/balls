@@ -6,7 +6,16 @@ import { config } from './config.js';
 const ERC20_ABI = [
   'function balanceOf(address) view returns (uint256)',
   'function transfer(address to, uint256 amount) returns (bool)',
+  'function decimals() view returns (uint8)',
 ];
+
+interface TransferResult {
+  to: string;
+  amount: string;
+  success: boolean;
+  txHash?: string;
+  error?: string;
+}
 
 interface WinnerShare {
   address: string;
@@ -27,12 +36,13 @@ interface DrawResult {
   winners: WinnerShare[];
   snapshotHash: string;
   autoTransfer: boolean;
+  transferStatus: 'pending' | 'success' | 'partial' | 'failed';
 }
 
 /**
  * Automated Lottery Service
  * - Tax split: 1% to dev, 3% to prize pool
- * - Draws at second :01 of every minute
+ * - Batch transfers for reliability
  */
 export class AutoLottery {
   private provider: ethers.JsonRpcProvider | null = null;
@@ -44,13 +54,13 @@ export class AutoLottery {
   private taxReceiverAddress: string;
   private devWalletAddress: string;
   
-  // Prize pool (3% portion only)
+  // Balances
   private currentPrizePool = 0n;
   private totalTaxBalance = 0n;
   
   // Demo mode
   private demoMode = false;
-  private demoPrizePool = 75000n * 10n ** 18n; // 75k (3/4 of 100k)
+  private demoPrizePool = 75000n * 10n ** 18n;
   
   // Lottery state
   private currentDrawId = 0;
@@ -69,6 +79,7 @@ export class AutoLottery {
   // Timers
   private intervalTimer: ReturnType<typeof setInterval> | null = null;
   private isRunning = false;
+  private isProcessingDraw = false; // Prevent concurrent draws
   
   // Auto transfer
   private autoTransferEnabled = false;
@@ -112,9 +123,6 @@ export class AutoLottery {
     }
   }
 
-  /**
-   * Get time until next :01
-   */
   private getTimeUntilDraw(): number {
     const now = new Date();
     const seconds = now.getSeconds();
@@ -133,7 +141,6 @@ export class AutoLottery {
     console.log(`Draw Time: Every minute at :01`);
     console.log(`Mode: ${this.demoMode ? 'Demo' : 'Live'}`);
     
-    // Check every 500ms
     this.intervalTimer = setInterval(() => {
       this.tick();
     }, 500);
@@ -156,16 +163,12 @@ export class AutoLottery {
     console.log('Lottery stopped');
   }
 
-  /**
-   * Update tax receiver balance and calculate prize pool (75%)
-   */
   private async updateBalances() {
     if (!this.tokenContract || this.demoMode) return;
     
     try {
       const balance = await this.tokenContract.balanceOf(this.taxReceiverAddress);
       this.totalTaxBalance = balance;
-      // Prize pool is 75% of total (3% out of 4%)
       this.currentPrizePool = (balance * 75n) / 100n;
     } catch (error) {
       // Silent
@@ -187,14 +190,11 @@ export class AutoLottery {
       }
     }
     
-    // Execute draw at :01 or :02
-    if ((currentSecond === 1 || currentSecond === 2) && currentMinute !== this.lastDrawMinute) {
+    // Execute draw at :01 or :02 (only if not already processing)
+    if ((currentSecond === 1 || currentSecond === 2) && 
+        currentMinute !== this.lastDrawMinute && 
+        !this.isProcessingDraw) {
       this.lastDrawMinute = currentMinute;
-      
-      if (!this.currentSnapshot) {
-        this.takeSnapshot();
-      }
-      
       this.executeDraw();
     }
   }
@@ -219,138 +219,297 @@ export class AutoLottery {
       })).sort((a, b) => a.address.localeCompare(b.address)),
     })));
     
-    this.currentSnapshot = {
-      drawId: nextDrawId,
-      timestamp,
-      holders,
-      hash,
-    };
+    this.currentSnapshot = { drawId: nextDrawId, timestamp, holders, hash };
     
     const prizePool = this.demoMode ? this.demoPrizePool : this.currentPrizePool;
     
     console.log('\n📸 Snapshot Locked');
-    console.log(`Draw: #${nextDrawId}`);
-    console.log(`Eligible: ${holders.length}`);
-    console.log(`Prize Pool (3%): ${ethers.formatUnits(prizePool, 18)}`);
+    console.log(`Draw: #${nextDrawId} | Eligible: ${holders.length} | Prize Pool: ${ethers.formatUnits(prizePool, 18)}`);
     
     if (this.onSnapshot) {
-      this.onSnapshot({
-        drawId: nextDrawId,
-        eligibleCount: holders.length,
-        hash,
-        timestamp
-      });
+      this.onSnapshot({ drawId: nextDrawId, eligibleCount: holders.length, hash, timestamp });
     }
   }
 
-  private async executeDraw() {
-    if (!this.currentSnapshot) {
-      this.takeSnapshot();
+  /**
+   * Execute batch transfer - send to multiple addresses
+   */
+  private async executeBatchTransfer(
+    transfers: Array<{to: string; amount: bigint}>
+  ): Promise<TransferResult[]> {
+    if (!this.tokenContract || !this.taxReceiverWallet) {
+      return transfers.map(t => ({
+        to: t.to,
+        amount: ethers.formatUnits(t.amount, 18),
+        success: false,
+        error: 'Wallet not configured'
+      }));
     }
+
+    const results: TransferResult[] = [];
     
-    const snapshot = this.currentSnapshot!;
-    this.currentDrawId++;
-    const drawId = this.currentDrawId;
+    // Get current nonce
+    let nonce = await this.taxReceiverWallet.getNonce();
     
-    console.log('\n🎱 DRAWING NOW!');
-    
-    // Step 1: Send 1% (25% of tax) to dev wallet FIRST
-    let devFee = 0n;
-    if (this.autoTransferEnabled && !this.demoMode && this.totalTaxBalance > 0n) {
-      devFee = (this.totalTaxBalance * BigInt(config.devSharePercent)) / 100n;
-      if (devFee > 0n) {
-        try {
-          console.log(`\n📤 Sending dev fee: ${ethers.formatUnits(devFee, 18)} tokens`);
-          const tx = await this.tokenContract!.transfer(this.devWalletAddress, devFee);
-          await tx.wait();
-          this.totalDevPaid += devFee;
-          console.log(`✅ Dev fee sent to ${this.devWalletAddress}`);
-        } catch (error: any) {
-          console.error(`❌ Dev fee transfer failed: ${error.message}`);
-          devFee = 0n;
-        }
+    // Prepare all transactions
+    const txPromises: Array<{
+      transfer: {to: string; amount: bigint};
+      txPromise: Promise<ethers.TransactionResponse>;
+    }> = [];
+
+    console.log(`\n📦 Preparing ${transfers.length} transfers...`);
+
+    for (const transfer of transfers) {
+      if (transfer.amount <= 0n) continue;
+      
+      try {
+        // Create transaction with specific nonce
+        const txPromise = this.tokenContract.transfer(transfer.to, transfer.amount, {
+          nonce: nonce,
+          // Add some gas buffer
+          gasLimit: 100000n,
+        });
+        
+        txPromises.push({ transfer, txPromise });
+        nonce++; // Increment nonce for next tx
+        
+        console.log(`  📤 Queued: ${ethers.formatUnits(transfer.amount, 18)} → ${transfer.to.slice(0, 10)}...`);
+      } catch (error: any) {
+        results.push({
+          to: transfer.to,
+          amount: ethers.formatUnits(transfer.amount, 18),
+          success: false,
+          error: error.message
+        });
       }
     }
+
+    // Send all transactions
+    console.log(`\n🚀 Sending ${txPromises.length} transactions...`);
     
-    // Step 2: Get remaining prize pool (75% of tax = 3%)
-    const winningNumber = this.generateWinningNumber(drawId);
-    const winnersData = snapshot.holders.filter(h => h.number === winningNumber);
-    const totalWinnerBalance = winnersData.reduce((sum, h) => sum + h.balance, 0n);
+    const sentTxs: Array<{
+      transfer: {to: string; amount: bigint};
+      tx: ethers.TransactionResponse;
+    }> = [];
+
+    for (const { transfer, txPromise } of txPromises) {
+      try {
+        const tx = await txPromise;
+        sentTxs.push({ transfer, tx });
+        console.log(`  ✓ Sent tx: ${tx.hash.slice(0, 16)}...`);
+      } catch (error: any) {
+        console.log(`  ✗ Failed to send: ${error.message}`);
+        results.push({
+          to: transfer.to,
+          amount: ethers.formatUnits(transfer.amount, 18),
+          success: false,
+          error: error.message
+        });
+      }
+    }
+
+    // Wait for all confirmations
+    console.log(`\n⏳ Waiting for ${sentTxs.length} confirmations...`);
     
-    // Recalculate prize pool after dev fee
-    let prizePool: bigint;
-    if (this.demoMode) {
-      prizePool = this.demoPrizePool;
-    } else {
-      await this.updateBalances();
-      prizePool = this.currentPrizePool;
+    const confirmPromises = sentTxs.map(async ({ transfer, tx }) => {
+      try {
+        const receipt = await tx.wait(1); // Wait for 1 confirmation
+        return {
+          to: transfer.to,
+          amount: ethers.formatUnits(transfer.amount, 18),
+          success: receipt?.status === 1,
+          txHash: tx.hash,
+        };
+      } catch (error: any) {
+        return {
+          to: transfer.to,
+          amount: ethers.formatUnits(transfer.amount, 18),
+          success: false,
+          txHash: tx.hash,
+          error: error.message
+        };
+      }
+    });
+
+    const confirmResults = await Promise.all(confirmPromises);
+    results.push(...confirmResults);
+
+    // Summary
+    const successful = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+    console.log(`\n📊 Transfer Summary: ${successful} success, ${failed} failed`);
+
+    return results;
+  }
+
+  private async executeDraw() {
+    if (this.isProcessingDraw) {
+      console.log('⚠️ Draw already in progress, skipping...');
+      return;
     }
     
-    const winners: WinnerShare[] = [];
+    this.isProcessingDraw = true;
     
-    // Step 3: Distribute prizes to winners
-    if (totalWinnerBalance > 0n && prizePool > 0n) {
-      for (const winner of winnersData) {
-        const prize = (winner.balance * prizePool) / totalWinnerBalance;
-        const sharePercent = Number((winner.balance * 10000n) / totalWinnerBalance) / 100;
+    try {
+      if (!this.currentSnapshot) {
+        this.takeSnapshot();
+      }
+      
+      const snapshot = this.currentSnapshot!;
+      this.currentDrawId++;
+      const drawId = this.currentDrawId;
+      
+      console.log('\n' + '='.repeat(50));
+      console.log('🎱 DRAW #' + drawId + ' STARTING');
+      console.log('='.repeat(50));
+      
+      // Get winning number
+      const winningNumber = this.generateWinningNumber(drawId);
+      console.log(`🎯 Winning Number: ${winningNumber}`);
+      
+      // Find winners
+      const winnersData = snapshot.holders.filter(h => h.number === winningNumber);
+      const totalWinnerBalance = winnersData.reduce((sum, h) => sum + h.balance, 0n);
+      
+      console.log(`👥 Winners found: ${winnersData.length}`);
+      
+      // Calculate amounts
+      let devFee = 0n;
+      let prizePool: bigint;
+      
+      if (this.demoMode) {
+        prizePool = this.demoPrizePool;
+        devFee = (prizePool * 25n) / 75n; // Calculate what 1% would be
+      } else {
+        await this.updateBalances();
+        devFee = (this.totalTaxBalance * BigInt(config.devSharePercent)) / 100n;
+        prizePool = this.currentPrizePool;
+      }
+      
+      console.log(`💰 Dev Fee (1%): ${ethers.formatUnits(devFee, 18)}`);
+      console.log(`🏆 Prize Pool (3%): ${ethers.formatUnits(prizePool, 18)}`);
+      
+      // Prepare all transfers
+      const transfers: Array<{to: string; amount: bigint; type: 'dev' | 'winner'}> = [];
+      const winners: WinnerShare[] = [];
+      
+      // Add dev fee transfer
+      if (devFee > 0n) {
+        transfers.push({ to: this.devWalletAddress, amount: devFee, type: 'dev' });
+      }
+      
+      // Calculate and add winner transfers
+      if (totalWinnerBalance > 0n && prizePool > 0n) {
+        for (const winner of winnersData) {
+          const prize = (winner.balance * prizePool) / totalWinnerBalance;
+          const sharePercent = Number((winner.balance * 10000n) / totalWinnerBalance) / 100;
+          
+          winners.push({
+            address: winner.address,
+            balance: ethers.formatUnits(winner.balance, 18),
+            sharePercent,
+            prize: ethers.formatUnits(prize, 18),
+          });
+          
+          if (prize > 0n) {
+            transfers.push({ to: winner.address, amount: prize, type: 'winner' });
+          }
+        }
+      }
+      
+      // Execute transfers
+      let transferStatus: 'pending' | 'success' | 'partial' | 'failed' = 'pending';
+      
+      if (this.autoTransferEnabled && !this.demoMode && transfers.length > 0) {
+        console.log(`\n💸 Processing ${transfers.length} transfers...`);
         
-        const winnerShare: WinnerShare = {
-          address: winner.address,
-          balance: ethers.formatUnits(winner.balance, 18),
-          sharePercent,
-          prize: ethers.formatUnits(prize, 18),
-        };
+        const results = await this.executeBatchTransfer(
+          transfers.map(t => ({ to: t.to, amount: t.amount }))
+        );
         
-        if (this.autoTransferEnabled && !this.demoMode && prize > 0n) {
-          try {
-            const tx = await this.tokenContract!.transfer(winner.address, prize);
-            const receipt = await tx.wait();
-            winnerShare.txHash = receipt.hash;
-            this.totalPrizePaid += prize;
-            console.log(`  ✅ Sent ${ethers.formatUnits(prize, 18)} to ${winner.address.slice(0, 10)}...`);
-          } catch (error: any) {
-            console.error(`  ❌ Transfer failed: ${error.message}`);
+        // Update winner txHashes
+        for (const result of results) {
+          // Check if it's dev fee
+          if (result.to.toLowerCase() === this.devWalletAddress.toLowerCase()) {
+            if (result.success) {
+              this.totalDevPaid += devFee;
+              console.log(`✅ Dev fee confirmed: ${result.txHash}`);
+            }
+            continue;
+          }
+          
+          // Find matching winner
+          const winner = winners.find(w => w.address.toLowerCase() === result.to.toLowerCase());
+          if (winner && result.success) {
+            winner.txHash = result.txHash;
+            this.totalPrizePaid += ethers.parseUnits(winner.prize, 18);
           }
         }
         
-        winners.push(winnerShare);
+        // Determine overall status
+        const successful = results.filter(r => r.success).length;
+        if (successful === results.length) {
+          transferStatus = 'success';
+        } else if (successful > 0) {
+          transferStatus = 'partial';
+        } else {
+          transferStatus = 'failed';
+        }
+      } else if (this.demoMode) {
+        // Demo mode - simulate successful transfers
+        for (const winner of winners) {
+          winner.txHash = '0x' + 'demo'.repeat(16);
+        }
+        transferStatus = 'success';
       }
-    }
-    
-    const result: DrawResult = {
-      drawId,
-      timestamp: Math.floor(Date.now() / 1000),
-      winningNumber,
-      prizePool: ethers.formatUnits(prizePool, 18),
-      devFee: ethers.formatUnits(devFee, 18),
-      winnersCount: winners.length,
-      totalWinnerBalance: ethers.formatUnits(totalWinnerBalance, 18),
-      winners,
-      snapshotHash: snapshot.hash,
-      autoTransfer: this.autoTransferEnabled && !this.demoMode,
-    };
-    
-    this.drawHistory.unshift(result);
-    if (this.drawHistory.length > 100) {
-      this.drawHistory.pop();
-    }
-    
-    this.currentSnapshot = null;
-    
-    console.log('\n🎉 DRAW COMPLETE!');
-    console.log(`Draw #${drawId}`);
-    console.log(`Winning Number: ${winningNumber}`);
-    console.log(`Dev Fee (1%): ${result.devFee}`);
-    console.log(`Prize Pool (3%): ${result.prizePool}`);
-    console.log(`Winners: ${winners.length}`);
-    
-    if (!this.demoMode) {
-      await this.updateBalances();
-    }
-    
-    if (this.onDraw) {
-      console.log('📢 Broadcasting draw event...');
-      this.onDraw(result);
+      
+      // Build result
+      const result: DrawResult = {
+        drawId,
+        timestamp: Math.floor(Date.now() / 1000),
+        winningNumber,
+        prizePool: ethers.formatUnits(prizePool, 18),
+        devFee: ethers.formatUnits(devFee, 18),
+        winnersCount: winners.length,
+        totalWinnerBalance: ethers.formatUnits(totalWinnerBalance, 18),
+        winners,
+        snapshotHash: snapshot.hash,
+        autoTransfer: this.autoTransferEnabled && !this.demoMode,
+        transferStatus,
+      };
+      
+      // Save to history
+      this.drawHistory.unshift(result);
+      if (this.drawHistory.length > 100) {
+        this.drawHistory.pop();
+      }
+      
+      // Clear snapshot
+      this.currentSnapshot = null;
+      
+      // Summary
+      console.log('\n' + '='.repeat(50));
+      console.log('🎉 DRAW #' + drawId + ' COMPLETE');
+      console.log('='.repeat(50));
+      console.log(`Winning Number: ${winningNumber}`);
+      console.log(`Winners: ${winners.length}`);
+      console.log(`Transfer Status: ${transferStatus}`);
+      
+      // Update balances
+      if (!this.demoMode) {
+        await this.updateBalances();
+      }
+      
+      // Broadcast event
+      if (this.onDraw) {
+        console.log('📢 Broadcasting draw result...');
+        this.onDraw(result);
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Draw error:', error.message);
+    } finally {
+      this.isProcessingDraw = false;
     }
   }
 
@@ -370,11 +529,11 @@ export class AutoLottery {
 
   getStatus() {
     const timeUntilDraw = this.getTimeUntilDraw();
-    // Show only prize pool (3%), not total tax (4%)
     const prizePool = this.demoMode ? this.demoPrizePool : this.currentPrizePool;
     
     return {
       isRunning: this.isRunning,
+      isProcessingDraw: this.isProcessingDraw,
       currentDrawId: this.currentDrawId,
       timeUntilNextDraw: timeUntilDraw,
       hasSnapshot: !!this.currentSnapshot,
