@@ -7,8 +7,8 @@ const API_URL = import.meta.env.VITE_API_URL
 interface LotteryStatus {
   isRunning: boolean;
   currentDrawId: number;
-  lastDrawTime: number;
   timeUntilNextDraw: number;
+  nextDrawTime: number;
   hasSnapshot: boolean;
   prizePool: string;
   prizePoolWallet: string;
@@ -57,23 +57,34 @@ interface UserInfo {
 }
 
 /**
- * Real-time status hook with auto-reconnect and local countdown
+ * Calculate time until next draw (second :01 of every minute)
+ */
+function getTimeUntilNextDraw(): number {
+  const now = new Date();
+  const seconds = now.getSeconds();
+  
+  if (seconds === 0) {
+    return 1; // 1 second until :01
+  } else if (seconds >= 1) {
+    return 60 - seconds + 1; // Seconds until next :01
+  }
+  return 1;
+}
+
+/**
+ * Real-time status hook with local time-based countdown
  */
 export function useRealtimeStatus() {
   const [status, setStatus] = useState<LotteryStatus | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [latestDraw, setLatestDraw] = useState<DrawResult | null>(null);
-  const [localCountdown, setLocalCountdown] = useState(60);
-  const lastServerTime = useRef<number>(60);
+  const [localCountdown, setLocalCountdown] = useState(getTimeUntilNextDraw());
 
-  // Local countdown timer
+  // Local countdown based on actual time
   useEffect(() => {
     const timer = setInterval(() => {
-      setLocalCountdown(prev => {
-        if (prev <= 0) return lastServerTime.current;
-        return prev - 1;
-      });
-    }, 1000);
+      setLocalCountdown(getTimeUntilNextDraw());
+    }, 100); // Update frequently for accuracy
     return () => clearInterval(timer);
   }, []);
 
@@ -93,16 +104,12 @@ export function useRealtimeStatus() {
       eventSource.onerror = () => {
         setIsConnected(false);
         eventSource?.close();
-        // Reconnect after 3 seconds
         reconnectTimeout = setTimeout(connect, 3000);
       };
 
       eventSource.addEventListener('status', (event) => {
         const data = JSON.parse(event.data);
         setStatus(data);
-        // Sync local countdown with server
-        lastServerTime.current = data.timeUntilNextDraw;
-        setLocalCountdown(data.timeUntilNextDraw);
       });
 
       eventSource.addEventListener('draw', (event) => {
@@ -119,7 +126,7 @@ export function useRealtimeStatus() {
     };
   }, []);
 
-  // Return local countdown for smooth display
+  // Return local countdown for smooth, accurate display
   const effectiveStatus = status ? {
     ...status,
     timeUntilNextDraw: localCountdown

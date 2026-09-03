@@ -30,6 +30,7 @@ interface DrawResult {
 
 /**
  * Automated Lottery Service
+ * Draws at second :01 of every minute (e.g., 3:00:01, 3:01:01, 3:02:01)
  */
 export class AutoLottery {
   private provider: ethers.JsonRpcProvider | null = null;
@@ -47,9 +48,7 @@ export class AutoLottery {
   
   // Lottery state
   private currentDrawId = 0;
-  private lastDrawTime = 0;
-  private drawInterval = 60;
-  private snapshotLeadTime = 10;
+  private snapshotLeadTime = 10; // Snapshot 10 seconds before draw
   
   // Current snapshot
   private currentSnapshot: {
@@ -63,7 +62,7 @@ export class AutoLottery {
   private drawHistory: DrawResult[] = [];
   
   // Timers
-  private intervalTimer: NodeJS.Timeout | null = null;
+  private intervalTimer: ReturnType<typeof setInterval> | null = null;
   private isRunning = false;
   
   // Auto transfer
@@ -96,10 +95,31 @@ export class AutoLottery {
         this.prizePoolWallet || this.provider
       );
     }
+  }
+
+  /**
+   * Get next draw time (second :01 of next minute)
+   */
+  private getNextDrawTime(): number {
+    const now = new Date();
+    const next = new Date(now);
+    next.setSeconds(1, 0); // Set to :01
     
-    // Calculate last draw time based on fixed interval (so it doesn't reset on restart)
+    // If we're past :01 this minute, go to next minute
+    if (now.getSeconds() >= 1) {
+      next.setMinutes(next.getMinutes() + 1);
+    }
+    
+    return Math.floor(next.getTime() / 1000);
+  }
+
+  /**
+   * Get time until next draw in seconds
+   */
+  private getTimeUntilDraw(): number {
     const now = Math.floor(Date.now() / 1000);
-    this.lastDrawTime = now - (now % this.drawInterval);
+    const nextDraw = this.getNextDrawTime();
+    return Math.max(0, nextDraw - now);
   }
 
   start() {
@@ -108,7 +128,7 @@ export class AutoLottery {
     
     console.log('\n🎱 Starting Balls Lottery');
     console.log(`Prize Pool: ${this.prizePoolAddress}`);
-    console.log(`Draw Interval: ${this.drawInterval}s`);
+    console.log(`Draw Time: Every minute at :01`);
     console.log(`Mode: ${this.demoMode ? 'Demo' : 'Live'}`);
     
     // Check every second
@@ -147,15 +167,16 @@ export class AutoLottery {
   }
 
   private tick() {
-    const now = Math.floor(Date.now() / 1000);
-    const nextDrawTime = this.lastDrawTime + this.drawInterval;
-    const snapshotTime = nextDrawTime - this.snapshotLeadTime;
+    const timeUntil = this.getTimeUntilDraw();
+    const snapshotTime = this.snapshotLeadTime;
     
-    if (!this.currentSnapshot && now >= snapshotTime && now < nextDrawTime) {
+    // Take snapshot 10 seconds before draw
+    if (!this.currentSnapshot && timeUntil <= snapshotTime && timeUntil > 0) {
       this.takeSnapshot();
     }
     
-    if (now >= nextDrawTime && this.currentSnapshot) {
+    // Execute draw at :01
+    if (timeUntil === 0 && this.currentSnapshot) {
       this.executeDraw();
     }
   }
@@ -202,7 +223,6 @@ export class AutoLottery {
     
     this.currentDrawId++;
     const drawId = this.currentDrawId;
-    this.lastDrawTime = Math.floor(Date.now() / 1000);
     
     console.log('\n🎱 Drawing...');
     
@@ -246,7 +266,7 @@ export class AutoLottery {
     
     const result: DrawResult = {
       drawId,
-      timestamp: this.lastDrawTime,
+      timestamp: Math.floor(Date.now() / 1000),
       winningNumber,
       prizePool: ethers.formatUnits(prizePool, 18),
       winnersCount: winners.length,
@@ -299,17 +319,14 @@ export class AutoLottery {
   }
 
   getStatus() {
-    const now = Math.floor(Date.now() / 1000);
-    const nextDrawTime = this.lastDrawTime + this.drawInterval;
-    const timeUntilDraw = Math.max(0, nextDrawTime - now);
-    
+    const timeUntilDraw = this.getTimeUntilDraw();
     const prizePool = this.demoMode ? this.demoPrizePool : this.currentPrizePool;
     
     return {
       isRunning: this.isRunning,
       currentDrawId: this.currentDrawId,
-      lastDrawTime: this.lastDrawTime,
       timeUntilNextDraw: timeUntilDraw,
+      nextDrawTime: this.getNextDrawTime(),
       hasSnapshot: !!this.currentSnapshot,
       prizePool: ethers.formatUnits(prizePool, 18),
       prizePoolWallet: this.prizePoolAddress,
