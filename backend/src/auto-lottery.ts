@@ -30,7 +30,7 @@ interface DrawResult {
 
 /**
  * Automated Lottery Service
- * Draws at second :01 of every minute (e.g., 3:00:01, 3:01:01, 3:02:01)
+ * Draws at second :01 of every minute
  */
 export class AutoLottery {
   private provider: ethers.JsonRpcProvider | null = null;
@@ -48,7 +48,6 @@ export class AutoLottery {
   
   // Lottery state
   private currentDrawId = 0;
-  private snapshotLeadTime = 10; // Snapshot 10 seconds before draw
   
   // Current snapshot
   private currentSnapshot: {
@@ -68,8 +67,9 @@ export class AutoLottery {
   // Auto transfer
   private autoTransferEnabled = false;
   
-  // Track last draw to prevent duplicates
+  // Track state
   private lastDrawMinute = -1;
+  private snapshotTakenForMinute = -1;
   
   // Event callbacks
   public onDraw: ((result: DrawResult) => void) | null = null;
@@ -79,7 +79,6 @@ export class AutoLottery {
     this.holderTracker = holderTracker;
     this.prizePoolAddress = config.prizePoolWallet;
     
-    // Check demo mode
     if (!config.tokenAddress) {
       console.log('🎮 Lottery running in demo mode');
       this.demoMode = true;
@@ -101,28 +100,14 @@ export class AutoLottery {
   }
 
   /**
-   * Get next draw time (second :01 of next minute)
-   */
-  private getNextDrawTime(): number {
-    const now = new Date();
-    const next = new Date(now);
-    next.setSeconds(1, 0); // Set to :01
-    
-    // If we're past :01 this minute, go to next minute
-    if (now.getSeconds() >= 1) {
-      next.setMinutes(next.getMinutes() + 1);
-    }
-    
-    return Math.floor(next.getTime() / 1000);
-  }
-
-  /**
-   * Get time until next draw in seconds
+   * Get time until next :01
    */
   private getTimeUntilDraw(): number {
-    const now = Math.floor(Date.now() / 1000);
-    const nextDraw = this.getNextDrawTime();
-    return Math.max(0, nextDraw - now);
+    const now = new Date();
+    const seconds = now.getSeconds();
+    if (seconds === 0) return 1;
+    if (seconds >= 1) return 61 - seconds;
+    return 1;
   }
 
   start() {
@@ -134,12 +119,11 @@ export class AutoLottery {
     console.log(`Draw Time: Every minute at :01`);
     console.log(`Mode: ${this.demoMode ? 'Demo' : 'Live'}`);
     
-    // Check every second
+    // Check every 500ms for more accuracy
     this.intervalTimer = setInterval(() => {
       this.tick();
-    }, 1000);
+    }, 500);
     
-    // Update prize pool every 5 seconds (if not demo)
     if (!this.demoMode) {
       this.updatePrizePool();
       setInterval(() => this.updatePrizePool(), 5000);
@@ -174,16 +158,26 @@ export class AutoLottery {
     const currentMinute = now.getMinutes();
     const currentSecond = now.getSeconds();
     
-    const timeUntil = this.getTimeUntilDraw();
+    // Next minute for draw
+    const nextDrawMinute = (currentSecond >= 1) ? (currentMinute + 1) % 60 : currentMinute;
     
-    // Take snapshot 10 seconds before draw (at :51)
-    if (!this.currentSnapshot && currentSecond >= 51 && currentSecond <= 59) {
-      this.takeSnapshot();
+    // Take snapshot at :50-:59 (10 seconds before draw)
+    if (currentSecond >= 50 && currentSecond <= 59) {
+      if (this.snapshotTakenForMinute !== nextDrawMinute) {
+        this.snapshotTakenForMinute = nextDrawMinute;
+        this.takeSnapshot();
+      }
     }
     
-    // Execute draw at :01 (only once per minute)
-    if (currentSecond === 1 && currentMinute !== this.lastDrawMinute && this.currentSnapshot) {
+    // Execute draw at :01 or :02 (small window for reliability)
+    if ((currentSecond === 1 || currentSecond === 2) && currentMinute !== this.lastDrawMinute) {
       this.lastDrawMinute = currentMinute;
+      
+      // Take snapshot now if we don't have one
+      if (!this.currentSnapshot) {
+        this.takeSnapshot();
+      }
+      
       this.executeDraw();
     }
   }
@@ -222,24 +216,32 @@ export class AutoLottery {
     console.log(`Eligible: ${holders.length}`);
     console.log(`Prize Pool: ${ethers.formatUnits(prizePool, 18)}`);
     
-    this.onSnapshot?.(this.currentSnapshot);
+    if (this.onSnapshot) {
+      this.onSnapshot({
+        drawId: nextDrawId,
+        eligibleCount: holders.length,
+        hash,
+        timestamp
+      });
+    }
   }
 
   private async executeDraw() {
-    if (!this.currentSnapshot) return;
+    // Always ensure we have a snapshot
+    if (!this.currentSnapshot) {
+      this.takeSnapshot();
+    }
     
+    const snapshot = this.currentSnapshot!;
     this.currentDrawId++;
     const drawId = this.currentDrawId;
     
-    console.log('\n🎱 Drawing...');
+    console.log('\n🎱 DRAWING NOW!');
     
     const winningNumber = this.generateWinningNumber(drawId);
     
-    const winnersData = this.currentSnapshot.holders
-      .filter(h => h.number === winningNumber);
-    
+    const winnersData = snapshot.holders.filter(h => h.number === winningNumber);
     const totalWinnerBalance = winnersData.reduce((sum, h) => sum + h.balance, 0n);
-    
     const prizePool = this.demoMode ? this.demoPrizePool : this.currentPrizePool;
     
     const winners: WinnerShare[] = [];
@@ -256,7 +258,6 @@ export class AutoLottery {
           prize: ethers.formatUnits(prize, 18),
         };
         
-        // Auto transfer (only in live mode)
         if (this.autoTransferEnabled && !this.demoMode && prize > 0n) {
           try {
             const txHash = await this.transferPrize(winner.address, prize);
@@ -279,7 +280,7 @@ export class AutoLottery {
       winnersCount: winners.length,
       totalWinnerBalance: ethers.formatUnits(totalWinnerBalance, 18),
       winners,
-      snapshotHash: this.currentSnapshot.hash,
+      snapshotHash: snapshot.hash,
       autoTransfer: this.autoTransferEnabled && !this.demoMode,
     };
     
@@ -288,17 +289,26 @@ export class AutoLottery {
       this.drawHistory.pop();
     }
     
+    // Clear snapshot for next round
     this.currentSnapshot = null;
     
-    console.log('\n🎉 Draw Complete!');
+    console.log('\n🎉 DRAW COMPLETE!');
+    console.log(`Draw #${drawId}`);
     console.log(`Winning Number: ${winningNumber}`);
     console.log(`Winners: ${winners.length}`);
+    console.log(`Prize Pool: ${result.prizePool}`);
     
     if (!this.demoMode) {
       await this.updatePrizePool();
     }
     
-    this.onDraw?.(result);
+    // IMPORTANT: Trigger the draw event!
+    if (this.onDraw) {
+      console.log('📢 Broadcasting draw event...');
+      this.onDraw(result);
+    } else {
+      console.log('⚠️ No onDraw handler registered!');
+    }
   }
 
   private async transferPrize(to: string, amount: bigint): Promise<string> {
@@ -333,7 +343,6 @@ export class AutoLottery {
       isRunning: this.isRunning,
       currentDrawId: this.currentDrawId,
       timeUntilNextDraw: timeUntilDraw,
-      nextDrawTime: this.getNextDrawTime(),
       hasSnapshot: !!this.currentSnapshot,
       prizePool: ethers.formatUnits(prizePool, 18),
       prizePoolWallet: this.prizePoolAddress,

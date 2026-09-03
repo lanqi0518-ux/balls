@@ -13,26 +13,37 @@ function App() {
   const { status, isConnected, latestDraw } = useRealtimeStatus()
   const { draws, refetch: refetchDraws } = useRecentDraws(10)
   const [showDrawAnimation, setShowDrawAnimation] = useState(false)
-  const [currentDraw, setCurrentDraw] = useState<typeof latestDraw>(null)
+  const [animationResult, setAnimationResult] = useState<typeof latestDraw>(null)
   const [notifications, setNotifications] = useState<string[]>([])
-  const lastDrawId = useRef(0)
+  const processedDraws = useRef<Set<number>>(new Set())
 
-  // Show animation when new draw comes in
+  // Handle new draw
   useEffect(() => {
-    if (latestDraw && latestDraw.drawId > lastDrawId.current) {
-      lastDrawId.current = latestDraw.drawId
-      setCurrentDraw(latestDraw)
+    if (latestDraw && !processedDraws.current.has(latestDraw.drawId)) {
+      console.log('🎰 New draw received:', latestDraw)
+      processedDraws.current.add(latestDraw.drawId)
+      
+      // Show animation
+      setAnimationResult(latestDraw)
       setShowDrawAnimation(true)
+      
+      // Refresh draws list
       refetchDraws()
-      addNotification(`🎱 Draw #${latestDraw.drawId} complete! Winning number: ${latestDraw.winningNumber}`)
+      
+      // Add notification
+      addNotification(`🎱 Draw #${latestDraw.drawId}! Winning number: ${latestDraw.winningNumber}`)
     }
-  }, [latestDraw])
+  }, [latestDraw, refetchDraws])
 
   const addNotification = (message: string) => {
-    setNotifications(prev => [...prev, message])
+    setNotifications(prev => [message, ...prev].slice(0, 3))
     setTimeout(() => {
-      setNotifications(prev => prev.slice(1))
+      setNotifications(prev => prev.slice(0, -1))
     }, 5000)
+  }
+
+  const closeAnimation = () => {
+    setShowDrawAnimation(false)
   }
 
   return (
@@ -41,7 +52,7 @@ function App() {
       <header className="border-b border-white/5">
         <div className="container py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="ball ball-winning" style={{ width: 40, height: 40, fontSize: 16 }}>B</div>
+            <img src="/logo.png" alt="Balls" className="w-10 h-10 rounded-full" />
             <div>
               <h1 className="text-xl font-bold">Balls</h1>
               <p className="text-xs text-[var(--text-muted)]">On-Chain Lottery</p>
@@ -49,9 +60,9 @@ function App() {
           </div>
           
           <div className="flex items-center gap-4">
-            <div className="live-indicator">
-              <span className="live-dot" />
-              {isConnected ? 'LIVE' : 'CONNECTING...'}
+            <div className={`live-indicator ${!isConnected ? 'opacity-50' : ''}`}>
+              <span className={`live-dot ${!isConnected ? 'bg-red-500' : ''}`} />
+              {isConnected ? 'LIVE' : 'OFFLINE'}
             </div>
             
             {status?.demoMode && (
@@ -79,17 +90,17 @@ function App() {
       </div>
       
       {/* Draw Animation */}
-      {currentDraw && (
+      {showDrawAnimation && animationResult && (
         <LiveDrawAnimation
           isVisible={showDrawAnimation}
           result={{
-            drawId: currentDraw.drawId,
-            winningNumber: currentDraw.winningNumber,
-            winnersCount: currentDraw.winnersCount,
-            prizePool: currentDraw.prizePool,
-            winners: currentDraw.winners,
+            drawId: animationResult.drawId,
+            winningNumber: animationResult.winningNumber,
+            winnersCount: animationResult.winnersCount,
+            prizePool: animationResult.prizePool,
+            winners: animationResult.winners,
           }}
-          onClose={() => setShowDrawAnimation(false)}
+          onClose={closeAnimation}
         />
       )}
       
@@ -169,7 +180,7 @@ function App() {
         {/* Footer */}
         <footer className="text-center py-12 mt-12 border-t border-white/5">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <div className="ball ball-small ball-winning">B</div>
+            <img src="/logo.png" alt="Balls" className="w-10 h-10 rounded-full" />
             <span className="text-lg font-bold" style={{ color: 'var(--green-primary)' }}>Balls</span>
           </div>
           <p className="text-[var(--text-muted)] text-sm">
