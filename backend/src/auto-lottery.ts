@@ -6,7 +6,6 @@ import { config } from './config.js';
 const ERC20_ABI = [
   'function balanceOf(address) view returns (uint256)',
   'function transfer(address to, uint256 amount) returns (bool)',
-  'function decimals() view returns (uint8)',
 ];
 
 interface WinnerShare {
@@ -31,10 +30,9 @@ interface DrawResult {
 
 /**
  * Automated Lottery Service
- * Reads prize pool balance in real-time, distributes by holding ratio
  */
 export class AutoLottery {
-  private provider: ethers.JsonRpcProvider;
+  private provider: ethers.JsonRpcProvider | null = null;
   private prizePoolWallet: ethers.Wallet | null = null;
   private tokenContract: ethers.Contract | null = null;
   private holderTracker: HolderTracker;
@@ -42,6 +40,10 @@ export class AutoLottery {
   // Prize pool
   private prizePoolAddress: string;
   private currentPrizePool = 0n;
+  
+  // Demo mode
+  private demoMode = false;
+  private demoPrizePool = 100000n * 10n ** 18n;
   
   // Lottery state
   private currentDrawId = 0;
@@ -60,9 +62,6 @@ export class AutoLottery {
   // History
   private drawHistory: DrawResult[] = [];
   
-  // Stats
-  private totalDistributed = 0n;
-  
   // Timers
   private intervalTimer: NodeJS.Timeout | null = null;
   private isRunning = false;
@@ -73,37 +72,29 @@ export class AutoLottery {
   // Event callbacks
   public onDraw: ((result: DrawResult) => void) | null = null;
   public onSnapshot: ((snapshot: any) => void) | null = null;
-  public onTransfer: ((winner: string, amount: string, txHash: string) => void) | null = null;
 
   constructor(holderTracker: HolderTracker) {
     this.holderTracker = holderTracker;
-    this.provider = new ethers.JsonRpcProvider(config.rpcUrl);
     this.prizePoolAddress = config.prizePoolWallet;
     
-    // Setup prize pool wallet (for auto transfer)
-    if (config.prizePoolPrivateKey) {
-      this.prizePoolWallet = new ethers.Wallet(config.prizePoolPrivateKey, this.provider);
-      this.autoTransferEnabled = true;
-      console.log('✅ Prize pool wallet configured, auto transfer enabled');
+    // Check demo mode
+    if (!config.tokenAddress) {
+      console.log('🎮 Lottery running in demo mode');
+      this.demoMode = true;
     } else {
-      console.log('⚠️ Prize pool private key not set, auto transfer disabled');
-    }
-    
-    // Setup token contract
-    if (config.tokenAddress) {
-      if (this.prizePoolWallet) {
-        this.tokenContract = new ethers.Contract(
-          config.tokenAddress,
-          ERC20_ABI,
-          this.prizePoolWallet
-        );
-      } else {
-        this.tokenContract = new ethers.Contract(
-          config.tokenAddress,
-          ERC20_ABI,
-          this.provider
-        );
+      this.provider = new ethers.JsonRpcProvider(config.rpcUrl);
+      
+      if (config.prizePoolPrivateKey) {
+        this.prizePoolWallet = new ethers.Wallet(config.prizePoolPrivateKey, this.provider);
+        this.autoTransferEnabled = true;
+        console.log('✅ Auto transfer enabled');
       }
+      
+      this.tokenContract = new ethers.Contract(
+        config.tokenAddress,
+        ERC20_ABI,
+        this.prizePoolWallet || this.provider
+      );
     }
     
     this.lastDrawTime = Math.floor(Date.now() / 1000);
@@ -116,21 +107,18 @@ export class AutoLottery {
     console.log('\n🎱 Starting Balls Lottery');
     console.log(`Prize Pool: ${this.prizePoolAddress}`);
     console.log(`Draw Interval: ${this.drawInterval}s`);
-    console.log(`Distribution: By holding ratio`);
-    console.log(`Auto Transfer: ${this.autoTransferEnabled ? '✅ Enabled' : '❌ Disabled'}`);
-    
-    // Get initial prize pool balance
-    this.updatePrizePool();
+    console.log(`Mode: ${this.demoMode ? 'Demo' : 'Live'}`);
     
     // Check every second
     this.intervalTimer = setInterval(() => {
       this.tick();
     }, 1000);
     
-    // Update prize pool every 5 seconds
-    setInterval(() => {
+    // Update prize pool every 5 seconds (if not demo)
+    if (!this.demoMode) {
       this.updatePrizePool();
-    }, 5000);
+      setInterval(() => this.updatePrizePool(), 5000);
+    }
   }
 
   stop() {
@@ -142,14 +130,11 @@ export class AutoLottery {
     }
     
     this.isRunning = false;
-    console.log('Lottery service stopped');
+    console.log('Lottery stopped');
   }
 
-  /**
-   * Read prize pool wallet token balance
-   */
   private async updatePrizePool() {
-    if (!this.tokenContract) return;
+    if (!this.tokenContract || this.demoMode) return;
     
     try {
       const balance = await this.tokenContract.balanceOf(this.prizePoolAddress);
@@ -200,10 +185,12 @@ export class AutoLottery {
       hash,
     };
     
+    const prizePool = this.demoMode ? this.demoPrizePool : this.currentPrizePool;
+    
     console.log('\n📸 Snapshot Locked');
     console.log(`Draw: #${nextDrawId}`);
-    console.log(`Eligible: ${holders.length} participants`);
-    console.log(`Prize Pool: ${ethers.formatUnits(this.currentPrizePool, 18)} tokens`);
+    console.log(`Eligible: ${holders.length}`);
+    console.log(`Prize Pool: ${ethers.formatUnits(prizePool, 18)}`);
     
     this.onSnapshot?.(this.currentSnapshot);
   }
@@ -217,20 +204,15 @@ export class AutoLottery {
     
     console.log('\n🎱 Drawing...');
     
-    // Generate winning number
     const winningNumber = this.generateWinningNumber(drawId);
     
-    // Find winners
     const winnersData = this.currentSnapshot.holders
       .filter(h => h.number === winningNumber);
     
-    // Total winner balance
     const totalWinnerBalance = winnersData.reduce((sum, h) => sum + h.balance, 0n);
     
-    // Current prize pool
-    const prizePool = this.currentPrizePool;
+    const prizePool = this.demoMode ? this.demoPrizePool : this.currentPrizePool;
     
-    // Distribute by ratio
     const winners: WinnerShare[] = [];
     
     if (totalWinnerBalance > 0n && prizePool > 0n) {
@@ -245,13 +227,12 @@ export class AutoLottery {
           prize: ethers.formatUnits(prize, 18),
         };
         
-        // Auto transfer
-        if (this.autoTransferEnabled && prize > 0n) {
+        // Auto transfer (only in live mode)
+        if (this.autoTransferEnabled && !this.demoMode && prize > 0n) {
           try {
             const txHash = await this.transferPrize(winner.address, prize);
             winnerShare.txHash = txHash;
-            console.log(`  ✅ Sent to ${winner.address.slice(0, 10)}... | ${ethers.formatUnits(prize, 18)} tokens`);
-            this.onTransfer?.(winner.address, ethers.formatUnits(prize, 18), txHash);
+            console.log(`  ✅ Sent to ${winner.address.slice(0, 10)}...`);
           } catch (error: any) {
             console.error(`  ❌ Transfer failed: ${error.message}`);
           }
@@ -259,8 +240,6 @@ export class AutoLottery {
         
         winners.push(winnerShare);
       }
-      
-      this.totalDistributed += prizePool;
     }
     
     const result: DrawResult = {
@@ -272,7 +251,7 @@ export class AutoLottery {
       totalWinnerBalance: ethers.formatUnits(totalWinnerBalance, 18),
       winners,
       snapshotHash: this.currentSnapshot.hash,
-      autoTransfer: this.autoTransferEnabled,
+      autoTransfer: this.autoTransferEnabled && !this.demoMode,
     };
     
     this.drawHistory.unshift(result);
@@ -282,33 +261,17 @@ export class AutoLottery {
     
     this.currentSnapshot = null;
     
-    // Print result
     console.log('\n🎉 Draw Complete!');
-    console.log(`Draw: #${drawId}`);
     console.log(`Winning Number: ${winningNumber}`);
-    console.log(`Prize Pool: ${result.prizePool} tokens`);
     console.log(`Winners: ${winners.length}`);
     
-    if (winners.length > 0) {
-      console.log(`Total Winner Balance: ${result.totalWinnerBalance}`);
-      console.log('Distribution:');
-      for (const w of winners) {
-        const status = w.txHash ? `✅ ${w.txHash.slice(0, 10)}...` : '⏳ Pending';
-        console.log(`  ${w.address.slice(0, 10)}... | ${w.sharePercent.toFixed(2)}% | ${Number(w.prize).toFixed(2)} | ${status}`);
-      }
-    } else {
-      console.log('No winners this round, prize rolls over');
+    if (!this.demoMode) {
+      await this.updatePrizePool();
     }
-    
-    // Update prize pool balance
-    await this.updatePrizePool();
     
     this.onDraw?.(result);
   }
 
-  /**
-   * Transfer prize to winner
-   */
   private async transferPrize(to: string, amount: bigint): Promise<string> {
     if (!this.tokenContract || !this.prizePoolWallet) {
       throw new Error('Transfer not configured');
@@ -316,7 +279,6 @@ export class AutoLottery {
     
     const tx = await this.tokenContract.transfer(to, amount);
     const receipt = await tx.wait();
-    
     return receipt.hash;
   }
 
@@ -338,18 +300,18 @@ export class AutoLottery {
     const now = Math.floor(Date.now() / 1000);
     const nextDrawTime = this.lastDrawTime + this.drawInterval;
     const timeUntilDraw = Math.max(0, nextDrawTime - now);
-    const timeUntilSnapshot = Math.max(0, nextDrawTime - this.snapshotLeadTime - now);
+    
+    const prizePool = this.demoMode ? this.demoPrizePool : this.currentPrizePool;
     
     return {
       isRunning: this.isRunning,
       currentDrawId: this.currentDrawId,
       lastDrawTime: this.lastDrawTime,
       timeUntilNextDraw: timeUntilDraw,
-      timeUntilSnapshot: timeUntilSnapshot,
       hasSnapshot: !!this.currentSnapshot,
-      prizePool: ethers.formatUnits(this.currentPrizePool, 18),
+      prizePool: ethers.formatUnits(prizePool, 18),
       prizePoolWallet: this.prizePoolAddress,
-      autoTransferEnabled: this.autoTransferEnabled,
+      demoMode: this.demoMode,
       snapshot: this.currentSnapshot ? {
         drawId: this.currentSnapshot.drawId,
         eligibleCount: this.currentSnapshot.holders.length,
@@ -379,7 +341,6 @@ export class AutoLottery {
       };
     }
     
-    // Calculate share in same number group
     const sameNumberHolders = this.holderTracker.getEligibleHolders()
       .filter(h => h.number === holder.number);
     const totalInNumber = sameNumberHolders.reduce((sum, h) => sum + h.balance, 0n);

@@ -6,8 +6,8 @@ import { config } from './config.js';
  * Monitors Transfer events, automatically tracks all holding addresses
  */
 export class HolderTracker {
-  private provider: ethers.JsonRpcProvider;
-  private tokenContract: ethers.Contract;
+  private provider: ethers.JsonRpcProvider | null = null;
+  private tokenContract: ethers.Contract | null = null;
   
   // Holder data
   private holders: Map<string, {
@@ -24,14 +24,25 @@ export class HolderTracker {
   
   // Running state
   private isRunning = false;
+  
+  // Demo mode (no token address)
+  private demoMode = false;
 
   constructor() {
-    this.provider = new ethers.JsonRpcProvider(config.rpcUrl);
-    
     // Initialize number mapping
     for (let i = 1; i <= 50; i++) {
       this.numberToHolders.set(i, new Set());
     }
+    
+    // Check if token address is set
+    if (!config.tokenAddress) {
+      console.log('📋 Demo mode: No token address configured');
+      this.demoMode = true;
+      this.createDemoHolders();
+      return;
+    }
+    
+    this.provider = new ethers.JsonRpcProvider(config.rpcUrl);
     
     // ERC20 minimal ABI
     const erc20Abi = [
@@ -44,6 +55,33 @@ export class HolderTracker {
       erc20Abi,
       this.provider
     );
+  }
+  
+  /**
+   * Create demo holders for testing
+   */
+  private createDemoHolders() {
+    const demoAddresses = [
+      '0x1234567890123456789012345678901234567890',
+      '0x2345678901234567890123456789012345678901',
+      '0x3456789012345678901234567890123456789012',
+      '0x4567890123456789012345678901234567890123',
+      '0x5678901234567890123456789012345678901234',
+    ];
+    
+    for (const addr of demoAddresses) {
+      const number = this.getNumber(addr);
+      const balance = BigInt(Math.floor(Math.random() * 10000)) * 10n ** 18n;
+      
+      this.holders.set(addr.toLowerCase(), {
+        balance,
+        firstSeen: Math.floor(Date.now() / 1000) - 120,
+        number,
+      });
+      this.numberToHolders.get(number)?.add(addr.toLowerCase());
+    }
+    
+    console.log(`Created ${demoAddresses.length} demo holders`);
   }
 
   /**
@@ -72,16 +110,13 @@ export class HolderTracker {
   private updateHolder(address: string, balance: bigint) {
     const addr = address.toLowerCase();
     
-    // Ignore zero address and contract addresses
     if (addr === '0x0000000000000000000000000000000000000000') return;
     
     const existing = this.holders.get(addr);
     const number = this.getNumber(addr);
     
     if (balance > 0n) {
-      // Add or update
       if (!existing) {
-        // New holder
         this.holders.set(addr, {
           balance,
           firstSeen: Math.floor(Date.now() / 1000),
@@ -90,11 +125,9 @@ export class HolderTracker {
         this.numberToHolders.get(number)?.add(addr);
         console.log(`New holder: ${addr.slice(0, 10)}... Number: ${number}`);
       } else {
-        // Update balance
         existing.balance = balance;
       }
     } else {
-      // Remove
       if (existing) {
         this.holders.delete(addr);
         this.numberToHolders.get(existing.number)?.delete(addr);
@@ -110,60 +143,68 @@ export class HolderTracker {
     if (this.isRunning) return;
     this.isRunning = true;
     
+    if (this.demoMode) {
+      console.log('Holder tracker running in demo mode');
+      return;
+    }
+    
     console.log('Starting holder tracker...');
     console.log(`Token: ${config.tokenAddress}`);
     
-    // Load historical data
-    await this.loadHistoricalHolders();
-    
-    // Listen for new Transfer events
-    this.tokenContract.on('Transfer', async (from, to, value) => {
-      console.log(`Transfer: ${from.slice(0, 10)}... → ${to.slice(0, 10)}... (${ethers.formatUnits(value, 18)})`);
+    try {
+      // Load historical data
+      await this.loadHistoricalHolders();
       
-      // Update sender
-      if (from !== '0x0000000000000000000000000000000000000000') {
-        const fromBalance = await this.tokenContract.balanceOf(from);
-        this.updateHolder(from, fromBalance);
-      }
+      // Listen for new Transfer events
+      this.tokenContract?.on('Transfer', async (from, to, value) => {
+        console.log(`Transfer: ${from.slice(0, 10)}... → ${to.slice(0, 10)}... (${ethers.formatUnits(value, 18)})`);
+        
+        if (from !== '0x0000000000000000000000000000000000000000') {
+          const fromBalance = await this.tokenContract!.balanceOf(from);
+          this.updateHolder(from, fromBalance);
+        }
+        
+        if (to !== '0x0000000000000000000000000000000000000000') {
+          const toBalance = await this.tokenContract!.balanceOf(to);
+          this.updateHolder(to, toBalance);
+        }
+      });
       
-      // Update receiver
-      if (to !== '0x0000000000000000000000000000000000000000') {
-        const toBalance = await this.tokenContract.balanceOf(to);
-        this.updateHolder(to, toBalance);
-      }
-    });
-    
-    console.log('Transfer event listener started');
+      console.log('Transfer event listener started');
+    } catch (error) {
+      console.error('Failed to start holder tracker:', error);
+      console.log('Falling back to demo mode');
+      this.demoMode = true;
+      this.createDemoHolders();
+    }
   }
 
   /**
    * Load historical holders from chain events
    */
   private async loadHistoricalHolders() {
+    if (!this.tokenContract || !this.provider) return;
+    
     console.log('Loading historical holders...');
     
     try {
-      // Get recent blocks
       const currentBlock = await this.provider.getBlockNumber();
       const fromBlock = Math.max(0, currentBlock - 10000);
       
-      // Query Transfer events
       const filter = this.tokenContract.filters.Transfer();
       const events = await this.tokenContract.queryFilter(filter, fromBlock, currentBlock);
       
       console.log(`Found ${events.length} Transfer events`);
       
-      // Collect all involved addresses
       const addresses = new Set<string>();
       for (const event of events) {
         const log = event as ethers.EventLog;
         if (log.args) {
-          addresses.add(log.args[0]); // from
-          addresses.add(log.args[1]); // to
+          addresses.add(log.args[0]);
+          addresses.add(log.args[1]);
         }
       }
       
-      // Query balance for each address
       console.log(`Checking balances for ${addresses.size} addresses...`);
       
       for (const addr of addresses) {
@@ -175,7 +216,7 @@ export class HolderTracker {
             this.updateHolder(addr, balance);
           }
         } catch (e) {
-          // Ignore errors
+          // Ignore
         }
       }
       
@@ -191,7 +232,7 @@ export class HolderTracker {
   stop() {
     if (!this.isRunning) return;
     
-    this.tokenContract.removeAllListeners('Transfer');
+    this.tokenContract?.removeAllListeners('Transfer');
     this.isRunning = false;
     console.log('Holder tracker stopped');
   }
@@ -275,7 +316,6 @@ export class HolderTracker {
       number: h.number,
     }));
     
-    // Calculate hash
     const dataToHash = JSON.stringify({
       timestamp,
       holders: holders.sort((a, b) => a.address.localeCompare(b.address)),
