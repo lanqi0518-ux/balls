@@ -72,11 +72,23 @@ function App() {
             )}
             
             {status && (
-              <div className="text-xs md:text-sm text-[var(--text-secondary)]">
-                <span className="hidden sm:inline">{status.stats.eligibleHolders} participants</span>
-                <span className="sm:hidden">{status.stats.eligibleHolders}</span>
+              <div className="text-xs md:text-sm text-[var(--text-secondary)] hidden sm:block">
+                {status.stats.eligibleHolders} participants
               </div>
             )}
+            
+            <a 
+              href="https://twitter.com/ballsonrobin" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:opacity-80 transition-opacity"
+              style={{ color: 'var(--green-primary)' }}
+              title="@ballsonrobin"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+            </a>
           </div>
         </div>
       </header>
@@ -184,9 +196,21 @@ function App() {
             <img src="/logo.svg" alt="Balls" className="w-8 h-8 md:w-10 md:h-10" />
             <span className="text-base md:text-lg font-bold" style={{ color: 'var(--green-primary)' }}>Balls</span>
           </div>
-          <p className="text-[var(--text-muted)] text-xs md:text-sm">
+          <p className="text-[var(--text-muted)] text-xs md:text-sm mb-3">
             Built on Robinhood Chain · Fully Automated
           </p>
+          <a 
+            href="https://twitter.com/ballsonrobin" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-xs md:text-sm hover:opacity-80 transition-opacity"
+            style={{ color: 'var(--green-primary)' }}
+          >
+            <svg className="w-4 h-4 md:w-5 md:h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+            </svg>
+            @ballsonrobin
+          </a>
         </footer>
       </main>
     </div>
