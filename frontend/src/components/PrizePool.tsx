@@ -2,15 +2,17 @@ import { useState, useEffect } from 'react'
 
 interface Props {
   prizePool: string
+  prizePoolUsd?: string
+  ethPriceUsd?: number
   prizePoolWallet?: string
 }
 
-export function PrizePool({ prizePool, prizePoolWallet }: Props) {
+export function PrizePool({ prizePool, prizePoolUsd, ethPriceUsd, prizePoolWallet }: Props) {
   const [displayValue, setDisplayValue] = useState(0)
   const [isIncreasing, setIsIncreasing] = useState(false)
 
   useEffect(() => {
-    const targetValue = Number(prizePool) || 0
+    const targetValue = Number(prizePoolUsd) || 0
     const currentValue = displayValue
     
     if (targetValue > currentValue) {
@@ -34,25 +36,37 @@ export function PrizePool({ prizePool, prizePoolWallet }: Props) {
     }, duration / steps)
     
     return () => clearInterval(timer)
-  }, [prizePool])
+  }, [prizePoolUsd])
+
+  const ethAmount = Number(prizePool) || 0
 
   return (
     <div className="prize-pool">
       <div className="prize-label">Current Jackpot</div>
       
+      {/* USD Value - Main Display */}
       <div 
         className={`prize-amount transition-transform duration-300 ${isIncreasing ? 'scale-105' : ''}`}
       >
-        {displayValue.toLocaleString(undefined, {
-          maximumFractionDigits: 0,
+        ${displayValue.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
         })}
       </div>
       
-      <div className="text-[var(--text-muted)] text-sm md:text-lg font-semibold mt-1 md:mt-2">
-        BALLS
+      {/* ETH Amount */}
+      <div className="text-[var(--text-secondary)] text-sm md:text-lg font-semibold mt-1 md:mt-2">
+        {ethAmount.toFixed(4)} ETH
       </div>
       
-      {/* 奖池钱包 */}
+      {/* ETH Price */}
+      {ethPriceUsd && ethPriceUsd > 0 && (
+        <div className="text-[var(--text-muted)] text-xs mt-1">
+          ETH = ${ethPriceUsd.toLocaleString()}
+        </div>
+      )}
+      
+      {/* Prize Pool Wallet */}
       {prizePoolWallet && (
         <div className="mt-4 md:mt-6 flex items-center justify-center gap-2 flex-wrap">
           <span className="text-[var(--text-muted)] text-[10px] md:text-xs">Prize Pool:</span>
@@ -68,7 +82,7 @@ export function PrizePool({ prizePool, prizePoolWallet }: Props) {
         </div>
       )}
       
-      {/* 实时指示器 */}
+      {/* Live Indicator */}
       <div className="mt-3 md:mt-4 flex justify-center">
         <div className="live-indicator">
           <span className="live-dot" />

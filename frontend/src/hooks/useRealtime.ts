@@ -10,9 +10,23 @@ interface LotteryStatus {
   timeUntilNextDraw: number;
   nextDrawTime: number;
   hasSnapshot: boolean;
+  // ETH-based prize pool
   prizePool: string;
-  prizePoolWallet: string;
+  prizePoolUsd: string;
+  ethBalance: string;
+  ethBalanceUsd: string;
+  ethPriceUsd: number;
+  prizeInEth?: boolean;
+  // Wallets
+  taxReceiverWallet: string;
+  devWallet: string;
+  // Status
+  hasEnoughForTransfers?: boolean;
+  autoTransferEnabled?: boolean;
   demoMode?: boolean;
+  // Stats
+  totalDraws?: number;
+  failedTransfers?: number;
   snapshot: {
     drawId: number;
     eligibleCount: number;
@@ -21,6 +35,8 @@ interface LotteryStatus {
   stats: {
     totalHolders: number;
     eligibleHolders: number;
+    holdersWithTime?: number;
+    topHoldersLimit?: number;
     minHoldingDuration: number;
   };
 }

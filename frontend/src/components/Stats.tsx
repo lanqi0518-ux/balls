@@ -33,7 +33,7 @@ export function Stats({ totalDraws, totalHolders, eligibleHolders }: Props) {
       <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-white/5 grid grid-cols-4 gap-2 md:gap-4 text-center">
         <div>
           <div className="text-base md:text-lg font-bold">4%</div>
-          <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Tax</div>
+          <div className="text-[10px] md:text-xs text-[var(--text-muted)]">ETH Tax</div>
         </div>
         <div>
           <div className="text-base md:text-lg font-bold" style={{ color: 'var(--green-primary)' }}>Top 200</div>
@@ -44,8 +44,8 @@ export function Stats({ totalDraws, totalHolders, eligibleHolders }: Props) {
           <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Numbers</div>
         </div>
         <div>
-          <div className="text-base md:text-lg font-bold">1 min</div>
-          <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Interval</div>
+          <div className="text-base md:text-lg font-bold">ETH</div>
+          <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Prize</div>
         </div>
       </div>
     </div>

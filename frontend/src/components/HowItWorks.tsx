@@ -17,8 +17,8 @@ export function HowItWorks() {
     },
     {
       num: '04',
-      title: 'Win by Ratio',
-      desc: 'Winners split prize pool based on their holding ratio',
+      title: 'Win ETH',
+      desc: 'Winners split ETH prize pool based on their BALLS holding ratio',
     },
   ]
 
@@ -47,21 +47,21 @@ export function HowItWorks() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         <div className="p-4 md:p-6 rounded-lg" style={{ background: 'var(--bg-dark)' }}>
           <h4 className="text-sm md:text-base font-bold mb-3 md:mb-4" style={{ color: 'var(--green-primary)' }}>
-            Tax Distribution
+            Tax Distribution (ETH)
           </h4>
           <div className="space-y-2 md:space-y-3 text-sm">
             <div className="flex justify-between">
               <span className="text-[var(--text-muted)]">Transaction Tax</span>
-              <span className="font-bold">4%</span>
+              <span className="font-bold">4% ETH</span>
             </div>
             <div className="h-px bg-white/10" />
             <div className="flex justify-between">
               <span className="text-[var(--text-muted)]">→ Prize Pool</span>
-              <span style={{ color: 'var(--green-primary)' }}>3%</span>
+              <span style={{ color: 'var(--green-primary)' }}>3% ETH</span>
             </div>
             <div className="flex justify-between">
               <span className="text-[var(--text-muted)]">→ Developer</span>
-              <span>1%</span>
+              <span>1% ETH</span>
             </div>
           </div>
         </div>
@@ -72,11 +72,11 @@ export function HowItWorks() {
           </h4>
           <div className="text-xs md:text-sm text-[var(--text-muted)] space-y-2">
             <p>
-              When your number wins, the prize is split among all winners 
-              based on their token holdings.
+              When your number wins, the ETH prize is split among all winners 
+              based on their BALLS token holdings.
             </p>
             <p className="font-mono text-[10px] md:text-xs" style={{ color: 'var(--green-primary)' }}>
-              Your Prize = (Your Balance / Total Balance) × Pool
+              Your ETH = (Your BALLS / Total BALLS) × ETH Pool
             </p>
           </div>
         </div>

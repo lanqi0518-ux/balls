@@ -84,7 +84,7 @@ export function LiveDrawAnimation({ isVisible, result, onClose }: Props) {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl md:text-3xl font-bold" style={{ color: 'var(--green-primary)' }}>
-                    {Number(result.prizePool).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    {Number(result.prizePool).toFixed(4)} ETH
                   </div>
                   <div className="text-xs md:text-sm text-[var(--text-muted)]">Prize Pool</div>
                 </div>
@@ -99,7 +99,7 @@ export function LiveDrawAnimation({ isVisible, result, onClose }: Props) {
                   No winners - Prize accumulates to next draw
                 </div>
                 <div className="text-lg md:text-xl font-bold mt-3 md:mt-4" style={{ color: 'var(--green-primary)' }}>
-                  {Number(result.prizePool).toLocaleString(undefined, { maximumFractionDigits: 0 })} + Next Round
+                  {Number(result.prizePool).toFixed(4)} ETH + Next Round
                 </div>
               </div>
             )}
@@ -126,13 +126,13 @@ export function LiveDrawAnimation({ isVisible, result, onClose }: Props) {
                           {winner.address.slice(0, 6)}...{winner.address.slice(-4)}
                         </div>
                         <div className="text-[10px] md:text-xs text-[var(--text-muted)]">
-                          Balance: {Number(winner.balance).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                          {Number(winner.balance).toLocaleString(undefined, { maximumFractionDigits: 0 })} BALLS
                         </div>
                       </div>
                       
                       <div className="text-right">
                         <div className="text-sm md:text-base font-bold" style={{ color: 'var(--green-primary)' }}>
-                          +{Number(winner.prize).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                          +{Number(winner.prize).toFixed(4)} ETH
                         </div>
                         <div className="text-[10px] md:text-xs" style={{ color: 'var(--purple)' }}>
                           {winner.sharePercent.toFixed(1)}%

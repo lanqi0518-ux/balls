@@ -2,12 +2,39 @@ import { ethers } from 'ethers';
 import { HolderTracker } from './holder-tracker.js';
 import { config } from './config.js';
 
-// ERC20 ABI
+// ERC20 ABI (for token holder tracking only)
 const ERC20_ABI = [
   'function balanceOf(address) view returns (uint256)',
   'function transfer(address to, uint256 amount) returns (bool)',
   'function decimals() view returns (uint8)',
 ];
+
+// ETH price cache
+let ethPriceUsd = 0;
+let lastPriceUpdate = 0;
+
+/**
+ * Fetch ETH price in USD
+ */
+async function fetchEthPrice(): Promise<number> {
+  const now = Date.now();
+  // Cache for 60 seconds
+  if (ethPriceUsd > 0 && now - lastPriceUpdate < 60000) {
+    return ethPriceUsd;
+  }
+  
+  try {
+    const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
+    const data = await response.json();
+    ethPriceUsd = data.ethereum?.usd || 0;
+    lastPriceUpdate = now;
+    console.log(`💵 ETH Price: $${ethPriceUsd}`);
+    return ethPriceUsd;
+  } catch (error: any) {
+    console.error('Failed to fetch ETH price:', error.message);
+    return ethPriceUsd || 2500; // Fallback
+  }
+}
 
 interface TransferResult {
   to: string;
@@ -55,10 +82,10 @@ export class AutoLottery {
   private taxReceiverAddress: string;
   private devWalletAddress: string;
   
-  // Balances
-  private currentPrizePool = 0n;
-  private totalTaxBalance = 0n;
-  private nativeBalance = 0n; // Gas balance
+  // Balances (all in ETH now, since tax is collected in ETH)
+  private ethBalance = 0n; // Total ETH in tax receiver wallet
+  private currentPrizePool = 0n; // 75% for prizes
+  private ethPriceUsd = 0; // ETH price in USD
   
   // Demo mode
   private demoMode = false;
@@ -177,32 +204,30 @@ export class AutoLottery {
   }
 
   /**
-   * Update all balances (token + native gas)
+   * Update ETH balance and price
    */
   private async updateBalances() {
-    if (!this.tokenContract || !this.provider || this.demoMode) return;
+    if (!this.provider || this.demoMode) return;
     
     try {
-      // Token balance
-      const tokenBalance = await this.tokenContract.balanceOf(this.taxReceiverAddress);
-      this.totalTaxBalance = tokenBalance;
-      this.currentPrizePool = (tokenBalance * 75n) / 100n;
+      // Get ETH balance (tax is collected in ETH)
+      this.ethBalance = await this.provider.getBalance(this.taxReceiverAddress);
+      this.currentPrizePool = (this.ethBalance * 75n) / 100n; // 75% for prizes
       
-      // Native balance for gas
-      if (this.taxReceiverWallet) {
-        this.nativeBalance = await this.provider.getBalance(this.taxReceiverAddress);
-      }
+      // Update ETH price
+      this.ethPriceUsd = await fetchEthPrice();
     } catch (error: any) {
       console.error('❌ Failed to update balance:', error.message);
     }
   }
 
   /**
-   * Check if we have enough gas for transfers
+   * Check if we have enough ETH for transfers (need some reserve for gas)
    */
-  private hasEnoughGas(): boolean {
+  private hasEnoughForTransfers(): boolean {
     if (this.demoMode) return true;
-    return this.nativeBalance >= this.MIN_GAS_BALANCE;
+    // Need at least 0.01 ETH reserve for gas after transfers
+    return this.ethBalance > this.MIN_GAS_BALANCE;
   }
 
   private tick() {
@@ -253,8 +278,11 @@ export class AutoLottery {
     
     const prizePool = this.demoMode ? this.demoPrizePool : this.currentPrizePool;
     
+    const prizePoolEth = ethers.formatEther(prizePool);
+    const prizeUsd = (parseFloat(prizePoolEth) * this.ethPriceUsd).toFixed(2);
+    
     console.log('\n📸 Snapshot Locked (Top 200 Holders)');
-    console.log(`Draw: #${nextDrawId} | Eligible: ${holders.length} | Prize Pool: ${ethers.formatUnits(prizePool, 18)}`);
+    console.log(`Draw: #${nextDrawId} | Eligible: ${holders.length} | Prize Pool: ${prizePoolEth} ETH ($${prizeUsd})`);
     
     if (this.onSnapshot) {
       this.onSnapshot({ drawId: nextDrawId, eligibleCount: holders.length, hash, timestamp });
@@ -262,17 +290,17 @@ export class AutoLottery {
   }
 
   /**
-   * Execute a single transfer with retry
+   * Execute a single ETH transfer with retry
    */
   private async executeTransfer(
     to: string, 
     amount: bigint,
     retries = 3
   ): Promise<TransferResult> {
-    if (!this.tokenContract || !this.taxReceiverWallet) {
+    if (!this.taxReceiverWallet) {
       return {
         to,
-        amount: ethers.formatUnits(amount, 18),
+        amount: ethers.formatEther(amount),
         success: false,
         error: 'Wallet not configured'
       };
@@ -280,25 +308,19 @@ export class AutoLottery {
 
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        console.log(`  📤 Sending ${ethers.formatUnits(amount, 18)} → ${to.slice(0, 10)}... (attempt ${attempt})`);
+        const amountInEth = ethers.formatEther(amount);
+        const amountUsd = (parseFloat(amountInEth) * this.ethPriceUsd).toFixed(2);
+        console.log(`  📤 Sending ${amountInEth} ETH ($${amountUsd}) → ${to.slice(0, 10)}... (attempt ${attempt})`);
         
         // Get fresh nonce
         const nonce = await this.taxReceiverWallet.getNonce();
         
-        // Estimate gas
-        let gasLimit: bigint;
-        try {
-          const estimated = await this.tokenContract.transfer.estimateGas(to, amount);
-          gasLimit = (estimated * 130n) / 100n; // Add 30% buffer
-        } catch (estimateError: any) {
-          console.log(`  ⚠️ Gas estimate failed: ${estimateError.message}, using default`);
-          gasLimit = 150000n;
-        }
-        
-        // Send transaction
-        const tx = await this.tokenContract.transfer(to, amount, {
+        // Send ETH transaction
+        const tx = await this.taxReceiverWallet.sendTransaction({
+          to,
+          value: amount,
           nonce,
-          gasLimit,
+          gasLimit: 21000n, // Standard ETH transfer
         });
         
         console.log(`  ⏳ Tx: ${tx.hash.slice(0, 20)}...`);
@@ -315,7 +337,7 @@ export class AutoLottery {
           console.log(`  ✅ Confirmed!`);
           return {
             to,
-            amount: ethers.formatUnits(amount, 18),
+            amount: amountInEth,
             success: true,
             txHash: tx.hash,
           };
@@ -332,7 +354,7 @@ export class AutoLottery {
           this.failedTransfers++;
           return {
             to,
-            amount: ethers.formatUnits(amount, 18),
+            amount: ethers.formatEther(amount),
             success: false,
             error: error.message?.slice(0, 100),
           };
@@ -342,14 +364,14 @@ export class AutoLottery {
     
     return {
       to,
-      amount: ethers.formatUnits(amount, 18),
+      amount: ethers.formatEther(amount),
       success: false,
       error: 'Max retries exceeded',
     };
   }
 
   /**
-   * Execute batch transfer sequentially
+   * Execute batch ETH transfer sequentially
    */
   private async executeBatchTransfer(
     transfers: Array<{to: string; amount: bigint}>
@@ -364,32 +386,25 @@ export class AutoLottery {
       return results;
     }
     
-    console.log(`\n📦 Processing ${validTransfers.length} transfers...`);
+    console.log(`\n📦 Processing ${validTransfers.length} ETH transfers...`);
     
-    // Check total amount needed
+    // Check total amount needed (including gas reserve)
     const totalNeeded = validTransfers.reduce((sum, t) => sum + t.amount, 0n);
-    console.log(`  💰 Total needed: ${ethers.formatUnits(totalNeeded, 18)}`);
-    console.log(`  💳 Available: ${ethers.formatUnits(this.totalTaxBalance, 18)}`);
+    const gasReserve = this.MIN_GAS_BALANCE;
+    const totalWithGas = totalNeeded + gasReserve;
     
-    if (totalNeeded > this.totalTaxBalance) {
-      console.log(`  ❌ Insufficient balance!`);
+    const totalEth = ethers.formatEther(totalNeeded);
+    const totalUsd = (parseFloat(totalEth) * this.ethPriceUsd).toFixed(2);
+    console.log(`  💰 Total needed: ${totalEth} ETH ($${totalUsd})`);
+    console.log(`  💳 Available: ${ethers.formatEther(this.ethBalance)} ETH`);
+    
+    if (totalWithGas > this.ethBalance) {
+      console.log(`  ❌ Insufficient ETH balance!`);
       return validTransfers.map(t => ({
         to: t.to,
-        amount: ethers.formatUnits(t.amount, 18),
+        amount: ethers.formatEther(t.amount),
         success: false,
-        error: 'Insufficient balance'
-      }));
-    }
-    
-    // Check gas
-    if (!this.hasEnoughGas()) {
-      console.log(`  ❌ Insufficient gas! Need ${ethers.formatEther(this.MIN_GAS_BALANCE)} RB`);
-      console.log(`  💨 Current: ${ethers.formatEther(this.nativeBalance)} RB`);
-      return validTransfers.map(t => ({
-        to: t.to,
-        amount: ethers.formatUnits(t.amount, 18),
-        success: false,
-        error: 'Insufficient gas'
+        error: 'Insufficient ETH balance'
       }));
     }
     
@@ -482,7 +497,7 @@ export class AutoLottery {
       console.log(`👥 Winners: ${winnersData.length}` + 
         (winnersData.length === this.MAX_WINNERS_PER_DRAW ? ' (limited)' : ''));
       
-      // Calculate amounts
+      // Calculate amounts (all in ETH now)
       let devFee = 0n;
       let prizePool: bigint;
       
@@ -491,16 +506,19 @@ export class AutoLottery {
         devFee = (prizePool * 25n) / 75n;
       } else {
         await this.updateBalances();
-        devFee = (this.totalTaxBalance * BigInt(config.devSharePercent)) / 100n;
+        devFee = (this.ethBalance * BigInt(config.devSharePercent)) / 100n;
         prizePool = this.currentPrizePool;
       }
       
-      console.log(`💵 Tax Balance: ${ethers.formatUnits(this.totalTaxBalance, 18)}`);
-      console.log(`💰 Dev Fee: ${ethers.formatUnits(devFee, 18)}`);
-      console.log(`🏆 Prize Pool: ${ethers.formatUnits(prizePool, 18)}`);
-      if (!this.demoMode) {
-        console.log(`⛽ Gas Balance: ${ethers.formatEther(this.nativeBalance)} RB`);
-      }
+      const ethBalanceStr = ethers.formatEther(this.ethBalance);
+      const prizePoolStr = ethers.formatEther(prizePool);
+      const devFeeStr = ethers.formatEther(devFee);
+      const prizeUsd = (parseFloat(prizePoolStr) * this.ethPriceUsd).toFixed(2);
+      
+      console.log(`💵 Total ETH: ${ethBalanceStr} ETH`);
+      console.log(`💰 Dev Fee: ${devFeeStr} ETH`);
+      console.log(`🏆 Prize Pool: ${prizePoolStr} ETH ($${prizeUsd})`);
+      console.log(`📈 ETH Price: $${this.ethPriceUsd}`)
       
       // Prepare transfers
       const transfers: Array<{to: string; amount: bigint; type: 'dev' | 'winner'}> = [];
@@ -516,16 +534,16 @@ export class AutoLottery {
           transfers.push({ to: this.devWalletAddress, amount: devFee, type: 'dev' });
         }
         
-        // Winner transfers
+        // Winner transfers (ETH prizes)
         for (const winner of winnersData) {
           const prize = (winner.balance * prizePool) / totalWinnerBalance;
           const sharePercent = Number((winner.balance * 10000n) / totalWinnerBalance) / 100;
           
           winners.push({
             address: winner.address,
-            balance: ethers.formatUnits(winner.balance, 18),
+            balance: ethers.formatUnits(winner.balance, 18), // BALLS tokens
             sharePercent,
-            prize: ethers.formatUnits(prize, 18),
+            prize: ethers.formatEther(prize), // ETH prize
           });
           
           if (prize > 0n) {
@@ -535,7 +553,7 @@ export class AutoLottery {
       } else {
         // NO WINNERS - Prize pool ROLLS OVER to next draw!
         console.log('🎰 NO WINNERS! Prize pool rolls over to next draw!');
-        console.log(`💰 Accumulated: ${ethers.formatUnits(this.totalTaxBalance, 18)} tokens`);
+        console.log(`💰 Accumulated: ${ethers.formatEther(this.ethBalance)} ETH`);
       }
       
       // Execute transfers
@@ -592,10 +610,10 @@ export class AutoLottery {
         drawId,
         timestamp: Math.floor(Date.now() / 1000),
         winningNumber,
-        prizePool: ethers.formatUnits(prizePool, 18),
-        devFee: hasWinners ? ethers.formatUnits(devFee, 18) : '0',
+        prizePool: ethers.formatEther(prizePool), // ETH
+        devFee: hasWinners ? ethers.formatEther(devFee) : '0', // ETH
         winnersCount: winners.length,
-        totalWinnerBalance: ethers.formatUnits(totalWinnerBalance, 18),
+        totalWinnerBalance: ethers.formatUnits(totalWinnerBalance, 18), // BALLS tokens
         winners,
         snapshotHash: snapshot.hash,
         autoTransfer: this.autoTransferEnabled && !this.demoMode,
@@ -666,22 +684,33 @@ export class AutoLottery {
     const prizePool = this.demoMode ? this.demoPrizePool : this.currentPrizePool;
     const trackerStats = this.holderTracker.getStats();
     
+    // Calculate USD values
+    const prizePoolEth = parseFloat(ethers.formatEther(prizePool));
+    const prizePoolUsd = prizePoolEth * this.ethPriceUsd;
+    const ethBalanceUsd = parseFloat(ethers.formatEther(this.ethBalance)) * this.ethPriceUsd;
+    
     return {
       isRunning: this.isRunning,
       isProcessingDraw: this.isProcessingDraw,
       currentDrawId: this.currentDrawId,
       timeUntilNextDraw: timeUntilDraw,
       hasSnapshot: !!this.currentSnapshot,
-      prizePool: ethers.formatUnits(prizePool, 18),
-      totalTaxBalance: ethers.formatUnits(this.totalTaxBalance, 18),
-      nativeBalance: ethers.formatEther(this.nativeBalance),
-      hasEnoughGas: this.hasEnoughGas(),
+      // ETH values
+      prizePool: ethers.formatEther(prizePool),
+      prizePoolUsd: prizePoolUsd.toFixed(2),
+      ethBalance: ethers.formatEther(this.ethBalance),
+      ethBalanceUsd: ethBalanceUsd.toFixed(2),
+      ethPriceUsd: this.ethPriceUsd,
+      // Status
+      hasEnoughForTransfers: this.hasEnoughForTransfers(),
       taxReceiverWallet: this.taxReceiverAddress,
       devWallet: this.devWalletAddress,
       autoTransferEnabled: this.autoTransferEnabled,
       demoMode: this.demoMode,
-      totalDevPaid: ethers.formatUnits(this.totalDevPaid, 18),
-      totalPrizePaid: ethers.formatUnits(this.totalPrizePaid, 18),
+      prizeInEth: true,
+      // Stats
+      totalDevPaid: ethers.formatEther(this.totalDevPaid),
+      totalPrizePaid: ethers.formatEther(this.totalPrizePaid),
       totalDraws: this.totalDraws,
       failedTransfers: this.failedTransfers,
       snapshot: this.currentSnapshot ? {

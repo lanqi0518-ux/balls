@@ -6,14 +6,15 @@ export const config = {
   rpcUrl: process.env.RPC_URL || 'https://rpc.mainnet.chain.robinhood.com',
   chainId: parseInt(process.env.CHAIN_ID || '4663'),
   
-  // Token contract address
+  // Token contract address (BALLS token for holder tracking)
   tokenAddress: process.env.TOKEN_ADDRESS || '',
   lotteryAddress: process.env.LOTTERY_ADDRESS || '',
   
-  // Tax receiver wallet (receives 4% tax from Pons)
+  // Tax is collected in ETH (paired asset)
+  // Tax receiver wallet receives ETH from Pons creator tax
   taxReceiverWallet: process.env.TAX_RECEIVER_WALLET || '0xfaF2deaF29C4A0bb086195c675eA37d4820E0598',
   
-  // Tax receiver wallet private key (for sending to dev + winners)
+  // Tax receiver wallet private key (for sending ETH to dev + winners)
   taxReceiverPrivateKey: process.env.TAX_RECEIVER_PRIVATE_KEY || '',
   
   // Developer wallet (receives 1% of 4% = 25% of total tax)
@@ -21,6 +22,9 @@ export const config = {
   
   // Tax split: 25% to dev (1% of 4%), 75% to prize (3% of 4%)
   devSharePercent: 25,
+  
+  // Prize is distributed in ETH (not tokens)
+  prizeInEth: true,
   
   // Excluded addresses (LP pools, contracts, etc.)
   // These are NOT counted as real holders

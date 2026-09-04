@@ -136,7 +136,9 @@ function App() {
           <div className="lg:col-span-3">
             <PrizePool 
               prizePool={status?.prizePool || '0'}
-              prizePoolWallet={status?.prizePoolWallet}
+              prizePoolUsd={status?.prizePoolUsd || '0'}
+              ethPriceUsd={status?.ethPriceUsd || 0}
+              prizePoolWallet={status?.taxReceiverWallet}
             />
           </div>
           <div className="lg:col-span-2 card flex flex-col items-center justify-center py-6 md:py-8">

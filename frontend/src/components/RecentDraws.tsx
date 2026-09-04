@@ -73,7 +73,7 @@ export function RecentDraws({ draws }: Props) {
                 <div className="flex items-center gap-3 md:gap-6">
                   <div className="text-right">
                     <div className="font-bold text-sm md:text-base" style={{ color: 'var(--green-primary)' }}>
-                      {Number(draw.prizePool).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      {Number(draw.prizePool).toFixed(4)} ETH
                     </div>
                     <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Prize</div>
                   </div>
@@ -134,13 +134,6 @@ export function RecentDraws({ draws }: Props) {
                         {/* Stats - horizontal on mobile */}
                         <div className="flex items-center gap-3 md:gap-6 ml-7 sm:ml-0">
                           <div className="text-left sm:text-right">
-                            <div className="text-xs md:text-sm">
-                              {Number(winner.balance).toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                            </div>
-                            <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Balance</div>
-                          </div>
-                          
-                          <div className="text-left sm:text-right">
                             <div className="text-xs md:text-sm font-bold" style={{ color: 'var(--purple)' }}>
                               {winner.sharePercent.toFixed(1)}%
                             </div>
@@ -149,7 +142,7 @@ export function RecentDraws({ draws }: Props) {
                           
                           <div className="text-left sm:text-right">
                             <div className="text-xs md:text-sm font-bold" style={{ color: 'var(--green-primary)' }}>
-                              {Number(winner.prize).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                              {Number(winner.prize).toFixed(4)} ETH
                             </div>
                             <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Won</div>
                           </div>
