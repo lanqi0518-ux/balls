@@ -253,7 +253,7 @@ export class AutoLottery {
     
     const prizePool = this.demoMode ? this.demoPrizePool : this.currentPrizePool;
     
-    console.log('\n📸 Snapshot Locked');
+    console.log('\n📸 Snapshot Locked (Top 200 Holders)');
     console.log(`Draw: #${nextDrawId} | Eligible: ${holders.length} | Prize Pool: ${ethers.formatUnits(prizePool, 18)}`);
     
     if (this.onSnapshot) {

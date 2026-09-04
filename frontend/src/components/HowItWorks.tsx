@@ -7,13 +7,13 @@ export function HowItWorks() {
     },
     {
       num: '02',
-      title: 'Get Number',
-      desc: 'System assigns you a number (1-50) based on your wallet',
+      title: 'Top 200',
+      desc: 'Only top 200 holders by balance can participate in draws',
     },
     {
       num: '03',
-      title: 'Wait for Draw',
-      desc: 'Snapshot locks 10 seconds before each draw',
+      title: 'Get Number',
+      desc: 'System assigns you a number (1-50) based on your wallet',
     },
     {
       num: '04',

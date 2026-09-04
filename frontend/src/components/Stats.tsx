@@ -30,10 +30,14 @@ export function Stats({ totalDraws, totalHolders, eligibleHolders }: Props) {
         </div>
       </div>
       
-      <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-white/5 grid grid-cols-3 gap-3 md:gap-6 text-center">
+      <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-white/5 grid grid-cols-4 gap-2 md:gap-4 text-center">
         <div>
           <div className="text-base md:text-lg font-bold">4%</div>
           <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Tax</div>
+        </div>
+        <div>
+          <div className="text-base md:text-lg font-bold" style={{ color: 'var(--green-primary)' }}>Top 200</div>
+          <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Eligible</div>
         </div>
         <div>
           <div className="text-base md:text-lg font-bold">1-50</div>

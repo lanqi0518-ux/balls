@@ -17,7 +17,7 @@ export function SnapshotPanel({ snapshot, hasSnapshot }: Props) {
     <div className="card mb-6 md:mb-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 md:mb-6">
         <h3 className="text-xs md:text-sm text-[var(--text-muted)] uppercase tracking-wider">
-          Number Distribution
+          Number Distribution <span style={{ color: 'var(--green-primary)' }}>(Top 200)</span>
         </h3>
         
         {hasSnapshot && (

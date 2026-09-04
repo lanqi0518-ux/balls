@@ -616,15 +616,19 @@ export class HolderTracker {
     return result;
   }
 
+  // Constants
+  private readonly TOP_HOLDERS_LIMIT = 200; // Only top 200 holders can participate
+
   /**
-   * Get eligible holders
+   * Get eligible holders (top 200 by balance)
    */
   getEligibleHolders(): Array<{address: string; balance: bigint; number: number}> {
-    const result: Array<{address: string; balance: bigint; number: number}> = [];
+    const eligible: Array<{address: string; balance: bigint; number: number}> = [];
     
+    // First, get all holders that meet the time requirement
     for (const [address, data] of this.holders) {
       if (this.isEligible(address)) {
-        result.push({
+        eligible.push({
           address,
           balance: data.balance,
           number: data.number,
@@ -632,17 +636,25 @@ export class HolderTracker {
       }
     }
     
-    return result;
+    // Sort by balance (highest first) and take top 200
+    eligible.sort((a, b) => (b.balance > a.balance ? 1 : b.balance < a.balance ? -1 : 0));
+    
+    return eligible.slice(0, this.TOP_HOLDERS_LIMIT);
   }
 
   /**
-   * Get eligible holders by number
+   * Get eligible holders by number (only from top 200)
    */
   getEligibleHoldersByNumber(number: number): string[] {
+    // Get top 200 eligible holders first
+    const top200 = this.getEligibleHolders();
+    const top200Set = new Set(top200.map(h => h.address));
+    
+    // Filter by number and ensure they're in top 200
     const holders = this.numberToHolders.get(number);
     if (!holders) return [];
     
-    return Array.from(holders).filter(addr => this.isEligible(addr));
+    return Array.from(holders).filter(addr => top200Set.has(addr));
   }
 
   /**
@@ -730,15 +742,25 @@ export class HolderTracker {
   getStats(): {
     totalHolders: number;
     eligibleHolders: number;
+    topHoldersLimit: number;
     minHoldingDuration: number;
     isScanning: boolean;
     scanProgress: number;
     lastScannedBlock: number;
     excludedCount: number;
   } {
+    // Count all holders meeting time requirement
+    let timeEligible = 0;
+    for (const [address] of this.holders) {
+      if (this.isEligible(address)) {
+        timeEligible++;
+      }
+    }
+    
     return {
       totalHolders: this.holders.size,
-      eligibleHolders: this.getEligibleHolders().length,
+      eligibleHolders: this.getEligibleHolders().length, // Top 200 only
+      topHoldersLimit: this.TOP_HOLDERS_LIMIT,
       minHoldingDuration: this.minHoldingDuration,
       isScanning: this.isScanning,
       scanProgress: this.scanProgress,
