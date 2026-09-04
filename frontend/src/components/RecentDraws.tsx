@@ -16,6 +16,7 @@ interface DrawResult {
   winnersCount: number
   totalWinnerBalance?: string
   winners?: WinnerShare[]
+  rollover?: boolean // No winners, prize rolls over
 }
 
 interface Props {
@@ -76,8 +77,17 @@ export function RecentDraws({ draws }: Props) {
                   </div>
                   
                   <div className="text-right">
-                    <div className="font-bold">{draw.winnersCount}</div>
-                    <div className="text-xs text-[var(--text-muted)]">Winners</div>
+                    {draw.rollover ? (
+                      <>
+                        <div className="font-bold" style={{ color: 'var(--yellow)' }}>🎰</div>
+                        <div className="text-xs" style={{ color: 'var(--yellow)' }}>ROLLOVER</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="font-bold">{draw.winnersCount}</div>
+                        <div className="text-xs text-[var(--text-muted)]">Winners</div>
+                      </>
+                    )}
                   </div>
                   
                   <div className="text-sm text-[var(--text-muted)] w-24 text-right">

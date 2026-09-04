@@ -74,20 +74,35 @@ export function LiveDrawAnimation({ isVisible, result, onClose }: Props) {
         {/* Winners Info */}
         {phase !== 'spinning' && (
           <div className="mt-8">
-            <div className="flex justify-center gap-8 mb-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold" style={{ color: 'var(--green-primary)' }}>
-                  {result.winnersCount}
+            {result.winnersCount > 0 ? (
+              <div className="flex justify-center gap-8 mb-6">
+                <div className="text-center">
+                  <div className="text-3xl font-bold" style={{ color: 'var(--green-primary)' }}>
+                    {result.winnersCount}
+                  </div>
+                  <div className="text-sm text-[var(--text-muted)]">Winners</div>
                 </div>
-                <div className="text-sm text-[var(--text-muted)]">Winners</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold" style={{ color: 'var(--green-primary)' }}>
-                  {Number(result.prizePool).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                <div className="text-center">
+                  <div className="text-3xl font-bold" style={{ color: 'var(--green-primary)' }}>
+                    {Number(result.prizePool).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </div>
+                  <div className="text-sm text-[var(--text-muted)]">Prize Pool</div>
                 </div>
-                <div className="text-sm text-[var(--text-muted)]">Prize Pool</div>
               </div>
-            </div>
+            ) : (
+              <div className="text-center mb-6">
+                <div className="text-4xl mb-2">🎰</div>
+                <div className="text-2xl font-bold" style={{ color: 'var(--yellow)' }}>
+                  JACKPOT ROLLOVER!
+                </div>
+                <div className="text-[var(--text-muted)] mt-2">
+                  No winners - Prize accumulates to next draw
+                </div>
+                <div className="text-xl font-bold mt-4" style={{ color: 'var(--green-primary)' }}>
+                  {Number(result.prizePool).toLocaleString(undefined, { maximumFractionDigits: 0 })} + Next Round
+                </div>
+              </div>
+            )}
             
             {/* Winner Details */}
             {phase === 'winners' && result.winners && result.winners.length > 0 && (
@@ -129,13 +144,6 @@ export function LiveDrawAnimation({ isVisible, result, onClose }: Props) {
               </div>
             )}
             
-            {phase === 'winners' && result.winnersCount === 0 && (
-              <div className="mt-6 p-4 rounded-xl" style={{ background: 'var(--bg-dark)' }}>
-                <p className="text-[var(--text-muted)]">
-                  No winners this round. Prize rolls over to next draw!
-                </p>
-              </div>
-            )}
           </div>
         )}
         

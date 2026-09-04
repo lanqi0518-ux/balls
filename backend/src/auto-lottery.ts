@@ -37,6 +37,7 @@ interface DrawResult {
   snapshotHash: string;
   autoTransfer: boolean;
   transferStatus: 'pending' | 'success' | 'partial' | 'failed' | 'skipped';
+  rollover: boolean; // True if no winners, prize rolls over
 }
 
 /**
@@ -505,13 +506,17 @@ export class AutoLottery {
       const transfers: Array<{to: string; amount: bigint; type: 'dev' | 'winner'}> = [];
       const winners: WinnerShare[] = [];
       
-      // Dev fee first
-      if (devFee > 0n) {
-        transfers.push({ to: this.devWalletAddress, amount: devFee, type: 'dev' });
-      }
+      // ⚠️ JACKPOT ROLLOVER: If no winners, ENTIRE balance rolls over to next draw
+      // Dev fee is ONLY sent when there ARE winners
+      const hasWinners = totalWinnerBalance > 0n && winnersData.length > 0;
       
-      // Winner transfers
-      if (totalWinnerBalance > 0n && prizePool > 0n) {
+      if (hasWinners) {
+        // Dev fee (only when there are winners)
+        if (devFee > 0n) {
+          transfers.push({ to: this.devWalletAddress, amount: devFee, type: 'dev' });
+        }
+        
+        // Winner transfers
         for (const winner of winnersData) {
           const prize = (winner.balance * prizePool) / totalWinnerBalance;
           const sharePercent = Number((winner.balance * 10000n) / totalWinnerBalance) / 100;
@@ -527,6 +532,10 @@ export class AutoLottery {
             transfers.push({ to: winner.address, amount: prize, type: 'winner' });
           }
         }
+      } else {
+        // NO WINNERS - Prize pool ROLLS OVER to next draw!
+        console.log('🎰 NO WINNERS! Prize pool rolls over to next draw!');
+        console.log(`💰 Accumulated: ${ethers.formatUnits(this.totalTaxBalance, 18)} tokens`);
       }
       
       // Execute transfers
@@ -584,13 +593,14 @@ export class AutoLottery {
         timestamp: Math.floor(Date.now() / 1000),
         winningNumber,
         prizePool: ethers.formatUnits(prizePool, 18),
-        devFee: ethers.formatUnits(devFee, 18),
+        devFee: hasWinners ? ethers.formatUnits(devFee, 18) : '0',
         winnersCount: winners.length,
         totalWinnerBalance: ethers.formatUnits(totalWinnerBalance, 18),
         winners,
         snapshotHash: snapshot.hash,
         autoTransfer: this.autoTransferEnabled && !this.demoMode,
         transferStatus,
+        rollover: !hasWinners, // No winners = rollover
       };
       
       // Save history
@@ -605,7 +615,11 @@ export class AutoLottery {
       // Summary
       console.log('\n' + '='.repeat(50));
       console.log(`🎉 DRAW #${drawId} COMPLETE`);
-      console.log(`   Number: ${winningNumber} | Winners: ${winners.length} | Status: ${transferStatus}`);
+      if (hasWinners) {
+        console.log(`   Number: ${winningNumber} | Winners: ${winners.length} | Status: ${transferStatus}`);
+      } else {
+        console.log(`   Number: ${winningNumber} | 🎰 ROLLOVER! No winners - prize accumulates`);
+      }
       console.log('='.repeat(50));
       
       // ⚠️ IMPORTANT: Reset all firstSeen timestamps after each draw
