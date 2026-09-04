@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: balls-api
+    env: node
+    buildCommand: npm ci --prefer-offline && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production

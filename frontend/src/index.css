@@ -1,0 +1,671 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ================================
+   BALLS - Robinhood 风格
+   ================================ */
+
+:root {
+  /* Robinhood 绿色 */
+  --green-primary: #00C805;
+  --green-dark: #00A804;
+  --green-light: #D4FFDB;
+  
+  /* 背景色 */
+  --bg-dark: #1E2124;
+  --bg-card: #2A2D31;
+  --bg-hover: #3A3D41;
+  
+  /* 文字 */
+  --text-primary: #FFFFFF;
+  --text-secondary: #9CA3AF;
+  --text-muted: #6B7280;
+  
+  /* 其他颜色 */
+  --red: #FF5000;
+  --yellow: #FFCC00;
+  --purple: #9945FF;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ================================
+   布局
+   ================================ */
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ================================
+   卡片 - Robinhood 风格
+   ================================ */
+
+.card {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 24px;
+  transition: background-color 0.2s ease;
+}
+
+.card:hover {
+  background: var(--bg-hover);
+}
+
+.card-highlight {
+  background: linear-gradient(135deg, rgba(0, 200, 5, 0.1), rgba(0, 200, 5, 0.05));
+  border: 1px solid rgba(0, 200, 5, 0.2);
+}
+
+/* ================================
+   按钮
+   ================================ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.btn-primary {
+  background: var(--green-primary);
+  color: #000;
+}
+
+.btn-primary:hover {
+  background: var(--green-dark);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--green-primary);
+  border: 1px solid var(--green-primary);
+}
+
+.btn-secondary:hover {
+  background: rgba(0, 200, 5, 0.1);
+}
+
+/* ================================
+   彩球
+   ================================ */
+
+.ball {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 20px;
+  color: #000;
+  background: linear-gradient(180deg, #FFFFFF 0%, #E5E7EB 100%);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    inset 0 2px 4px rgba(255, 255, 255, 0.5);
+  transition: all 0.3s ease;
+}
+
+.ball-winning {
+  background: linear-gradient(180deg, var(--green-primary) 0%, var(--green-dark) 100%);
+  color: #000;
+  box-shadow: 
+    0 0 24px rgba(0, 200, 5, 0.45),
+    0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.ball-small {
+  width: 40px;
+  height: 40px;
+  font-size: 16px;
+}
+
+/* ================================
+   奖池
+   ================================ */
+
+.prize-pool {
+  text-align: center;
+  padding: 48px 24px;
+  background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-dark) 100%);
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.prize-pool::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 3px;
+  background: var(--green-primary);
+  border-radius: 0 0 3px 3px;
+}
+
+.prize-amount {
+  font-size: 72px;
+  font-weight: 800;
+  color: var(--green-primary);
+  line-height: 1;
+  letter-spacing: -2px;
+}
+
+.prize-label {
+  font-size: 14px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+/* ================================
+   倒计时
+   ================================ */
+
+.countdown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.countdown-digit {
+  width: 64px;
+  height: 80px;
+  background: var(--bg-card);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--text-primary);
+  position: relative;
+}
+
+.countdown-digit::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.countdown-separator {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.countdown-urgent .countdown-digit {
+  background: rgba(255, 80, 0, 0.2);
+  color: var(--red);
+}
+
+/* ================================
+   统计数字
+   ================================ */
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.stat-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.stat-change {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stat-change.positive {
+  color: var(--green-primary);
+}
+
+.stat-change.negative {
+  color: var(--red);
+}
+
+/* ================================
+   开奖历史
+   ================================ */
+
+.draw-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-radius: 8px;
+  transition: background 0.2s ease;
+  cursor: pointer;
+}
+
+.draw-item:hover {
+  background: var(--bg-hover);
+}
+
+.draw-item-new {
+  background: rgba(0, 200, 5, 0.1);
+  border: 1px solid rgba(0, 200, 5, 0.2);
+}
+
+/* ================================
+   号码网格
+   ================================ */
+
+.number-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 8px;
+}
+
+.number-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.number-cell.has-holders {
+  background: rgba(0, 200, 5, 0.1);
+  color: var(--green-primary);
+  border: 1px solid rgba(0, 200, 5, 0.3);
+}
+
+.number-cell .holder-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  background: var(--green-primary);
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ================================
+   实时指示器
+   ================================ */
+
+.live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(0, 200, 5, 0.1);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--green-primary);
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--green-primary);
+  border-radius: 50%;
+  animation: live-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* ================================
+   输入框
+   ================================ */
+
+.input {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--bg-dark);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--green-primary);
+  box-shadow: 0 0 0 3px rgba(0, 200, 5, 0.1);
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+/* ================================
+   通知 Toast
+   ================================ */
+
+.toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.toast {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border-left: 3px solid var(--green-primary);
+  animation: toast-in 0.3s ease;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(100px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ================================
+   开奖动画
+   ================================ */
+
+.draw-animation-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  animation: fade-in 0.3s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.draw-ball {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, var(--green-primary) 0%, var(--green-dark) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 72px;
+  font-weight: 800;
+  color: #000;
+  box-shadow: 
+    0 0 100px rgba(0, 200, 5, 0.5),
+    0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: ball-spin 0.5s ease-out;
+}
+
+@keyframes ball-spin {
+  from { transform: scale(0) rotate(-180deg); }
+  to { transform: scale(1) rotate(0); }
+}
+
+/* ================================
+   滚动条
+   ================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-hover);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ================================
+   响应式 - 平板
+   ================================ */
+
+@media (max-width: 1024px) {
+  .container {
+    padding: 0 16px;
+  }
+  
+  .prize-amount {
+    font-size: 56px;
+  }
+}
+
+/* ================================
+   响应式 - 手机
+   ================================ */
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 12px;
+  }
+  
+  /* 奖池金额 */
+  .prize-amount {
+    font-size: 42px;
+    letter-spacing: -1px;
+  }
+  
+  .prize-pool {
+    padding: 32px 16px;
+  }
+  
+  /* 倒计时 */
+  .countdown {
+    gap: 4px;
+  }
+  
+  .countdown-digit {
+    width: 44px;
+    height: 56px;
+    font-size: 22px;
+    border-radius: 8px;
+  }
+  
+  .countdown-separator {
+    font-size: 24px;
+  }
+  
+  /* 彩球 */
+  .ball {
+    width: 48px;
+    height: 48px;
+    font-size: 18px;
+  }
+  
+  .ball-small {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+  }
+  
+  /* 卡片 */
+  .card {
+    padding: 16px;
+    border-radius: 10px;
+  }
+  
+  /* 号码网格 */
+  .number-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+  }
+  
+  .number-cell {
+    font-size: 12px;
+  }
+  
+  .number-cell .holder-count {
+    width: 14px;
+    height: 14px;
+    font-size: 8px;
+    top: -2px;
+    right: -2px;
+  }
+  
+  /* 统计数字 */
+  .stat-value {
+    font-size: 24px;
+  }
+  
+  .stat-label {
+    font-size: 11px;
+  }
+  
+  /* 开奖历史 */
+  .draw-item {
+    padding: 12px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  
+  /* 开奖动画 */
+  .draw-ball {
+    width: 120px;
+    height: 120px;
+    font-size: 52px;
+  }
+  
+  /* 通知 */
+  .toast-container {
+    top: 12px;
+    right: 12px;
+    left: 12px;
+  }
+  
+  .toast {
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+  
+  /* 输入框 */
+  .input {
+    padding: 10px 14px;
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+  
+  /* 按钮 */
+  .btn {
+    padding: 10px 20px;
+    font-size: 14px;
+  }
+}
+
+/* ================================
+   响应式 - 小手机
+   ================================ */
+
+@media (max-width: 480px) {
+  .prize-amount {
+    font-size: 36px;
+  }
+  
+  .countdown-digit {
+    width: 38px;
+    height: 48px;
+    font-size: 18px;
+  }
+  
+  .countdown-separator {
+    font-size: 20px;
+  }
+  
+  .draw-ball {
+    width: 100px;
+    height: 100px;
+    font-size: 44px;
+  }
+  
+  .number-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+  }
+  
+  .number-cell {
+    font-size: 11px;
+    border-radius: 6px;
+  }
+}
+
+/* ================================
+   移动端专属样式
+   ================================ */
+
+/* 防止水平滚动 */
+html, body {
+  overflow-x: hidden;
+}
+
+/* 触摸友好的点击区域 */
+@media (max-width: 768px) {
+  .draw-item,
+  .btn,
+  .number-cell {
+    min-height: 44px;
+  }
+}
+
+/* iOS 安全区域 */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .container {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
