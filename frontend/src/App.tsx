@@ -65,11 +65,6 @@ function App() {
               <span className="hidden xs:inline">{isConnected ? 'LIVE' : 'OFFLINE'}</span>
             </div>
             
-            {status?.demoMode && (
-              <span className="text-[10px] md:text-xs px-2 py-1 rounded bg-yellow-500/20 text-yellow-400">
-                DEMO
-              </span>
-            )}
             
             {status && (
               <div className="text-xs md:text-sm text-[var(--text-secondary)] hidden sm:block">
