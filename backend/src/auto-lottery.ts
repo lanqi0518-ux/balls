@@ -440,8 +440,36 @@ export class AutoLottery {
       const winningNumber = this.generateWinningNumber(drawId);
       console.log(`🎯 Winning Number: ${winningNumber}`);
       
-      // Find winners
-      let winnersData = snapshot.holders.filter(h => h.number === winningNumber);
+      // Find winners from snapshot
+      const snapshotWinners = snapshot.holders.filter(h => h.number === winningNumber);
+      
+      // ⚠️ IMPORTANT: Get REAL-TIME balances for winners (not snapshot balances)
+      // This prevents issues where someone sold between snapshot and draw
+      let winnersData: Array<{address: string; number: number; balance: bigint}> = [];
+      
+      if (!this.demoMode && this.tokenContract) {
+        console.log(`🔄 Fetching real-time balances for ${snapshotWinners.length} potential winners...`);
+        
+        for (const winner of snapshotWinners) {
+          try {
+            const realBalance = await this.tokenContract.balanceOf(winner.address);
+            if (realBalance > 0n) {
+              winnersData.push({
+                address: winner.address,
+                number: winner.number,
+                balance: realBalance, // Use REAL balance, not snapshot
+              });
+            } else {
+              console.log(`  ⏭️ ${winner.address.slice(0, 10)}... sold all tokens, skipping`);
+            }
+          } catch {
+            // If balance check fails, use snapshot balance
+            winnersData.push(winner);
+          }
+        }
+      } else {
+        winnersData = snapshotWinners;
+      }
       
       // Sort by balance (highest first) and limit
       winnersData = winnersData
@@ -579,6 +607,10 @@ export class AutoLottery {
       console.log(`🎉 DRAW #${drawId} COMPLETE`);
       console.log(`   Number: ${winningNumber} | Winners: ${winners.length} | Status: ${transferStatus}`);
       console.log('='.repeat(50));
+      
+      // ⚠️ IMPORTANT: Reset all firstSeen timestamps after each draw
+      // This ensures only addresses holding for 60+ seconds in THIS round are eligible
+      this.holderTracker.resetAllFirstSeen();
       
       // Refresh balance
       if (!this.demoMode) {

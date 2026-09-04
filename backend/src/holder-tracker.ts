@@ -398,7 +398,7 @@ export class HolderTracker {
           console.log(`📨 Transfer: ${fromAddr.slice(0, 8)}... → ${toAddr.slice(0, 8)}... (${ethers.formatUnits(value, 18)})`);
         }
         
-        // Update sender
+        // Update sender - check their new balance
         if (!this.isExcluded(fromAddr)) {
           try {
             const balance = await this.tokenContract!.balanceOf(from);
@@ -406,12 +406,17 @@ export class HolderTracker {
           } catch { /* ignore */ }
         }
         
-        // Update receiver
+        // Update receiver - ALWAYS use current time for new purchases
+        // This ensures the 60-second countdown starts fresh for each buy
         if (!this.isExcluded(toAddr)) {
           try {
             const balance = await this.tokenContract!.balanceOf(to);
             const existing = this.holders.get(toAddr);
-            this.updateHolder(to, balance, existing?.firstSeen);
+            
+            // If holder exists and already has balance, keep their firstSeen
+            // If new holder or was removed (balance was 0), use current time
+            const useExistingTime = existing && existing.balance > 0n;
+            this.updateHolder(to, balance, useExistingTime ? existing.firstSeen : undefined);
           } catch { /* ignore */ }
         }
       });
@@ -430,7 +435,11 @@ export class HolderTracker {
         await this.provider!.getBlockNumber();
       } catch (error: any) {
         console.log('🔄 Reconnecting event listener...');
-        this.tokenContract!.removeAllListeners('Transfer');
+        
+        try {
+          this.tokenContract!.removeAllListeners('Transfer');
+          this.provider!.removeAllListeners();
+        } catch { /* ignore */ }
         
         // Recreate provider and contract
         this.provider = new ethers.JsonRpcProvider(config.rpcUrl);
@@ -439,6 +448,11 @@ export class HolderTracker {
           ['event Transfer(address indexed from, address indexed to, uint256 value)', 'function balanceOf(address) view returns (uint256)'],
           this.provider
         );
+        
+        // Re-setup error listener
+        this.provider.on('error', (err) => {
+          console.error('⚠️ Provider error:', err.message);
+        });
         
         setupListener();
         console.log('✅ Reconnected');
@@ -649,6 +663,22 @@ export class HolderTracker {
       this.numberToHolders.get(holder.number)?.delete(addr);
       console.log(`🚫 Excluded and removed: ${addr}`);
     }
+  }
+
+  /**
+   * Reset all firstSeen timestamps to now
+   * Called after each draw to start fresh eligibility countdown
+   */
+  resetAllFirstSeen(): void {
+    const now = Math.floor(Date.now() / 1000);
+    let count = 0;
+    
+    for (const [address, data] of this.holders) {
+      data.firstSeen = now;
+      count++;
+    }
+    
+    console.log(`🔄 Reset firstSeen for ${count} holders`);
   }
 
   /**
