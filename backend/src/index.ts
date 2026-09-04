@@ -214,11 +214,12 @@ async function main() {
       mode: config.tokenAddress ? 'LIVE' : 'WAITING',
       config: {
         tokenAddress: config.tokenAddress || '(not set)',
-        taxReceiverWallet: config.taxReceiverWallet,
-        devWallet: config.devWallet,
-        devSharePercent: config.devSharePercent,
+        prizePoolWallet: config.taxReceiverWallet,
+        publisherWallet: config.publisherWallet || '(not set — 1% forward skipped)',
+        teamWallet: config.devWallet,
         excludedAddresses: config.excludedAddresses,
-        hasPrivateKey: !!config.taxReceiverPrivateKey,
+        hasPrizeWalletKey: !!config.taxReceiverPrivateKey,
+        hasPublisherKey: !!config.publisherPrivateKey,
       },
       status: {
         autoTransferEnabled: status.autoTransferEnabled,

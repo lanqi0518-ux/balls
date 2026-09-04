@@ -10,46 +10,40 @@ export const config = {
   tokenAddress: process.env.TOKEN_ADDRESS || '',
   lotteryAddress: process.env.LOTTERY_ADDRESS || '',
   
-  // Tax is collected in ETH (paired asset)
-  // Tax receiver wallet receives ETH from Pons creator tax
+  // Prize pool wallet — receives the 3% lottery tax.
+  // 100% of this wallet (minus 0.05 ETH gas) goes to winners.
   taxReceiverWallet: process.env.TAX_RECEIVER_WALLET || '0xfaF2deaF29C4A0bb086195c675eA37d4820E0598',
-  
-  // Tax receiver wallet private key (for sending ETH to dev + winners)
   taxReceiverPrivateKey: process.env.TAX_RECEIVER_PRIVATE_KEY || '',
   
-  // Developer wallet (receives 1% of 4% = 25% of total tax)
-  devWallet: '0x9bae8aDF73F0dd6d27acB12E41eb9B800f93785F',
+  // Publisher automatically receives 1%. At draw time this is forwarded
+  // to teamWallet together with prize payouts.
+  // If empty or the same as the prize wallet, only the 3% prize pool is paid.
+  publisherWallet: process.env.PUBLISHER_WALLET || '',
+  publisherPrivateKey: process.env.PUBLISHER_PRIVATE_KEY || '',
   
-  // Tax split: 25% to dev (1% of 4%), 75% to prize (3% of 4%)
-  devSharePercent: 25,
+  // Team wallet that receives the forwarded publisher 1%
+  devWallet: process.env.TEAM_WALLET || '0x9bae8aDF73F0dd6d27acB12E41eb9B800f93785F',
   
-  // Prize is distributed in ETH (not tokens)
   prizeInEth: true,
   
   // Excluded addresses (LP pools, contracts, etc.)
-  // These are NOT counted as real holders
   excludedAddresses: [
     '0x267444d099b10fb5ed7c3cc7b7c767adca574952', // LP Pool
     '0x8366a39cc670b4001a1121b8f6a443a643e40951', // Router/Contract
   ],
   
-  // Server config
   port: parseInt(process.env.PORT || '3001'),
-  
-  // Draw interval (ms)
   drawInterval: parseInt(process.env.DRAW_INTERVAL || '60000'),
-  
-  // Enable auto draw (default: true when TOKEN_ADDRESS is set)
   autoDrawEnabled: process.env.AUTO_DRAW_ENABLED !== 'false',
 };
 
-// Validate config
 export function validateConfig(): void {
   console.log('\n📋 Configuration:');
   console.log(`  Token: ${config.tokenAddress || '(not set - waiting)'}`);
-  console.log(`  Tax Receiver: ${config.taxReceiverWallet}`);
-  console.log(`  Dev Wallet: ${config.devWallet}`);
-  console.log(`  Tax Split: ${config.devSharePercent}% dev / ${100 - config.devSharePercent}% prize`);
+  console.log(`  Prize Pool Wallet (3%): ${config.taxReceiverWallet}`);
+  console.log(`  Publisher Wallet (1%): ${config.publisherWallet || '(same as prize pool — 1% forward skipped)'}`);
+  console.log(`  Team Wallet (receives 1%): ${config.devWallet}`);
+  console.log('  Payout: 3% ALL to winners | 1% forwarded to team at draw');
   
   console.log('\n🚫 Excluded Addresses (not counted as holders):');
   config.excludedAddresses.forEach(addr => {

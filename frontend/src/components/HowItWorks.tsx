@@ -57,12 +57,15 @@ export function HowItWorks() {
             <div className="h-px bg-white/10" />
             <div className="flex justify-between">
               <span className="text-[var(--text-muted)]">→ Prize Pool</span>
-              <span style={{ color: 'var(--green-primary)' }}>3% ETH</span>
+              <span style={{ color: 'var(--green-primary)' }}>3% ETH (all)</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[var(--text-muted)]">→ Developer</span>
+              <span className="text-[var(--text-muted)]">→ Publisher (auto)</span>
               <span>1% ETH</span>
             </div>
+            <p className="text-[10px] md:text-xs text-[var(--text-muted)] pt-2">
+              The 3% is paid 100% to winners. The auto 1% is forwarded to the team wallet in the same draw as prizes.
+            </p>
           </div>
         </div>
         

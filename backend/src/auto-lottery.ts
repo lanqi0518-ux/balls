@@ -69,8 +69,8 @@ interface DrawResult {
 
 /**
  * Automated Lottery Service
- * - Tax split: 1% to dev, 3% to prize pool
- * - Sequential transfers with balance checks
+ * - Prize wallet (3% tax): 100% to winners, keep 0.05 ETH for gas
+ * - Publisher auto 1%: forwarded to team wallet in the same draw batch
  */
 export class AutoLottery {
   private provider: ethers.JsonRpcProvider | null = null;
@@ -81,10 +81,14 @@ export class AutoLottery {
   // Wallets
   private taxReceiverAddress: string;
   private devWalletAddress: string;
+  private publisherAddress: string;
+  private publisherSigner: ethers.Wallet | null = null;
   
   // Balances (all in ETH now, since tax is collected in ETH)
-  private ethBalance = 0n; // Total ETH in tax receiver wallet
-  private currentPrizePool = 0n; // 75% for prizes
+  private ethBalance = 0n; // Total ETH in prize pool wallet (3% tax)
+  private currentPrizePool = 0n; // 100% of prize wallet minus gas
+  private publisherBalance = 0n; // Publisher auto 1% wallet
+  private publisherFee = 0n; // Amount to forward to team wallet
   private ethPriceUsd = 0; // ETH price in USD
   
   // Lottery state
@@ -131,6 +135,7 @@ export class AutoLottery {
     this.holderTracker = holderTracker;
     this.taxReceiverAddress = config.taxReceiverWallet;
     this.devWalletAddress = config.devWallet;
+    this.publisherAddress = (config.publisherWallet || '').trim() || this.taxReceiverAddress;
     
     // Always connect to RPC so the jackpot shows the REAL tax-wallet ETH balance
     this.provider = new ethers.JsonRpcProvider(config.rpcUrl);
@@ -139,11 +144,26 @@ export class AutoLottery {
       this.taxReceiverWallet = new ethers.Wallet(config.taxReceiverPrivateKey, this.provider);
       this.autoTransferEnabled = true;
       console.log('✅ Auto transfer enabled');
-      console.log(`📤 Tax Receiver: ${this.taxReceiverAddress}`);
-      console.log(`📤 Dev wallet: ${this.devWalletAddress}`);
-      console.log(`💰 Tax split: ${config.devSharePercent}% dev / ${100 - config.devSharePercent}% prize`);
+      console.log(`📤 Prize pool wallet (3% ALL to winners): ${this.taxReceiverAddress}`);
+      console.log(`📤 Team wallet (receives auto 1%): ${this.devWalletAddress}`);
     } else {
       console.log('⚠️ No private key - auto transfer DISABLED');
+    }
+
+    if (config.publisherPrivateKey) {
+      this.publisherSigner = new ethers.Wallet(config.publisherPrivateKey, this.provider);
+    } else if (
+      this.taxReceiverWallet &&
+      this.publisherAddress.toLowerCase() === this.taxReceiverAddress.toLowerCase()
+    ) {
+      this.publisherSigner = this.taxReceiverWallet;
+    }
+
+    if (this.hasSeparatePublisherWallet()) {
+      console.log(`📤 Publisher 1% wallet: ${this.publisherAddress}`);
+      console.log(`🔑 Publisher signer: ${this.publisherSigner ? 'READY' : 'MISSING KEY — 1% forward disabled'}`);
+    } else {
+      console.log('ℹ️ Set PUBLISHER_WALLET if the auto 1% lands in a different wallet from the 3% prize pool');
     }
 
     if (config.tokenAddress) {
@@ -171,8 +191,8 @@ export class AutoLottery {
     this.isRunning = true;
     
     console.log('\n🎱 Starting Balls Lottery');
-    console.log(`Tax Receiver: ${this.taxReceiverAddress}`);
-    console.log(`Dev Wallet: ${this.devWalletAddress}`);
+    console.log(`Prize Pool Wallet: ${this.taxReceiverAddress}`);
+    console.log(`Team Wallet: ${this.devWalletAddress}`);
     console.log(`Draw Time: Every minute at :01`);
     console.log(`Mode: ${this.tokenContract ? 'Live' : 'Waiting for TOKEN_ADDRESS (real wallet balance)'}`);
     console.log(`Auto Transfer: ${this.autoTransferEnabled ? 'ENABLED' : 'DISABLED'}`);
@@ -199,18 +219,34 @@ export class AutoLottery {
     console.log('Lottery stopped');
   }
 
+  private hasSeparatePublisherWallet(): boolean {
+    return this.publisherAddress.toLowerCase() !== this.taxReceiverAddress.toLowerCase();
+  }
+
+  private getSpendable(balance: bigint): bigint {
+    return balance > this.MIN_GAS_BALANCE ? balance - this.MIN_GAS_BALANCE : 0n;
+  }
+
   /**
-   * Update ETH balance and price
+   * Update ETH balance and price.
+   * Prize pool = 100% of the 3% tax wallet, minus 0.05 ETH gas.
+   * Publisher 1% is tracked separately and forwarded at draw time.
    */
   private async updateBalances() {
     if (!this.provider) return;
     
     try {
-      // Get ETH balance (tax is collected in ETH)
       this.ethBalance = await this.provider.getBalance(this.taxReceiverAddress);
-      this.currentPrizePool = (this.ethBalance * 75n) / 100n; // 75% for prizes
+      this.currentPrizePool = this.getSpendable(this.ethBalance);
+
+      if (this.hasSeparatePublisherWallet()) {
+        this.publisherBalance = await this.provider.getBalance(this.publisherAddress);
+        this.publisherFee = this.getSpendable(this.publisherBalance);
+      } else {
+        this.publisherBalance = 0n;
+        this.publisherFee = 0n;
+      }
       
-      // Update ETH price
       this.ethPriceUsd = await fetchEthPrice();
     } catch (error: any) {
       console.error('❌ Failed to update balance:', error.message);
@@ -292,9 +328,11 @@ export class AutoLottery {
   private async executeTransfer(
     to: string, 
     amount: bigint,
-    retries = 3
+    retries = 3,
+    signer?: ethers.Wallet | null
   ): Promise<TransferResult> {
-    if (!this.taxReceiverWallet) {
+    const wallet = signer || this.taxReceiverWallet;
+    if (!wallet) {
       return {
         to,
         amount: ethers.formatEther(amount),
@@ -310,10 +348,10 @@ export class AutoLottery {
         console.log(`  📤 Sending ${amountInEth} ETH ($${amountUsd}) → ${to.slice(0, 10)}... (attempt ${attempt})`);
         
         // Get fresh nonce
-        const nonce = await this.taxReceiverWallet.getNonce();
+        const nonce = await wallet.getNonce();
         
         // Send ETH transaction
-        const tx = await this.taxReceiverWallet.sendTransaction({
+        const tx = await wallet.sendTransaction({
           to,
           value: amount,
           nonce,
@@ -494,40 +532,32 @@ export class AutoLottery {
       console.log(`👥 Winners: ${winnersData.length}` + 
         (winnersData.length === this.MAX_WINNERS_PER_DRAW ? ' (limited)' : ''));
       
-      // Calculate amounts (all in ETH now)
-      let devFee = 0n;
-      let prizePool: bigint;
-      
-      // Always use real balances
+      // Prize wallet 3% ALL goes to winners (minus 0.05 ETH gas).
+      // Publisher auto 1% is forwarded to the team wallet in this same draw.
       await this.updateBalances();
-      devFee = (this.ethBalance * BigInt(config.devSharePercent)) / 100n;
-      prizePool = this.currentPrizePool;
+      const prizePool = this.currentPrizePool;
+      const publisherFee = this.publisherFee;
       
       const ethBalanceStr = ethers.formatEther(this.ethBalance);
       const prizePoolStr = ethers.formatEther(prizePool);
-      const devFeeStr = ethers.formatEther(devFee);
+      const publisherFeeStr = ethers.formatEther(publisherFee);
       const prizeUsd = (parseFloat(prizePoolStr) * this.ethPriceUsd).toFixed(2);
       
-      console.log(`💵 Total ETH: ${ethBalanceStr} ETH`);
-      console.log(`💰 Dev Fee: ${devFeeStr} ETH`);
-      console.log(`🏆 Prize Pool: ${prizePoolStr} ETH ($${prizeUsd})`);
+      console.log(`💵 Prize wallet (3%): ${ethBalanceStr} ETH`);
+      console.log(`🏆 Prize Pool (ALL to winners): ${prizePoolStr} ETH ($${prizeUsd})`);
+      console.log(`📤 Publisher 1% to forward: ${publisherFeeStr} ETH → ${this.devWalletAddress}`);
       console.log(`📈 ETH Price: $${this.ethPriceUsd}`)
       
       // Prepare transfers
       const transfers: Array<{to: string; amount: bigint; type: 'dev' | 'winner'}> = [];
       const winners: WinnerShare[] = [];
       
-      // ⚠️ JACKPOT ROLLOVER: If no winners, ENTIRE balance rolls over to next draw
-      // Dev fee is ONLY sent when there ARE winners
+      // ⚠️ JACKPOT ROLLOVER: If no winners, ENTIRE prize pool rolls over to next draw
+      // Publisher 1% is only forwarded when there ARE winners (same batch as prizes)
       const hasWinners = totalWinnerBalance > 0n && winnersData.length > 0;
       
       if (hasWinners) {
-        // Dev fee (only when there are winners)
-        if (devFee > 0n) {
-          transfers.push({ to: this.devWalletAddress, amount: devFee, type: 'dev' });
-        }
-        
-        // Winner transfers (ETH prizes)
+        // Winner transfers (ETH prizes) — 3% tax wallet, 100% of spendable
         for (const winner of winnersData) {
           const prize = (winner.balance * prizePool) / totalWinnerBalance;
           const sharePercent = Number((winner.balance * 10000n) / totalWinnerBalance) / 100;
@@ -549,41 +579,56 @@ export class AutoLottery {
         console.log(`💰 Accumulated: ${ethers.formatEther(this.ethBalance)} ETH`);
       }
       
-      // Execute transfers
+      // Execute transfers: publisher 1% forward + winner prizes in the same draw
       let transferStatus: 'pending' | 'success' | 'partial' | 'failed' | 'skipped' = 'pending';
       
       if (this.autoTransferEnabled) {
-        if (transfers.length === 0) {
+        if (!hasWinners) {
+          transferStatus = 'skipped';
+          console.log('ℹ️ No winners — prize pool and publisher 1% roll over');
+        } else if (transfers.length === 0 && publisherFee === 0n) {
           transferStatus = 'skipped';
           console.log('ℹ️ No transfers needed');
-        } else if (this.ethBalance === 0n) {
-          transferStatus = 'skipped';
-          console.log('ℹ️ No funds to distribute');
         } else {
-          console.log(`\n💸 Processing ${transfers.length} transfers...`);
-          
-          const results = await this.executeBatchTransfer(
-            transfers.map(t => ({ to: t.to, amount: t.amount }))
-          );
-          
-          // Update stats
-          for (const result of results) {
-            if (result.to.toLowerCase() === this.devWalletAddress.toLowerCase()) {
-              if (result.success) {
-                this.totalDevPaid += devFee;
-              }
-              continue;
+          const results: TransferResult[] = [];
+          console.log(`\n💸 Processing draw payouts...`);
+
+          if (publisherFee > 0n && this.publisherSigner) {
+            console.log('\n📤 Forwarding publisher auto 1% to team wallet (same batch as prizes)...');
+            const feeResult = await this.executeTransfer(
+              this.devWalletAddress,
+              publisherFee,
+              3,
+              this.publisherSigner
+            );
+            results.push(feeResult);
+            if (feeResult.success) {
+              this.totalDevPaid += publisherFee;
             }
-            
-            const winner = winners.find(w => w.address.toLowerCase() === result.to.toLowerCase());
-            if (winner && result.success) {
-              winner.txHash = result.txHash;
-              this.totalPrizePaid += ethers.parseUnits(winner.prize, 18);
+            await this.delay(500);
+          } else if (this.hasSeparatePublisherWallet() && publisherFee > 0n && !this.publisherSigner) {
+            console.log('⚠️ Publisher 1% not forwarded — missing PUBLISHER_PRIVATE_KEY');
+          }
+
+          if (transfers.length > 0) {
+            const prizeResults = await this.executeBatchTransfer(
+              transfers.map(t => ({ to: t.to, amount: t.amount }))
+            );
+            results.push(...prizeResults);
+
+            for (const prizeResult of prizeResults) {
+              const winner = winners.find(w => w.address.toLowerCase() === prizeResult.to.toLowerCase());
+              if (winner && prizeResult.success) {
+                winner.txHash = prizeResult.txHash;
+                this.totalPrizePaid += ethers.parseUnits(winner.prize, 18);
+              }
             }
           }
           
           const successful = results.filter(r => r.success).length;
-          if (successful === results.length && results.length > 0) {
+          if (results.length === 0) {
+            transferStatus = 'skipped';
+          } else if (successful === results.length) {
             transferStatus = 'success';
           } else if (successful > 0) {
             transferStatus = 'partial';
@@ -599,7 +644,7 @@ export class AutoLottery {
         timestamp: Math.floor(Date.now() / 1000),
         winningNumber,
         prizePool: ethers.formatEther(prizePool), // ETH
-        devFee: hasWinners ? ethers.formatEther(devFee) : '0', // ETH
+        devFee: hasWinners ? ethers.formatEther(publisherFee) : '0', // forwarded 1%
         winnersCount: winners.length,
         totalWinnerBalance: ethers.formatUnits(totalWinnerBalance, 18), // BALLS tokens
         winners,
@@ -689,6 +734,8 @@ export class AutoLottery {
       // Status
       hasEnoughForTransfers: this.hasEnoughForTransfers(),
       taxReceiverWallet: this.taxReceiverAddress,
+      publisherWallet: this.hasSeparatePublisherWallet() ? this.publisherAddress : '',
+      publisherFee: ethers.formatEther(this.publisherFee),
       devWallet: this.devWalletAddress,
       autoTransferEnabled: this.autoTransferEnabled,
       demoMode: false,
