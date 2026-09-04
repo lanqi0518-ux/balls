@@ -1,10 +1,12 @@
+import { memo } from 'react'
+
 interface Props {
   totalDraws: number
   totalHolders: number
   eligibleHolders: number
 }
 
-export function Stats({ totalDraws, totalHolders, eligibleHolders }: Props) {
+export const Stats = memo(function Stats({ totalDraws, totalHolders, eligibleHolders }: Props) {
   return (
     <div className="card">
       <h3 className="text-xs md:text-sm text-[var(--text-muted)] uppercase tracking-wider mb-4 md:mb-6">
@@ -50,4 +52,4 @@ export function Stats({ totalDraws, totalHolders, eligibleHolders }: Props) {
       </div>
     </div>
   )
-}
+})

@@ -1,4 +1,6 @@
-export function HowItWorks() {
+import { memo } from 'react'
+
+export const HowItWorks = memo(function HowItWorks() {
   const steps = [
     {
       num: '01',
@@ -86,4 +88,4 @@ export function HowItWorks() {
       </div>
     </div>
   )
-}
+})

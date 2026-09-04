@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { useNumberLookup, useUserInfo } from '../hooks/useRealtime'
 
-export function NumberLookup() {
+export const NumberLookup = memo(function NumberLookup() {
   const [address, setAddress] = useState('')
   const [result, setResult] = useState<{address: string; number: number} | null>(null)
   const { lookupNumber, isLoading } = useNumberLookup()
@@ -87,4 +87,4 @@ export function NumberLookup() {
       )}
     </div>
   )
-}
+})

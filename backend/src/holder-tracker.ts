@@ -603,15 +603,9 @@ export class HolderTracker {
    * Get eligible holders by number (only from top 200)
    */
   getEligibleHoldersByNumber(number: number): string[] {
-    // Get top 200 eligible holders first
-    const top200 = this.getEligibleHolders();
-    const top200Set = new Set(top200.map(h => h.address));
-    
-    // Filter by number and ensure they're in top 200
-    const holders = this.numberToHolders.get(number);
-    if (!holders) return [];
-    
-    return Array.from(holders).filter(addr => top200Set.has(addr));
+    return this.getEligibleHolders()
+      .filter(h => h.number === number)
+      .map(h => h.address);
   }
 
   /**
@@ -619,12 +613,15 @@ export class HolderTracker {
    */
   getNumberDistribution(): Map<number, number> {
     const distribution = new Map<number, number>();
-    
     for (let i = 1; i <= 50; i++) {
-      const eligibleCount = this.getEligibleHoldersByNumber(i).length;
-      distribution.set(i, eligibleCount);
+      distribution.set(i, 0);
     }
-    
+
+    const eligible = this.getEligibleHolders();
+    for (const holder of eligible) {
+      distribution.set(holder.number, (distribution.get(holder.number) || 0) + 1);
+    }
+
     return distribution;
   }
 
@@ -707,18 +704,12 @@ export class HolderTracker {
     lastScannedBlock: number;
     excludedCount: number;
   } {
-    // Count all holders meeting time requirement
-    let holdersWithTime = 0;
-    for (const [address] of this.holders) {
-      if (this.isEligible(address)) {
-        holdersWithTime++;
-      }
-    }
-    
+    const eligible = this.getEligibleHolders();
+
     return {
       totalHolders: this.holders.size,
-      holdersWithTime, // All holders with 60s+ holding time
-      eligibleHolders: this.getEligibleHolders().length, // Top 200 only
+      holdersWithTime: eligible.length,
+      eligibleHolders: eligible.length,
       topHoldersLimit: this.TOP_HOLDERS_LIMIT,
       minHoldingDuration: this.minHoldingDuration,
       isScanning: this.isScanning,

@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { useNumberDistribution } from '../hooks/useRealtime'
 
 interface Props {
@@ -10,7 +11,7 @@ interface Props {
   eligibleCount: number
 }
 
-export function SnapshotPanel({ snapshot, hasSnapshot }: Props) {
+export const SnapshotPanel = memo(function SnapshotPanel({ snapshot, hasSnapshot }: Props) {
   const { distribution } = useNumberDistribution()
 
   return (
@@ -65,4 +66,4 @@ export function SnapshotPanel({ snapshot, hasSnapshot }: Props) {
       )}
     </div>
   )
-}
+})

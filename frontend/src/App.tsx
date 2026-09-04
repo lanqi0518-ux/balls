@@ -49,7 +49,7 @@ function App() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="border-b border-white/5 sticky top-0 z-50 bg-[var(--bg-dark)]/95 backdrop-blur-sm">
+      <header className="border-b border-white/5 sticky top-0 z-50 bg-[var(--bg-dark)]">
         <div className="container py-3 md:py-4 flex items-center justify-between">
           <div className="flex items-center gap-2 md:gap-3">
             <img src="/logo.svg" alt="Balls" className="w-8 h-8 md:w-10 md:h-10" />
@@ -140,10 +140,7 @@ function App() {
             <p className="text-[var(--text-muted)] text-xs md:text-sm uppercase tracking-wider mb-3 md:mb-4">
               Next Draw
             </p>
-            <Countdown 
-              timeUntil={status?.timeUntilNextDraw || 60}
-              isUrgent={(status?.timeUntilNextDraw || 60) <= 10}
-            />
+            <Countdown />
             {status?.hasSnapshot && (
               <p className="mt-3 md:mt-4 text-xs md:text-sm" style={{ color: 'var(--green-primary)' }}>
                 ✓ Snapshot Locked

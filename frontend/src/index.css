@@ -60,7 +60,7 @@ body {
   background: var(--bg-card);
   border-radius: 12px;
   padding: 24px;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease;
 }
 
 .card:hover {
@@ -134,20 +134,14 @@ body {
   background: linear-gradient(180deg, var(--green-primary) 0%, var(--green-dark) 100%);
   color: #000;
   box-shadow: 
-    0 0 30px rgba(0, 200, 5, 0.5),
+    0 0 24px rgba(0, 200, 5, 0.45),
     0 4px 12px rgba(0, 0, 0, 0.3);
-  animation: ball-glow 2s ease-in-out infinite;
 }
 
 .ball-small {
   width: 40px;
   height: 40px;
   font-size: 16px;
-}
-
-@keyframes ball-glow {
-  0%, 100% { box-shadow: 0 0 30px rgba(0, 200, 5, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3); }
-  50% { box-shadow: 0 0 50px rgba(0, 200, 5, 0.8), 0 4px 12px rgba(0, 0, 0, 0.3); }
 }
 
 /* ================================
@@ -235,12 +229,6 @@ body {
 .countdown-urgent .countdown-digit {
   background: rgba(255, 80, 0, 0.2);
   color: var(--red);
-  animation: pulse-urgent 1s ease-in-out infinite;
-}
-
-@keyframes pulse-urgent {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.02); }
 }
 
 /* ================================
@@ -363,12 +351,12 @@ body {
   height: 8px;
   background: var(--green-primary);
   border-radius: 50%;
-  animation: live-pulse 2s ease-in-out infinite;
+  animation: live-pulse 2.4s ease-in-out infinite;
 }
 
 @keyframes live-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(0.8); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
 }
 
 /* ================================

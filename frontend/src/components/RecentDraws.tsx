@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 
 interface WinnerShare {
   address: string
@@ -23,7 +23,7 @@ interface Props {
   draws: DrawResult[]
 }
 
-export function RecentDraws({ draws }: Props) {
+export const RecentDraws = memo(function RecentDraws({ draws }: Props) {
   const [expandedDraw, setExpandedDraw] = useState<number | null>(null)
 
   const formatTime = (timestamp: number) => {
@@ -176,4 +176,4 @@ export function RecentDraws({ draws }: Props) {
       )}
     </div>
   )
-}
+})

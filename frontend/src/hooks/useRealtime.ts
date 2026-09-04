@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 const API_URL = import.meta.env.VITE_API_URL 
   ? `${import.meta.env.VITE_API_URL}/api`
@@ -75,43 +75,37 @@ interface UserInfo {
 }
 
 /**
- * Calculate time until next draw (second :01 of every minute)
- */
-function getTimeUntilNextDraw(): number {
-  const now = new Date();
-  const seconds = now.getSeconds();
-  
-  if (seconds === 0) return 1;
-  if (seconds >= 1) return 60 - seconds + 1;
-  return 1;
-}
-
-/**
  * Real-time status hook
  */
+function statusUnchanged(prev: LotteryStatus, next: LotteryStatus): boolean {
+  return (
+    prev.prizePool === next.prizePool &&
+    prev.prizePoolUsd === next.prizePoolUsd &&
+    prev.ethPriceUsd === next.ethPriceUsd &&
+    prev.hasSnapshot === next.hasSnapshot &&
+    prev.currentDrawId === next.currentDrawId &&
+    prev.stats?.eligibleHolders === next.stats?.eligibleHolders &&
+    prev.stats?.totalHolders === next.stats?.totalHolders
+  );
+}
+
 export function useRealtimeStatus() {
   const [status, setStatus] = useState<LotteryStatus | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [latestDraw, setLatestDraw] = useState<DrawResult | null>(null);
-  const [localCountdown, setLocalCountdown] = useState(getTimeUntilNextDraw());
+  const esRef = useRef<EventSource | null>(null);
 
-  // Local countdown - update every 500ms for smooth display
   useEffect(() => {
-    const timer = setInterval(() => {
-      setLocalCountdown(getTimeUntilNextDraw());
-    }, 500);
-    return () => clearInterval(timer);
-  }, []);
-
-  // SSE connection
-  useEffect(() => {
-    let eventSource: EventSource | null = null;
     let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
     let retryCount = 0;
+    let closed = false;
 
     const connect = () => {
+      if (closed) return;
       try {
-        eventSource = new EventSource(`${API_URL}/events`);
+        esRef.current?.close();
+        const eventSource = new EventSource(`${API_URL}/events`);
+        esRef.current = eventSource;
 
         eventSource.onopen = () => {
           setIsConnected(true);
@@ -120,47 +114,41 @@ export function useRealtimeStatus() {
 
         eventSource.onerror = () => {
           setIsConnected(false);
-          eventSource?.close();
-          
-          // Exponential backoff: 1s, 2s, 4s, max 10s
-          const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
+          eventSource.close();
+          if (closed) return;
+          const delay = Math.min(2000 * Math.pow(2, retryCount), 15000);
           retryCount++;
           reconnectTimeout = setTimeout(connect, delay);
         };
 
         eventSource.addEventListener('status', (event) => {
           try {
-            const data = JSON.parse(event.data);
-            setStatus(data);
-          } catch (e) {}
+            const data = JSON.parse((event as MessageEvent).data) as LotteryStatus;
+            setStatus((prev) => (prev && statusUnchanged(prev, data) ? prev : data));
+          } catch {}
         });
 
         eventSource.addEventListener('draw', (event) => {
           try {
-            const data = JSON.parse(event.data);
-            setLatestDraw(data);
-          } catch (e) {}
+            setLatestDraw(JSON.parse((event as MessageEvent).data));
+          } catch {}
         });
-      } catch (e) {
-        reconnectTimeout = setTimeout(connect, 3000);
+      } catch {
+        reconnectTimeout = setTimeout(connect, 5000);
       }
     };
 
     connect();
 
     return () => {
-      eventSource?.close();
+      closed = true;
+      esRef.current?.close();
+      esRef.current = null;
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
   }, []);
 
-  // Combine server status with local countdown
-  const effectiveStatus = status ? {
-    ...status,
-    timeUntilNextDraw: localCountdown
-  } : null;
-
-  return { status: effectiveStatus, isConnected, latestDraw };
+  return { status, isConnected, latestDraw };
 }
 
 /**
@@ -285,7 +273,7 @@ export function useNumberDistribution() {
   useEffect(() => {
     refetch();
     // Refresh every 60 seconds instead of 30
-    const interval = setInterval(refetch, 60000);
+    const interval = setInterval(refetch, 90000);
     return () => clearInterval(interval);
   }, [refetch]);
 

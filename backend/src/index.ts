@@ -30,8 +30,14 @@ async function main() {
   };
   
   // Set up lottery event handlers
-  autoLottery.onDraw = (result) => broadcast('draw', result);
-  autoLottery.onSnapshot = (snapshot) => broadcast('snapshot', snapshot);
+  autoLottery.onDraw = (result) => {
+    broadcast('draw', result);
+    broadcast('status', autoLottery.getStatus());
+  };
+  autoLottery.onSnapshot = (snapshot) => {
+    broadcast('snapshot', snapshot);
+    broadcast('status', autoLottery.getStatus());
+  };
   
   // Create Express app
   const app = express();
@@ -309,12 +315,12 @@ async function main() {
     });
   });
   
-  // Broadcast status every 3 seconds
+  // Broadcast status every 10 seconds (draw/snapshot push immediately)
   setInterval(() => {
     if (sseClients.size > 0) {
       broadcast('status', autoLottery.getStatus());
     }
-  }, 3000);
+  }, 10000);
   
   // Start server
   const port = config.port || 10000;

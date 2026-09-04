@@ -116,6 +116,7 @@ export class AutoLottery {
   // Track state
   private lastDrawMinute = -1;
   private snapshotTakenForMinute = -1;
+  private statusCache: { at: number; value: ReturnType<AutoLottery['buildStatus']> } | null = null;
   
   // Stats
   private totalDevPaid = 0n;
@@ -204,7 +205,7 @@ export class AutoLottery {
     
     // Start balance updates if configured
     this.updateBalances();
-    setInterval(() => this.updateBalances(), 5000);
+    setInterval(() => this.updateBalances(), 10000);
   }
 
   stop() {
@@ -710,11 +711,23 @@ export class AutoLottery {
   }
 
   getStatus() {
-    const timeUntilDraw = this.getTimeUntilDraw();
+    const now = Date.now();
+    if (this.statusCache && now - this.statusCache.at < 1500) {
+      return {
+        ...this.statusCache.value,
+        timeUntilNextDraw: this.getTimeUntilDraw(),
+      };
+    }
+
+    const value = this.buildStatus();
+    this.statusCache = { at: now, value };
+    return value;
+  }
+
+  private buildStatus() {
     const prizePool = this.currentPrizePool;
     const trackerStats = this.holderTracker.getStats();
     
-    // Calculate USD values
     const prizePoolEth = parseFloat(ethers.formatEther(prizePool));
     const prizePoolUsd = prizePoolEth * this.ethPriceUsd;
     const ethBalanceUsd = parseFloat(ethers.formatEther(this.ethBalance)) * this.ethPriceUsd;
@@ -723,15 +736,13 @@ export class AutoLottery {
       isRunning: this.isRunning,
       isProcessingDraw: this.isProcessingDraw,
       currentDrawId: this.currentDrawId,
-      timeUntilNextDraw: timeUntilDraw,
+      timeUntilNextDraw: this.getTimeUntilDraw(),
       hasSnapshot: !!this.currentSnapshot,
-      // ETH values
       prizePool: ethers.formatEther(prizePool),
       prizePoolUsd: prizePoolUsd.toFixed(2),
       ethBalance: ethers.formatEther(this.ethBalance),
       ethBalanceUsd: ethBalanceUsd.toFixed(2),
       ethPriceUsd: this.ethPriceUsd,
-      // Status
       hasEnoughForTransfers: this.hasEnoughForTransfers(),
       taxReceiverWallet: this.taxReceiverAddress,
       publisherWallet: this.hasSeparatePublisherWallet() ? this.publisherAddress : '',
@@ -741,7 +752,6 @@ export class AutoLottery {
       demoMode: false,
       tokenConfigured: !!this.tokenContract,
       prizeInEth: true,
-      // Stats
       totalDevPaid: ethers.formatEther(this.totalDevPaid),
       totalPrizePaid: ethers.formatEther(this.totalPrizePaid),
       totalDraws: this.totalDraws,
