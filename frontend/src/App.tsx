@@ -52,7 +52,7 @@ function App() {
       <header className="border-b border-white/5">
         <div className="container py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Balls" className="w-10 h-10 rounded-full" />
+            <img src="/logo.svg" alt="Balls" className="w-10 h-10" />
             <div>
               <h1 className="text-xl font-bold">Balls</h1>
               <p className="text-xs text-[var(--text-muted)]">On-Chain Lottery</p>
@@ -180,7 +180,7 @@ function App() {
         {/* Footer */}
         <footer className="text-center py-12 mt-12 border-t border-white/5">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <img src="/logo.png" alt="Balls" className="w-10 h-10 rounded-full" />
+            <img src="/logo.svg" alt="Balls" className="w-10 h-10" />
             <span className="text-lg font-bold" style={{ color: 'var(--green-primary)' }}>Balls</span>
           </div>
           <p className="text-[var(--text-muted)] text-sm">

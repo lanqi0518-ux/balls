@@ -1,0 +1,31 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="ballGradient" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" style="stop-color:#00FF00"/>
+      <stop offset="50%" style="stop-color:#00C805"/>
+      <stop offset="100%" style="stop-color:#008000"/>
+    </radialGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#00C805" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+  
+  <!-- Outer glow -->
+  <circle cx="50" cy="50" r="45" fill="none" stroke="#00C805" stroke-width="1" opacity="0.3" filter="url(#glow)"/>
+  
+  <!-- Main ball -->
+  <circle cx="50" cy="50" r="42" fill="url(#ballGradient)" filter="url(#shadow)"/>
+  
+  <!-- Highlight -->
+  <ellipse cx="35" cy="35" rx="15" ry="10" fill="white" opacity="0.3"/>
+  
+  <!-- Letter B -->
+  <text x="50" y="65" font-family="Arial Black, sans-serif" font-size="45" font-weight="900" fill="white" text-anchor="middle" filter="url(#glow)">B</text>
+</svg>
