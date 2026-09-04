@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="fireGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" style="stop-color:#b8860b"/>
+      <stop offset="50%" style="stop-color:#d4a017"/>
+      <stop offset="100%" style="stop-color:#f5d061"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="512" height="512" rx="64" fill="#0a0a0a"/>
+  
+  <!-- Fire/Flame icon -->
+  <path d="M256 80 c0 0 -60 70 -60 130 c0 20 8 38 20 52 c-5-15 0-35 15-55 c0 0 25 40 25 65 c0 10-3 18-8 25 c12-5 23-20 23-40 c0 0 20 25 20 50 c0 35-30 65-60 75 c50-5 95-45 95-95 c0-80-70-140-70-207z" fill="url(#fireGrad)" opacity="0.9"/>
+  
+  <!-- Grill lines -->
+  <line x1="170" y1="340" x2="342" y2="340" stroke="#d4a017" stroke-width="3" stroke-linecap="round"/>
+  <line x1="175" y1="355" x2="337" y2="355" stroke="#d4a017" stroke-width="3" stroke-linecap="round"/>
+  <line x1="180" y1="370" x2="332" y2="370" stroke="#d4a017" stroke-width="3" stroke-linecap="round"/>
+  
+  <!-- Text: BACKYARD -->
+  <text x="256" y="420" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="6">BACKYARD</text>
+  
+  <!-- Text: HIBACHI -->
+  <text x="256" y="470" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="400" fill="#d4a017" text-anchor="middle" letter-spacing="10">HIBACHI</text>
+</svg>
