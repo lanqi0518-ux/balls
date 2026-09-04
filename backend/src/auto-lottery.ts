@@ -87,10 +87,6 @@ export class AutoLottery {
   private currentPrizePool = 0n; // 75% for prizes
   private ethPriceUsd = 0; // ETH price in USD
   
-  // Demo mode
-  private demoMode = false;
-  private demoPrizePool = 75000n * 10n ** 18n;
-  
   // Lottery state
   private currentDrawId = 0;
   
@@ -136,28 +132,29 @@ export class AutoLottery {
     this.taxReceiverAddress = config.taxReceiverWallet;
     this.devWalletAddress = config.devWallet;
     
-    if (!config.tokenAddress) {
-      console.log('🎮 Lottery running in demo mode');
-      this.demoMode = true;
+    // Always connect to RPC so the jackpot shows the REAL tax-wallet ETH balance
+    this.provider = new ethers.JsonRpcProvider(config.rpcUrl);
+
+    if (config.taxReceiverPrivateKey) {
+      this.taxReceiverWallet = new ethers.Wallet(config.taxReceiverPrivateKey, this.provider);
+      this.autoTransferEnabled = true;
+      console.log('✅ Auto transfer enabled');
+      console.log(`📤 Tax Receiver: ${this.taxReceiverAddress}`);
+      console.log(`📤 Dev wallet: ${this.devWalletAddress}`);
+      console.log(`💰 Tax split: ${config.devSharePercent}% dev / ${100 - config.devSharePercent}% prize`);
     } else {
-      this.provider = new ethers.JsonRpcProvider(config.rpcUrl);
-      
-      if (config.taxReceiverPrivateKey) {
-        this.taxReceiverWallet = new ethers.Wallet(config.taxReceiverPrivateKey, this.provider);
-        this.autoTransferEnabled = true;
-        console.log('✅ Auto transfer enabled');
-        console.log(`📤 Tax Receiver: ${this.taxReceiverAddress}`);
-        console.log(`📤 Dev wallet: ${this.devWalletAddress}`);
-        console.log(`💰 Tax split: ${config.devSharePercent}% dev / ${100 - config.devSharePercent}% prize`);
-      } else {
-        console.log('⚠️ No private key - auto transfer DISABLED');
-      }
-      
+      console.log('⚠️ No private key - auto transfer DISABLED');
+    }
+
+    if (config.tokenAddress) {
       this.tokenContract = new ethers.Contract(
         config.tokenAddress,
         ERC20_ABI,
         this.taxReceiverWallet || this.provider
       );
+    } else {
+      console.log('⚠️ No TOKEN_ADDRESS - draws paused until contract is set');
+      console.log('💡 Prize pool still reads the real tax-wallet ETH balance');
     }
   }
 
@@ -177,7 +174,7 @@ export class AutoLottery {
     console.log(`Tax Receiver: ${this.taxReceiverAddress}`);
     console.log(`Dev Wallet: ${this.devWalletAddress}`);
     console.log(`Draw Time: Every minute at :01`);
-    console.log(`Mode: ${this.demoMode ? 'Demo' : 'Live'}`);
+    console.log(`Mode: ${this.tokenContract ? 'Live' : 'Waiting for TOKEN_ADDRESS (real wallet balance)'}`);
     console.log(`Auto Transfer: ${this.autoTransferEnabled ? 'ENABLED' : 'DISABLED'}`);
     console.log(`Max Winners/Draw: ${this.MAX_WINNERS_PER_DRAW}`);
     
@@ -185,10 +182,9 @@ export class AutoLottery {
       this.tick();
     }, 500);
     
-    if (!this.demoMode) {
-      this.updateBalances();
-      setInterval(() => this.updateBalances(), 5000);
-    }
+    // Start balance updates if configured
+    this.updateBalances();
+    setInterval(() => this.updateBalances(), 5000);
   }
 
   stop() {
@@ -207,7 +203,7 @@ export class AutoLottery {
    * Update ETH balance and price
    */
   private async updateBalances() {
-    if (!this.provider || this.demoMode) return;
+    if (!this.provider) return;
     
     try {
       // Get ETH balance (tax is collected in ETH)
@@ -225,12 +221,13 @@ export class AutoLottery {
    * Check if we have enough ETH for transfers (need some reserve for gas)
    */
   private hasEnoughForTransfers(): boolean {
-    if (this.demoMode) return true;
-    // Need at least 0.01 ETH reserve for gas after transfers
+    // Need at least 0.05 ETH reserve for gas after transfers
     return this.ethBalance > this.MIN_GAS_BALANCE;
   }
 
   private tick() {
+    if (!this.tokenContract) return;
+
     const now = new Date();
     const currentMinute = now.getMinutes();
     const currentSecond = now.getSeconds();
@@ -276,12 +273,12 @@ export class AutoLottery {
     
     this.currentSnapshot = { drawId: nextDrawId, timestamp, holders, hash };
     
-    const prizePool = this.demoMode ? this.demoPrizePool : this.currentPrizePool;
+    const prizePool = this.currentPrizePool;
     
     const prizePoolEth = ethers.formatEther(prizePool);
     const prizeUsd = (parseFloat(prizePoolEth) * this.ethPriceUsd).toFixed(2);
     
-    console.log('\n📸 Snapshot Locked (Top 200 Holders)');
+    console.log('\n📸 Snapshot Locked (Top 100 Holders)');
     console.log(`Draw: #${nextDrawId} | Eligible: ${holders.length} | Prize Pool: ${prizePoolEth} ETH ($${prizeUsd})`);
     
     if (this.onSnapshot) {
@@ -463,7 +460,7 @@ export class AutoLottery {
       // This prevents issues where someone sold between snapshot and draw
       let winnersData: Array<{address: string; number: number; balance: bigint}> = [];
       
-      if (!this.demoMode && this.tokenContract) {
+      if (this.tokenContract) {
         console.log(`🔄 Fetching real-time balances for ${snapshotWinners.length} potential winners...`);
         
         for (const winner of snapshotWinners) {
@@ -501,14 +498,10 @@ export class AutoLottery {
       let devFee = 0n;
       let prizePool: bigint;
       
-      if (this.demoMode) {
-        prizePool = this.demoPrizePool;
-        devFee = (prizePool * 25n) / 75n;
-      } else {
-        await this.updateBalances();
-        devFee = (this.ethBalance * BigInt(config.devSharePercent)) / 100n;
-        prizePool = this.currentPrizePool;
-      }
+      // Always use real balances
+      await this.updateBalances();
+      devFee = (this.ethBalance * BigInt(config.devSharePercent)) / 100n;
+      prizePool = this.currentPrizePool;
       
       const ethBalanceStr = ethers.formatEther(this.ethBalance);
       const prizePoolStr = ethers.formatEther(prizePool);
@@ -559,7 +552,7 @@ export class AutoLottery {
       // Execute transfers
       let transferStatus: 'pending' | 'success' | 'partial' | 'failed' | 'skipped' = 'pending';
       
-      if (this.autoTransferEnabled && !this.demoMode) {
+      if (this.autoTransferEnabled) {
         if (transfers.length === 0) {
           transferStatus = 'skipped';
           console.log('ℹ️ No transfers needed');
@@ -598,11 +591,6 @@ export class AutoLottery {
             transferStatus = 'failed';
           }
         }
-      } else if (this.demoMode) {
-        for (const winner of winners) {
-          winner.txHash = '0x' + 'demo'.repeat(16);
-        }
-        transferStatus = 'success';
       }
       
       // Build result
@@ -616,7 +604,7 @@ export class AutoLottery {
         totalWinnerBalance: ethers.formatUnits(totalWinnerBalance, 18), // BALLS tokens
         winners,
         snapshotHash: snapshot.hash,
-        autoTransfer: this.autoTransferEnabled && !this.demoMode,
+        autoTransfer: this.autoTransferEnabled,
         transferStatus,
         rollover: !hasWinners, // No winners = rollover
       };
@@ -644,10 +632,7 @@ export class AutoLottery {
       // This ensures only addresses holding for 60+ seconds in THIS round are eligible
       this.holderTracker.resetAllFirstSeen();
       
-      // Refresh balance
-      if (!this.demoMode) {
-        await this.updateBalances();
-      }
+      await this.updateBalances();
       
       // Broadcast
       if (this.onDraw) {
@@ -681,7 +666,7 @@ export class AutoLottery {
 
   getStatus() {
     const timeUntilDraw = this.getTimeUntilDraw();
-    const prizePool = this.demoMode ? this.demoPrizePool : this.currentPrizePool;
+    const prizePool = this.currentPrizePool;
     const trackerStats = this.holderTracker.getStats();
     
     // Calculate USD values
@@ -706,7 +691,8 @@ export class AutoLottery {
       taxReceiverWallet: this.taxReceiverAddress,
       devWallet: this.devWalletAddress,
       autoTransferEnabled: this.autoTransferEnabled,
-      demoMode: this.demoMode,
+      demoMode: false,
+      tokenConfigured: !!this.tokenContract,
       prizeInEth: true,
       // Stats
       totalDevPaid: ethers.formatEther(this.totalDevPaid),

@@ -27,9 +27,6 @@ export class HolderTracker {
   // Running state
   private isRunning = false;
   
-  // Demo mode (no token address)
-  private demoMode = false;
-  
   // Scan state
   private isScanning = false;
   private scanProgress = 0;
@@ -57,11 +54,8 @@ export class HolderTracker {
       this.numberToHolders.set(i, new Set());
     }
     
-    // Check if token address is set
     if (!config.tokenAddress) {
-      console.log('📋 Demo mode: No token address configured');
-      this.demoMode = true;
-      this.createDemoHolders();
+      console.log('⚠️ No TOKEN_ADDRESS - holder tracking paused until contract is set');
       return;
     }
     
@@ -92,41 +86,6 @@ export class HolderTracker {
     return this.EXCLUDED_ADDRESSES.has(address.toLowerCase());
   }
   
-  /**
-   * Create demo holders for testing
-   */
-  private createDemoHolders() {
-    const demoAddresses = [
-      '0x1234567890123456789012345678901234567890',
-      '0x2345678901234567890123456789012345678901',
-      '0x3456789012345678901234567890123456789012',
-      '0x4567890123456789012345678901234567890123',
-      '0x5678901234567890123456789012345678901234',
-      '0x6789012345678901234567890123456789012345',
-      '0x7890123456789012345678901234567890123456',
-      '0x8901234567890123456789012345678901234567',
-      '0x9012345678901234567890123456789012345678',
-      '0x0123456789012345678901234567890123456789',
-    ];
-    
-    const now = Math.floor(Date.now() / 1000);
-    
-    for (const addr of demoAddresses) {
-      const number = this.getNumber(addr);
-      const balance = BigInt(Math.floor(Math.random() * 10000) + 100) * 10n ** 18n;
-      
-      this.holders.set(addr.toLowerCase(), {
-        balance,
-        firstSeen: now - 120, // 2 minutes ago
-        number,
-        lastUpdated: now,
-      });
-      this.numberToHolders.get(number)?.add(addr.toLowerCase());
-    }
-    
-    console.log(`✅ Created ${demoAddresses.length} demo holders`);
-  }
-
   /**
    * Calculate address number (1-50)
    */
@@ -195,8 +154,8 @@ export class HolderTracker {
     if (this.isRunning) return;
     this.isRunning = true;
     
-    if (this.demoMode) {
-      console.log('✅ Holder tracker running in demo mode');
+    if (!this.tokenContract) {
+      console.log('⚠️ Holder tracker waiting for TOKEN_ADDRESS');
       return;
     }
     
@@ -223,9 +182,7 @@ export class HolderTracker {
       
     } catch (error: any) {
       console.error('❌ Failed to start holder tracker:', error.message);
-      console.log('⚠️ Falling back to demo mode');
-      this.demoMode = true;
-      this.createDemoHolders();
+      console.log('⚠️ Not using fake holders. Set TOKEN_ADDRESS and restart, or call /api/tracker/rescan');
     }
   }
 
@@ -587,7 +544,7 @@ export class HolderTracker {
    * Force rescan all holders
    */
   async rescan(): Promise<void> {
-    if (this.demoMode || this.isScanning) return;
+    if (!this.tokenContract || this.isScanning) return;
     
     console.log('\n🔄 Force rescan initiated...');
     this.holders.clear();

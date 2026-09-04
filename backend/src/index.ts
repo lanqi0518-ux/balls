@@ -56,7 +56,7 @@ async function main() {
     res.json({ 
       status: 'ok', 
       timestamp: new Date().toISOString(),
-      mode: status.demoMode ? 'demo' : 'live',
+      mode: config.tokenAddress ? 'live' : 'waiting',
       autoTransfer: status.autoTransferEnabled,
       holders: status.stats.totalHolders,
       eligible: status.stats.eligibleHolders,
@@ -70,7 +70,7 @@ async function main() {
     const status = autoLottery.getStatus();
     const checks: Record<string, boolean | string> = {
       api: true,
-      mode: status.demoMode ? 'demo' : 'live',
+      mode: config.tokenAddress ? 'live' : 'waiting',
       autoTransfer: status.autoTransferEnabled,
       hasEnoughForTransfers: status.hasEnoughForTransfers,
       rpc: false,
@@ -78,34 +78,34 @@ async function main() {
     };
     
     // Test RPC connection
-    if (!status.demoMode) {
-      try {
-        const { ethers } = await import('ethers');
-        const provider = new ethers.JsonRpcProvider(config.rpcUrl);
-        const blockNumber = await provider.getBlockNumber();
-        checks.rpc = true;
-        checks.blockNumber = blockNumber.toString();
-        
-        // Test token contract
-        if (config.tokenAddress) {
-          const contract = new ethers.Contract(
-            config.tokenAddress,
-            ['function balanceOf(address) view returns (uint256)'],
-            provider
-          );
-          const balance = await contract.balanceOf(config.taxReceiverWallet);
-          checks.tokenContract = true;
-          checks.taxReceiverBalance = ethers.formatUnits(balance, 18);
-        }
-      } catch (error: any) {
-        checks.rpcError = error.message?.slice(0, 100);
+    try {
+      const { ethers } = await import('ethers');
+      const provider = new ethers.JsonRpcProvider(config.rpcUrl);
+      const blockNumber = await provider.getBlockNumber();
+      checks.rpc = true;
+      checks.blockNumber = blockNumber.toString();
+      
+      const taxEth = await provider.getBalance(config.taxReceiverWallet);
+      checks.taxReceiverEth = ethers.formatEther(taxEth);
+      
+      // Test token contract
+      if (config.tokenAddress) {
+        const contract = new ethers.Contract(
+          config.tokenAddress,
+          ['function balanceOf(address) view returns (uint256)'],
+          provider
+        );
+        const balance = await contract.balanceOf(config.taxReceiverWallet);
+        checks.tokenContract = true;
+        checks.taxReceiverBalance = ethers.formatUnits(balance, 18);
+      } else {
+        checks.tokenContract = 'waiting for TOKEN_ADDRESS';
       }
-    } else {
-      checks.rpc = 'skipped (demo mode)';
-      checks.tokenContract = 'skipped (demo mode)';
+    } catch (error: any) {
+      checks.rpcError = error.message?.slice(0, 100);
     }
     
-    const allPassed = checks.rpc === true || checks.rpc === 'skipped (demo mode)';
+    const allPassed = checks.rpc === true;
     
     res.status(allPassed ? 200 : 503).json({
       status: allPassed ? 'healthy' : 'degraded',
@@ -211,7 +211,7 @@ async function main() {
     
     const verification = {
       timestamp: new Date().toISOString(),
-      mode: status.demoMode ? 'DEMO' : 'LIVE',
+      mode: config.tokenAddress ? 'LIVE' : 'WAITING',
       config: {
         tokenAddress: config.tokenAddress || '(not set)',
         taxReceiverWallet: config.taxReceiverWallet,

@@ -46,7 +46,7 @@ export const config = {
 // Validate config
 export function validateConfig(): void {
   console.log('\n📋 Configuration:');
-  console.log(`  Token: ${config.tokenAddress || '(demo mode)'}`);
+  console.log(`  Token: ${config.tokenAddress || '(not set - waiting)'}`);
   console.log(`  Tax Receiver: ${config.taxReceiverWallet}`);
   console.log(`  Dev Wallet: ${config.devWallet}`);
   console.log(`  Tax Split: ${config.devSharePercent}% dev / ${100 - config.devSharePercent}% prize`);
@@ -57,6 +57,6 @@ export function validateConfig(): void {
   });
   
   if (!config.tokenAddress) {
-    console.log('\n⚠️ TOKEN_ADDRESS not set - running in DEMO mode');
+    console.log('\n⚠️ TOKEN_ADDRESS not set - draws paused, prize pool uses real tax-wallet ETH');
   }
 }
