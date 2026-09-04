@@ -38,11 +38,11 @@ export function RecentDraws({ draws }: Props) {
 
   return (
     <div className="card">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-sm text-[var(--text-muted)] uppercase tracking-wider">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 md:mb-6 gap-1">
+        <h3 className="text-xs md:text-sm text-[var(--text-muted)] uppercase tracking-wider">
           Recent Draws
         </h3>
-        <span className="text-xs text-[var(--text-muted)]">
+        <span className="text-[10px] md:text-xs text-[var(--text-muted)]">
           Distributed by holding ratio
         </span>
       </div>
@@ -59,8 +59,9 @@ export function RecentDraws({ draws }: Props) {
                 className={`draw-item ${index === 0 ? 'draw-item-new' : ''}`}
                 onClick={() => setExpandedDraw(expandedDraw === draw.drawId ? null : draw.drawId)}
               >
-                <div className="flex items-center gap-4">
-                  <span className="text-[var(--text-muted)] text-sm w-12">
+                {/* Left side: ID + Ball */}
+                <div className="flex items-center gap-2 md:gap-4">
+                  <span className="text-[var(--text-muted)] text-xs md:text-sm w-8 md:w-12">
                     #{draw.drawId}
                   </span>
                   <div className="ball ball-small ball-winning">
@@ -68,35 +69,36 @@ export function RecentDraws({ draws }: Props) {
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-6">
+                {/* Right side: Stats */}
+                <div className="flex items-center gap-3 md:gap-6">
                   <div className="text-right">
-                    <div className="font-bold" style={{ color: 'var(--green-primary)' }}>
+                    <div className="font-bold text-sm md:text-base" style={{ color: 'var(--green-primary)' }}>
                       {Number(draw.prizePool).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </div>
-                    <div className="text-xs text-[var(--text-muted)]">Prize</div>
+                    <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Prize</div>
                   </div>
                   
-                  <div className="text-right">
+                  <div className="text-right min-w-[50px] md:min-w-[60px]">
                     {draw.rollover ? (
                       <>
-                        <div className="font-bold" style={{ color: 'var(--yellow)' }}>🎰</div>
-                        <div className="text-xs" style={{ color: 'var(--yellow)' }}>ROLLOVER</div>
+                        <div className="font-bold text-sm md:text-base" style={{ color: 'var(--yellow)' }}>🎰</div>
+                        <div className="text-[10px] md:text-xs" style={{ color: 'var(--yellow)' }}>ROLLOVER</div>
                       </>
                     ) : (
                       <>
-                        <div className="font-bold">{draw.winnersCount}</div>
-                        <div className="text-xs text-[var(--text-muted)]">Winners</div>
+                        <div className="font-bold text-sm md:text-base">{draw.winnersCount}</div>
+                        <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Winners</div>
                       </>
                     )}
                   </div>
                   
-                  <div className="text-sm text-[var(--text-muted)] w-24 text-right">
+                  <div className="text-[10px] md:text-sm text-[var(--text-muted)] w-16 md:w-24 text-right hidden xs:block">
                     {formatTime(draw.timestamp)}
                   </div>
                   
                   {draw.winners && draw.winners.length > 0 && (
                     <svg 
-                      className={`w-5 h-5 text-[var(--text-muted)] transition-transform ${expandedDraw === draw.drawId ? 'rotate-180' : ''}`}
+                      className={`w-4 h-4 md:w-5 md:h-5 text-[var(--text-muted)] transition-transform ${expandedDraw === draw.drawId ? 'rotate-180' : ''}`}
                       fill="none" 
                       viewBox="0 0 24 24" 
                       stroke="currentColor"
@@ -109,8 +111,8 @@ export function RecentDraws({ draws }: Props) {
               
               {/* Expanded Details */}
               {expandedDraw === draw.drawId && draw.winners && draw.winners.length > 0 && (
-                <div className="mt-2 p-4 rounded-lg" style={{ background: 'var(--bg-dark)' }}>
-                  <div className="text-xs text-[var(--text-muted)] mb-3">
+                <div className="mt-2 p-3 md:p-4 rounded-lg" style={{ background: 'var(--bg-dark)' }}>
+                  <div className="text-[10px] md:text-xs text-[var(--text-muted)] mb-2 md:mb-3">
                     Winner distribution (by holding ratio)
                   </div>
                   
@@ -118,51 +120,53 @@ export function RecentDraws({ draws }: Props) {
                     {draw.winners.map((winner, idx) => (
                       <div 
                         key={idx}
-                        className="flex items-center justify-between p-3 rounded-lg"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between p-2 md:p-3 rounded-lg gap-2"
                         style={{ background: 'var(--bg-card)' }}
                       >
-                        <div className="flex items-center gap-3">
-                          <span className="text-[var(--text-muted)] text-sm w-6">{idx + 1}</span>
-                          <span className="font-mono text-sm">
-                            {winner.address.slice(0, 8)}...{winner.address.slice(-6)}
+                        {/* Address */}
+                        <div className="flex items-center gap-2 md:gap-3">
+                          <span className="text-[var(--text-muted)] text-xs md:text-sm w-5 md:w-6">{idx + 1}</span>
+                          <span className="font-mono text-xs md:text-sm">
+                            {winner.address.slice(0, 6)}...{winner.address.slice(-4)}
                           </span>
                         </div>
                         
-                        <div className="flex items-center gap-6">
-                          <div className="text-right">
-                            <div className="text-sm">
+                        {/* Stats - horizontal on mobile */}
+                        <div className="flex items-center gap-3 md:gap-6 ml-7 sm:ml-0">
+                          <div className="text-left sm:text-right">
+                            <div className="text-xs md:text-sm">
                               {Number(winner.balance).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </div>
-                            <div className="text-xs text-[var(--text-muted)]">Balance</div>
+                            <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Balance</div>
                           </div>
                           
-                          <div className="text-right w-16">
-                            <div className="text-sm font-bold" style={{ color: 'var(--purple)' }}>
+                          <div className="text-left sm:text-right">
+                            <div className="text-xs md:text-sm font-bold" style={{ color: 'var(--purple)' }}>
                               {winner.sharePercent.toFixed(1)}%
                             </div>
-                            <div className="text-xs text-[var(--text-muted)]">Share</div>
+                            <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Share</div>
                           </div>
                           
-                          <div className="text-right w-20">
-                            <div className="text-sm font-bold" style={{ color: 'var(--green-primary)' }}>
+                          <div className="text-left sm:text-right">
+                            <div className="text-xs md:text-sm font-bold" style={{ color: 'var(--green-primary)' }}>
                               {Number(winner.prize).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </div>
-                            <div className="text-xs text-[var(--text-muted)]">Won</div>
+                            <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Won</div>
                           </div>
                           
-                          <div className="text-right w-16">
+                          <div className="text-left sm:text-right">
                             {winner.txHash ? (
                               <a 
                                 href={`https://robinhoodchain.blockscout.com/tx/${winner.txHash}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-xs"
+                                className="text-[10px] md:text-xs"
                                 style={{ color: 'var(--green-primary)' }}
                               >
                                 ✓ Sent
                               </a>
                             ) : (
-                              <span className="text-xs" style={{ color: 'var(--yellow)' }}>
+                              <span className="text-[10px] md:text-xs" style={{ color: 'var(--yellow)' }}>
                                 Pending
                               </span>
                             )}

@@ -48,28 +48,28 @@ export function PrizePool({ prizePool, prizePoolWallet }: Props) {
         })}
       </div>
       
-      <div className="text-[var(--text-muted)] text-lg font-semibold mt-2">
+      <div className="text-[var(--text-muted)] text-sm md:text-lg font-semibold mt-1 md:mt-2">
         BALLS
       </div>
       
       {/* 奖池钱包 */}
       {prizePoolWallet && (
-        <div className="mt-6 flex items-center justify-center gap-2">
-          <span className="text-[var(--text-muted)] text-xs">Prize Pool:</span>
+        <div className="mt-4 md:mt-6 flex items-center justify-center gap-2 flex-wrap">
+          <span className="text-[var(--text-muted)] text-[10px] md:text-xs">Prize Pool:</span>
           <a 
             href={`https://robinhoodchain.blockscout.com/address/${prizePoolWallet}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs font-mono hover:underline"
+            className="text-[10px] md:text-xs font-mono hover:underline"
             style={{ color: 'var(--green-primary)' }}
           >
-            {prizePoolWallet.slice(0, 10)}...{prizePoolWallet.slice(-8)}
+            {prizePoolWallet.slice(0, 8)}...{prizePoolWallet.slice(-6)}
           </a>
         </div>
       )}
       
       {/* 实时指示器 */}
-      <div className="mt-4 flex justify-center">
+      <div className="mt-3 md:mt-4 flex justify-center">
         <div className="live-indicator">
           <span className="live-dot" />
           LIVE

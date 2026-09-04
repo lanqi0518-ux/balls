@@ -14,9 +14,9 @@ export function SnapshotPanel({ snapshot, hasSnapshot }: Props) {
   const { distribution } = useNumberDistribution()
 
   return (
-    <div className="card mb-8">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-sm text-[var(--text-muted)] uppercase tracking-wider">
+    <div className="card mb-6 md:mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 md:mb-6">
+        <h3 className="text-xs md:text-sm text-[var(--text-muted)] uppercase tracking-wider">
           Number Distribution
         </h3>
         
@@ -52,14 +52,14 @@ export function SnapshotPanel({ snapshot, hasSnapshot }: Props) {
       
       {/* Snapshot Info */}
       {snapshot && (
-        <div className="mt-6 pt-6 border-t border-white/5 flex items-center justify-between">
-          <div>
-            <span className="text-[var(--text-muted)] text-sm">Draw #{snapshot.drawId}</span>
-            <span className="mx-3 text-[var(--text-muted)]">·</span>
-            <span className="text-sm">{snapshot.eligibleCount} participants</span>
+        <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="text-xs md:text-sm">
+            <span className="text-[var(--text-muted)]">Draw #{snapshot.drawId}</span>
+            <span className="mx-2 md:mx-3 text-[var(--text-muted)]">·</span>
+            <span>{snapshot.eligibleCount} participants</span>
           </div>
-          <div className="text-xs text-[var(--text-muted)] font-mono">
-            {snapshot.hash.slice(0, 16)}...
+          <div className="text-[10px] md:text-xs text-[var(--text-muted)] font-mono">
+            {snapshot.hash.slice(0, 12)}...
           </div>
         </div>
       )}

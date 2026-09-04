@@ -49,31 +49,32 @@ function App() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="border-b border-white/5">
-        <div className="container py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/logo.svg" alt="Balls" className="w-10 h-10" />
+      <header className="border-b border-white/5 sticky top-0 z-50 bg-[var(--bg-dark)]/95 backdrop-blur-sm">
+        <div className="container py-3 md:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 md:gap-3">
+            <img src="/logo.svg" alt="Balls" className="w-8 h-8 md:w-10 md:h-10" />
             <div>
-              <h1 className="text-xl font-bold">Balls</h1>
-              <p className="text-xs text-[var(--text-muted)]">On-Chain Lottery</p>
+              <h1 className="text-lg md:text-xl font-bold">Balls</h1>
+              <p className="text-[10px] md:text-xs text-[var(--text-muted)] hidden sm:block">On-Chain Lottery</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <div className={`live-indicator ${!isConnected ? 'opacity-50' : ''}`}>
               <span className={`live-dot ${!isConnected ? 'bg-red-500' : ''}`} />
-              {isConnected ? 'LIVE' : 'OFFLINE'}
+              <span className="hidden xs:inline">{isConnected ? 'LIVE' : 'OFFLINE'}</span>
             </div>
             
             {status?.demoMode && (
-              <span className="text-xs px-2 py-1 rounded bg-yellow-500/20 text-yellow-400">
+              <span className="text-[10px] md:text-xs px-2 py-1 rounded bg-yellow-500/20 text-yellow-400">
                 DEMO
               </span>
             )}
             
             {status && (
-              <div className="text-sm text-[var(--text-secondary)]">
-                {status.stats.eligibleHolders} participants
+              <div className="text-xs md:text-sm text-[var(--text-secondary)]">
+                <span className="hidden sm:inline">{status.stats.eligibleHolders} participants</span>
+                <span className="sm:hidden">{status.stats.eligibleHolders}</span>
               </div>
             )}
           </div>
@@ -104,30 +105,30 @@ function App() {
         />
       )}
       
-      <main className="container py-12">
+      <main className="container py-6 md:py-12">
         {/* Hero */}
-        <div className="text-center mb-12">
-          <p className="text-[var(--text-muted)] text-sm uppercase tracking-widest mb-4">
+        <div className="text-center mb-8 md:mb-12">
+          <p className="text-[var(--text-muted)] text-xs md:text-sm uppercase tracking-widest mb-2 md:mb-4">
             Robinhood Chain
           </p>
-          <h1 className="text-5xl md:text-6xl font-extrabold mb-4">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold mb-2 md:mb-4">
             <span style={{ color: 'var(--green-primary)' }}>Balls</span> Lottery
           </h1>
-          <p className="text-[var(--text-secondary)] text-lg max-w-xl mx-auto">
-            Hold tokens to automatically participate in draws. No action required.
+          <p className="text-[var(--text-secondary)] text-sm md:text-lg max-w-xl mx-auto px-4">
+            Hold tokens to automatically participate. No action required.
           </p>
         </div>
         
         {/* Prize Pool & Countdown */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 md:gap-6 mb-6 md:mb-8">
           <div className="lg:col-span-3">
             <PrizePool 
               prizePool={status?.prizePool || '0'}
               prizePoolWallet={status?.prizePoolWallet}
             />
           </div>
-          <div className="lg:col-span-2 card flex flex-col items-center justify-center">
-            <p className="text-[var(--text-muted)] text-sm uppercase tracking-wider mb-4">
+          <div className="lg:col-span-2 card flex flex-col items-center justify-center py-6 md:py-8">
+            <p className="text-[var(--text-muted)] text-xs md:text-sm uppercase tracking-wider mb-3 md:mb-4">
               Next Draw
             </p>
             <Countdown 
@@ -135,15 +136,15 @@ function App() {
               isUrgent={(status?.timeUntilNextDraw || 60) <= 10}
             />
             {status?.hasSnapshot && (
-              <p className="mt-4 text-sm" style={{ color: 'var(--green-primary)' }}>
+              <p className="mt-3 md:mt-4 text-xs md:text-sm" style={{ color: 'var(--green-primary)' }}>
                 ✓ Snapshot Locked
               </p>
             )}
             
             {/* Last winning number */}
             {draws.length > 0 && (
-              <div className="mt-4 text-center">
-                <p className="text-xs text-[var(--text-muted)] mb-2">Last Winner</p>
+              <div className="mt-3 md:mt-4 text-center">
+                <p className="text-[10px] md:text-xs text-[var(--text-muted)] mb-1 md:mb-2">Last Winner</p>
                 <div className="ball ball-small ball-winning">
                   {draws[0].winningNumber}
                 </div>
@@ -160,7 +161,7 @@ function App() {
         />
         
         {/* Stats & Lookup */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
           <Stats 
             totalDraws={status?.currentDrawId || 0}
             totalHolders={status?.stats.totalHolders || 0}
@@ -170,7 +171,7 @@ function App() {
         </div>
         
         {/* Recent Draws */}
-        <div className="mb-8">
+        <div className="mb-6 md:mb-8">
           <RecentDraws draws={draws} />
         </div>
         
@@ -178,12 +179,12 @@ function App() {
         <HowItWorks />
         
         {/* Footer */}
-        <footer className="text-center py-12 mt-12 border-t border-white/5">
-          <div className="flex items-center justify-center gap-3 mb-3">
-            <img src="/logo.svg" alt="Balls" className="w-10 h-10" />
-            <span className="text-lg font-bold" style={{ color: 'var(--green-primary)' }}>Balls</span>
+        <footer className="text-center py-8 md:py-12 mt-8 md:mt-12 border-t border-white/5">
+          <div className="flex items-center justify-center gap-2 md:gap-3 mb-2 md:mb-3">
+            <img src="/logo.svg" alt="Balls" className="w-8 h-8 md:w-10 md:h-10" />
+            <span className="text-base md:text-lg font-bold" style={{ color: 'var(--green-primary)' }}>Balls</span>
           </div>
-          <p className="text-[var(--text-muted)] text-sm">
+          <p className="text-[var(--text-muted)] text-xs md:text-sm">
             Built on Robinhood Chain · Fully Automated
           </p>
         </footer>
