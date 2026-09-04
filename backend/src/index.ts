@@ -114,6 +114,32 @@ async function main() {
     });
   });
   
+  // Get holder tracker stats
+  app.get('/api/tracker/stats', (_req, res) => {
+    res.json({
+      success: true,
+      data: holderTracker.getStats(),
+    });
+  });
+  
+  // Force rescan all holders
+  app.post('/api/tracker/rescan', async (_req, res) => {
+    try {
+      console.log('📡 Manual rescan requested via API');
+      await holderTracker.rescan();
+      res.json({
+        success: true,
+        message: 'Rescan complete',
+        data: holderTracker.getStats(),
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+  
   // SSE real-time events
   app.get('/api/events', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');

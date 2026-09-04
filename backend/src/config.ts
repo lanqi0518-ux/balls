@@ -22,6 +22,13 @@ export const config = {
   // Tax split: 25% to dev (1% of 4%), 75% to prize (3% of 4%)
   devSharePercent: 25,
   
+  // Excluded addresses (LP pools, contracts, etc.)
+  // These are NOT counted as real holders
+  excludedAddresses: [
+    '0x267444d099b10fb5ed7c3cc7b7c767adca574952', // LP Pool
+    '0x8366a39cc670b4001a1121b8f6a443a643e40951', // Router/Contract
+  ],
+  
   // Server config
   port: parseInt(process.env.PORT || '3001'),
   
@@ -34,13 +41,18 @@ export const config = {
 
 // Validate config
 export function validateConfig(): void {
-  console.log(`Tax Receiver: ${config.taxReceiverWallet}`);
-  console.log(`Dev Wallet: ${config.devWallet}`);
-  console.log(`Tax Split: ${config.devSharePercent}% dev / ${100 - config.devSharePercent}% prize`);
+  console.log('\n📋 Configuration:');
+  console.log(`  Token: ${config.tokenAddress || '(demo mode)'}`);
+  console.log(`  Tax Receiver: ${config.taxReceiverWallet}`);
+  console.log(`  Dev Wallet: ${config.devWallet}`);
+  console.log(`  Tax Split: ${config.devSharePercent}% dev / ${100 - config.devSharePercent}% prize`);
   
-  if (config.tokenAddress) {
-    console.log(`Token Contract: ${config.tokenAddress}`);
-  } else {
-    console.log('⚠️ Token address not set - running in demo mode');
+  console.log('\n🚫 Excluded Addresses (not counted as holders):');
+  config.excludedAddresses.forEach(addr => {
+    console.log(`  - ${addr}`);
+  });
+  
+  if (!config.tokenAddress) {
+    console.log('\n⚠️ TOKEN_ADDRESS not set - running in DEMO mode');
   }
 }

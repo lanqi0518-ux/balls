@@ -530,6 +530,7 @@ export class AutoLottery {
   getStatus() {
     const timeUntilDraw = this.getTimeUntilDraw();
     const prizePool = this.demoMode ? this.demoPrizePool : this.currentPrizePool;
+    const trackerStats = this.holderTracker.getStats();
     
     return {
       isRunning: this.isRunning,
@@ -548,7 +549,13 @@ export class AutoLottery {
         eligibleCount: this.currentSnapshot.holders.length,
         hash: this.currentSnapshot.hash,
       } : null,
-      stats: this.holderTracker.getStats(),
+      stats: trackerStats,
+      // Add scanning status
+      scanning: {
+        isScanning: trackerStats.isScanning,
+        progress: trackerStats.scanProgress,
+        lastBlock: trackerStats.lastScannedBlock,
+      },
     };
   }
 
