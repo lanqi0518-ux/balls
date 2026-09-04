@@ -236,7 +236,15 @@ export class HolderTracker {
     if (!this.provider || !this.tokenContract) return;
     
     this.isScanning = true;
-    const currentBlock = await this.provider.getBlockNumber();
+    
+    let currentBlock: number;
+    try {
+      currentBlock = await this.provider.getBlockNumber();
+    } catch (error: any) {
+      console.error('❌ Failed to get current block:', error.message);
+      this.isScanning = false;
+      return;
+    }
     
     console.log(`\n📡 Scanning Transfer events...`);
     console.log(`Current block: ${currentBlock}`);
@@ -244,51 +252,60 @@ export class HolderTracker {
     // Collect all unique addresses from events
     const allAddresses = new Set<string>();
     let totalEvents = 0;
+    let consecutiveEmptyChunks = 0;
     
     // Scan in chunks from recent to older
-    const maxBlocksBack = 500000; // Scan up to 500k blocks back
+    const maxBlocksBack = 500000;
     const startBlock = Math.max(0, currentBlock - maxBlocksBack);
     
     for (let toBlock = currentBlock; toBlock > startBlock; toBlock -= this.BLOCKS_PER_QUERY) {
       const fromBlock = Math.max(startBlock, toBlock - this.BLOCKS_PER_QUERY + 1);
       
-      try {
-        const filter = this.tokenContract.filters.Transfer();
-        const events = await this.tokenContract.queryFilter(filter, fromBlock, toBlock);
-        
-        for (const event of events) {
-          const log = event as ethers.EventLog;
-          if (log.args) {
-            const from = (log.args[0] as string).toLowerCase();
-            const to = (log.args[1] as string).toLowerCase();
+      // Retry logic for each chunk
+      let success = false;
+      for (let attempt = 1; attempt <= 3 && !success; attempt++) {
+        try {
+          const filter = this.tokenContract.filters.Transfer();
+          const events = await this.tokenContract.queryFilter(filter, fromBlock, toBlock);
+          
+          if (events.length > 0) {
+            consecutiveEmptyChunks = 0;
             
-            // Only add non-excluded addresses
-            if (!this.isExcluded(from)) allAddresses.add(from);
-            if (!this.isExcluded(to)) allAddresses.add(to);
+            for (const event of events) {
+              const log = event as ethers.EventLog;
+              if (log.args) {
+                const from = (log.args[0] as string).toLowerCase();
+                const to = (log.args[1] as string).toLowerCase();
+                
+                if (!this.isExcluded(from)) allAddresses.add(from);
+                if (!this.isExcluded(to)) allAddresses.add(to);
+              }
+            }
+            
+            totalEvents += events.length;
+            console.log(`  📊 Block ${fromBlock}-${toBlock} | +${events.length} events | Total: ${allAddresses.size} addresses`);
+          } else {
+            consecutiveEmptyChunks++;
           }
+          
+          this.lastScannedBlock = fromBlock;
+          this.scanProgress = Math.floor(((currentBlock - fromBlock) / (currentBlock - startBlock)) * 100);
+          
+          success = true;
+          
+          // Stop if 10 consecutive empty chunks (50k blocks)
+          if (consecutiveEmptyChunks >= 10) {
+            console.log(`  📍 No events in last ${consecutiveEmptyChunks * this.BLOCKS_PER_QUERY} blocks, stopping scan`);
+            toBlock = startBlock; // Exit loop
+          }
+          
+        } catch (error: any) {
+          console.error(`  ⚠️ Attempt ${attempt} failed for blocks ${fromBlock}-${toBlock}:`, error.message);
+          await this.delay(1000 * attempt);
         }
-        
-        totalEvents += events.length;
-        this.lastScannedBlock = fromBlock;
-        this.scanProgress = Math.floor(((currentBlock - fromBlock) / (currentBlock - startBlock)) * 100);
-        
-        // Stop if no events found in last 50k blocks
-        if (events.length === 0 && (currentBlock - fromBlock) > 50000) {
-          console.log(`  📍 No more events found, stopping scan at block ${fromBlock}`);
-          break;
-        }
-        
-        // Progress update
-        if (this.scanProgress % 20 === 0 || events.length > 0) {
-          console.log(`  📊 Block ${fromBlock} | Events: ${totalEvents} | Addresses: ${allAddresses.size}`);
-        }
-        
-        await this.delay(50);
-        
-      } catch (error: any) {
-        console.error(`  ⚠️ Error at block ${fromBlock}:`, error.message);
-        await this.delay(200);
       }
+      
+      await this.delay(100);
     }
     
     this.isScanning = false;
@@ -301,7 +318,7 @@ export class HolderTracker {
   }
 
   /**
-   * Check balances for a set of addresses
+   * Check balances for a set of addresses with retry
    */
   private async checkBalances(addresses: Set<string>): Promise<void> {
     if (!this.tokenContract || addresses.size === 0) return;
@@ -311,25 +328,38 @@ export class HolderTracker {
     const now = Math.floor(Date.now() / 1000);
     let checked = 0;
     let withBalance = 0;
+    let errors = 0;
     
     const addressArray = Array.from(addresses);
-    const batchSize = 20;
+    const batchSize = 10; // Smaller batches for reliability
     
     for (let i = 0; i < addressArray.length; i += batchSize) {
       const batch = addressArray.slice(i, i + batchSize);
       
       const results = await Promise.all(
         batch.map(async (addr) => {
-          try {
-            const balance = await this.tokenContract!.balanceOf(addr);
-            return { address: addr, balance };
-          } catch {
-            return { address: addr, balance: 0n };
+          // Retry up to 3 times
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+              const balance = await this.tokenContract!.balanceOf(addr);
+              return { address: addr, balance, success: true };
+            } catch (error: any) {
+              if (attempt === 3) {
+                return { address: addr, balance: 0n, success: false };
+              }
+              await this.delay(100 * attempt);
+            }
           }
+          return { address: addr, balance: 0n, success: false };
         })
       );
       
-      for (const { address, balance } of results) {
+      for (const { address, balance, success } of results) {
+        if (!success) {
+          errors++;
+          continue;
+        }
+        
         if (balance > 0n) {
           this.updateHolder(address, balance, now - 120);
           withBalance++;
@@ -337,52 +367,85 @@ export class HolderTracker {
         checked++;
       }
       
-      if (checked % 50 === 0 || checked === addresses.size) {
-        console.log(`  ✓ ${checked}/${addresses.size} checked | ${withBalance} with balance`);
+      // Progress update
+      if (checked % 50 === 0 || i + batchSize >= addressArray.length) {
+        console.log(`  ✓ ${checked}/${addresses.size} | Holders: ${withBalance} | Errors: ${errors}`);
       }
       
-      await this.delay(30);
+      await this.delay(50);
     }
     
-    console.log(`\n✅ Found ${withBalance} active holders`);
+    console.log(`\n✅ Balance check complete:`);
+    console.log(`   - Checked: ${checked}`);
+    console.log(`   - With balance: ${withBalance}`);
+    console.log(`   - Errors: ${errors}`);
   }
 
   /**
-   * Start listening for new Transfer events
+   * Start listening for new Transfer events with auto-reconnect
    */
   private startEventListener(): void {
-    if (!this.tokenContract) return;
+    if (!this.tokenContract || !this.provider) return;
     
     console.log('\n👂 Listening for new transfers...');
     
-    this.tokenContract.on('Transfer', async (from, to, value) => {
-      // Skip excluded addresses
-      const fromAddr = from.toLowerCase();
-      const toAddr = to.toLowerCase();
-      
-      if (!this.isExcluded(fromAddr) && !this.isExcluded(toAddr)) {
-        console.log(`📨 Transfer: ${fromAddr.slice(0, 8)}... → ${toAddr.slice(0, 8)}... (${ethers.formatUnits(value, 18)})`);
-      }
-      
-      // Update sender balance
-      if (!this.isExcluded(fromAddr)) {
-        try {
-          const balance = await this.tokenContract!.balanceOf(from);
-          this.updateHolder(from, balance);
-        } catch { /* ignore */ }
-      }
-      
-      // Update receiver balance  
-      if (!this.isExcluded(toAddr)) {
-        try {
-          const balance = await this.tokenContract!.balanceOf(to);
-          const existing = this.holders.get(toAddr);
-          this.updateHolder(to, balance, existing?.firstSeen);
-        } catch { /* ignore */ }
-      }
+    const setupListener = () => {
+      this.tokenContract!.on('Transfer', async (from, to, value) => {
+        const fromAddr = from.toLowerCase();
+        const toAddr = to.toLowerCase();
+        
+        if (!this.isExcluded(fromAddr) && !this.isExcluded(toAddr)) {
+          console.log(`📨 Transfer: ${fromAddr.slice(0, 8)}... → ${toAddr.slice(0, 8)}... (${ethers.formatUnits(value, 18)})`);
+        }
+        
+        // Update sender
+        if (!this.isExcluded(fromAddr)) {
+          try {
+            const balance = await this.tokenContract!.balanceOf(from);
+            this.updateHolder(from, balance);
+          } catch { /* ignore */ }
+        }
+        
+        // Update receiver
+        if (!this.isExcluded(toAddr)) {
+          try {
+            const balance = await this.tokenContract!.balanceOf(to);
+            const existing = this.holders.get(toAddr);
+            this.updateHolder(to, balance, existing?.firstSeen);
+          } catch { /* ignore */ }
+        }
+      });
+    };
+    
+    setupListener();
+    
+    // Monitor connection and reconnect if needed
+    this.provider.on('error', (error) => {
+      console.error('⚠️ Provider error:', error.message);
     });
     
-    console.log('✅ Event listener active');
+    // Periodic connection check
+    setInterval(async () => {
+      try {
+        await this.provider!.getBlockNumber();
+      } catch (error: any) {
+        console.log('🔄 Reconnecting event listener...');
+        this.tokenContract!.removeAllListeners('Transfer');
+        
+        // Recreate provider and contract
+        this.provider = new ethers.JsonRpcProvider(config.rpcUrl);
+        this.tokenContract = new ethers.Contract(
+          config.tokenAddress,
+          ['event Transfer(address indexed from, address indexed to, uint256 value)', 'function balanceOf(address) view returns (uint256)'],
+          this.provider
+        );
+        
+        setupListener();
+        console.log('✅ Reconnected');
+      }
+    }, 30000); // Check every 30 seconds
+    
+    console.log('✅ Event listener active with auto-reconnect');
   }
 
   /**
@@ -391,11 +454,16 @@ export class HolderTracker {
   private startPeriodicRefresh(): void {
     console.log(`🔄 Balance refresh every ${this.REFRESH_INTERVAL_MS / 1000}s`);
     
+    let isRefreshing = false;
+    
     this.refreshInterval = setInterval(async () => {
-      if (!this.tokenContract || this.holders.size === 0) return;
+      if (!this.tokenContract || this.holders.size === 0 || isRefreshing) return;
+      
+      isRefreshing = true;
       
       let updated = 0;
       let removed = 0;
+      let errors = 0;
       const holders = Array.from(this.holders.entries());
       
       for (const [address, data] of holders) {
@@ -407,20 +475,32 @@ export class HolderTracker {
               this.holders.delete(address);
               this.numberToHolders.get(data.number)?.delete(address);
               removed++;
+              console.log(`📤 Removed: ${address.slice(0, 10)}... (sold all)`);
             } else {
+              const diff = balance - data.balance;
               data.balance = balance;
               data.lastUpdated = Math.floor(Date.now() / 1000);
               updated++;
+              
+              if (diff > 0n) {
+                console.log(`📈 ${address.slice(0, 10)}... +${ethers.formatUnits(diff, 18)}`);
+              } else {
+                console.log(`📉 ${address.slice(0, 10)}... ${ethers.formatUnits(diff, 18)}`);
+              }
             }
           }
-        } catch { /* ignore */ }
+        } catch (error: any) {
+          errors++;
+        }
         
-        await this.delay(10);
+        await this.delay(20);
       }
       
-      if (updated > 0 || removed > 0) {
-        console.log(`🔄 Refresh: +${updated} -${removed} = ${this.holders.size} holders`);
+      if (updated > 0 || removed > 0 || errors > 0) {
+        console.log(`🔄 Refresh complete: +${updated} -${removed} errors:${errors} = ${this.holders.size} holders`);
       }
+      
+      isRefreshing = false;
       
     }, this.REFRESH_INTERVAL_MS);
   }

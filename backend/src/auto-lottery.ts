@@ -36,13 +36,13 @@ interface DrawResult {
   winners: WinnerShare[];
   snapshotHash: string;
   autoTransfer: boolean;
-  transferStatus: 'pending' | 'success' | 'partial' | 'failed';
+  transferStatus: 'pending' | 'success' | 'partial' | 'failed' | 'skipped';
 }
 
 /**
  * Automated Lottery Service
  * - Tax split: 1% to dev, 3% to prize pool
- * - Batch transfers for reliability
+ * - Sequential transfers with balance checks
  */
 export class AutoLottery {
   private provider: ethers.JsonRpcProvider | null = null;
@@ -57,6 +57,7 @@ export class AutoLottery {
   // Balances
   private currentPrizePool = 0n;
   private totalTaxBalance = 0n;
+  private nativeBalance = 0n; // Gas balance
   
   // Demo mode
   private demoMode = false;
@@ -79,7 +80,7 @@ export class AutoLottery {
   // Timers
   private intervalTimer: ReturnType<typeof setInterval> | null = null;
   private isRunning = false;
-  private isProcessingDraw = false; // Prevent concurrent draws
+  private isProcessingDraw = false;
   
   // Auto transfer
   private autoTransferEnabled = false;
@@ -91,6 +92,12 @@ export class AutoLottery {
   // Stats
   private totalDevPaid = 0n;
   private totalPrizePaid = 0n;
+  private totalDraws = 0;
+  private failedTransfers = 0;
+  
+  // Constants
+  private readonly MAX_WINNERS_PER_DRAW = 20; // Limit to prevent timeout
+  private readonly MIN_GAS_BALANCE = ethers.parseEther('0.01'); // Minimum 0.01 RB for gas
   
   // Event callbacks
   public onDraw: ((result: DrawResult) => void) | null = null;
@@ -111,8 +118,11 @@ export class AutoLottery {
         this.taxReceiverWallet = new ethers.Wallet(config.taxReceiverPrivateKey, this.provider);
         this.autoTransferEnabled = true;
         console.log('✅ Auto transfer enabled');
+        console.log(`📤 Tax Receiver: ${this.taxReceiverAddress}`);
         console.log(`📤 Dev wallet: ${this.devWalletAddress}`);
         console.log(`💰 Tax split: ${config.devSharePercent}% dev / ${100 - config.devSharePercent}% prize`);
+      } else {
+        console.log('⚠️ No private key - auto transfer DISABLED');
       }
       
       this.tokenContract = new ethers.Contract(
@@ -140,6 +150,8 @@ export class AutoLottery {
     console.log(`Dev Wallet: ${this.devWalletAddress}`);
     console.log(`Draw Time: Every minute at :01`);
     console.log(`Mode: ${this.demoMode ? 'Demo' : 'Live'}`);
+    console.log(`Auto Transfer: ${this.autoTransferEnabled ? 'ENABLED' : 'DISABLED'}`);
+    console.log(`Max Winners/Draw: ${this.MAX_WINNERS_PER_DRAW}`);
     
     this.intervalTimer = setInterval(() => {
       this.tick();
@@ -163,16 +175,33 @@ export class AutoLottery {
     console.log('Lottery stopped');
   }
 
+  /**
+   * Update all balances (token + native gas)
+   */
   private async updateBalances() {
-    if (!this.tokenContract || this.demoMode) return;
+    if (!this.tokenContract || !this.provider || this.demoMode) return;
     
     try {
-      const balance = await this.tokenContract.balanceOf(this.taxReceiverAddress);
-      this.totalTaxBalance = balance;
-      this.currentPrizePool = (balance * 75n) / 100n;
-    } catch (error) {
-      // Silent
+      // Token balance
+      const tokenBalance = await this.tokenContract.balanceOf(this.taxReceiverAddress);
+      this.totalTaxBalance = tokenBalance;
+      this.currentPrizePool = (tokenBalance * 75n) / 100n;
+      
+      // Native balance for gas
+      if (this.taxReceiverWallet) {
+        this.nativeBalance = await this.provider.getBalance(this.taxReceiverAddress);
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to update balance:', error.message);
     }
+  }
+
+  /**
+   * Check if we have enough gas for transfers
+   */
+  private hasEnoughGas(): boolean {
+    if (this.demoMode) return true;
+    return this.nativeBalance >= this.MIN_GAS_BALANCE;
   }
 
   private tick() {
@@ -190,7 +219,7 @@ export class AutoLottery {
       }
     }
     
-    // Execute draw at :01 or :02 (only if not already processing)
+    // Execute draw at :01 or :02
     if ((currentSecond === 1 || currentSecond === 2) && 
         currentMinute !== this.lastDrawMinute && 
         !this.isProcessingDraw) {
@@ -232,113 +261,156 @@ export class AutoLottery {
   }
 
   /**
-   * Execute batch transfer - send to multiple addresses
+   * Execute a single transfer with retry
+   */
+  private async executeTransfer(
+    to: string, 
+    amount: bigint,
+    retries = 3
+  ): Promise<TransferResult> {
+    if (!this.tokenContract || !this.taxReceiverWallet) {
+      return {
+        to,
+        amount: ethers.formatUnits(amount, 18),
+        success: false,
+        error: 'Wallet not configured'
+      };
+    }
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        console.log(`  📤 Sending ${ethers.formatUnits(amount, 18)} → ${to.slice(0, 10)}... (attempt ${attempt})`);
+        
+        // Get fresh nonce
+        const nonce = await this.taxReceiverWallet.getNonce();
+        
+        // Estimate gas
+        let gasLimit: bigint;
+        try {
+          const estimated = await this.tokenContract.transfer.estimateGas(to, amount);
+          gasLimit = (estimated * 130n) / 100n; // Add 30% buffer
+        } catch (estimateError: any) {
+          console.log(`  ⚠️ Gas estimate failed: ${estimateError.message}, using default`);
+          gasLimit = 150000n;
+        }
+        
+        // Send transaction
+        const tx = await this.tokenContract.transfer(to, amount, {
+          nonce,
+          gasLimit,
+        });
+        
+        console.log(`  ⏳ Tx: ${tx.hash.slice(0, 20)}...`);
+        
+        // Wait for confirmation with timeout
+        const receipt = await Promise.race([
+          tx.wait(1),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout 60s')), 60000)
+          )
+        ]) as ethers.TransactionReceipt;
+        
+        if (receipt?.status === 1) {
+          console.log(`  ✅ Confirmed!`);
+          return {
+            to,
+            amount: ethers.formatUnits(amount, 18),
+            success: true,
+            txHash: tx.hash,
+          };
+        } else {
+          throw new Error('Transaction reverted');
+        }
+        
+      } catch (error: any) {
+        console.error(`  ❌ Attempt ${attempt} failed:`, error.message?.slice(0, 50));
+        
+        if (attempt < retries) {
+          await this.delay(2000 * attempt);
+        } else {
+          this.failedTransfers++;
+          return {
+            to,
+            amount: ethers.formatUnits(amount, 18),
+            success: false,
+            error: error.message?.slice(0, 100),
+          };
+        }
+      }
+    }
+    
+    return {
+      to,
+      amount: ethers.formatUnits(amount, 18),
+      success: false,
+      error: 'Max retries exceeded',
+    };
+  }
+
+  /**
+   * Execute batch transfer sequentially
    */
   private async executeBatchTransfer(
     transfers: Array<{to: string; amount: bigint}>
   ): Promise<TransferResult[]> {
-    if (!this.tokenContract || !this.taxReceiverWallet) {
-      return transfers.map(t => ({
+    const results: TransferResult[] = [];
+    
+    // Filter out zero amounts
+    const validTransfers = transfers.filter(t => t.amount > 0n);
+    
+    if (validTransfers.length === 0) {
+      console.log('  ℹ️ No transfers to process');
+      return results;
+    }
+    
+    console.log(`\n📦 Processing ${validTransfers.length} transfers...`);
+    
+    // Check total amount needed
+    const totalNeeded = validTransfers.reduce((sum, t) => sum + t.amount, 0n);
+    console.log(`  💰 Total needed: ${ethers.formatUnits(totalNeeded, 18)}`);
+    console.log(`  💳 Available: ${ethers.formatUnits(this.totalTaxBalance, 18)}`);
+    
+    if (totalNeeded > this.totalTaxBalance) {
+      console.log(`  ❌ Insufficient balance!`);
+      return validTransfers.map(t => ({
         to: t.to,
         amount: ethers.formatUnits(t.amount, 18),
         success: false,
-        error: 'Wallet not configured'
+        error: 'Insufficient balance'
       }));
     }
-
-    const results: TransferResult[] = [];
     
-    // Get current nonce
-    let nonce = await this.taxReceiverWallet.getNonce();
+    // Check gas
+    if (!this.hasEnoughGas()) {
+      console.log(`  ❌ Insufficient gas! Need ${ethers.formatEther(this.MIN_GAS_BALANCE)} RB`);
+      console.log(`  💨 Current: ${ethers.formatEther(this.nativeBalance)} RB`);
+      return validTransfers.map(t => ({
+        to: t.to,
+        amount: ethers.formatUnits(t.amount, 18),
+        success: false,
+        error: 'Insufficient gas'
+      }));
+    }
     
-    // Prepare all transactions
-    const txPromises: Array<{
-      transfer: {to: string; amount: bigint};
-      txPromise: Promise<ethers.TransactionResponse>;
-    }> = [];
-
-    console.log(`\n📦 Preparing ${transfers.length} transfers...`);
-
-    for (const transfer of transfers) {
-      if (transfer.amount <= 0n) continue;
+    // Process transfers
+    for (let i = 0; i < validTransfers.length; i++) {
+      const transfer = validTransfers[i];
       
-      try {
-        // Create transaction with specific nonce
-        const txPromise = this.tokenContract.transfer(transfer.to, transfer.amount, {
-          nonce: nonce,
-          // Add some gas buffer
-          gasLimit: 100000n,
-        });
-        
-        txPromises.push({ transfer, txPromise });
-        nonce++; // Increment nonce for next tx
-        
-        console.log(`  📤 Queued: ${ethers.formatUnits(transfer.amount, 18)} → ${transfer.to.slice(0, 10)}...`);
-      } catch (error: any) {
-        results.push({
-          to: transfer.to,
-          amount: ethers.formatUnits(transfer.amount, 18),
-          success: false,
-          error: error.message
-        });
+      console.log(`\n[${i + 1}/${validTransfers.length}]`);
+      const result = await this.executeTransfer(transfer.to, transfer.amount);
+      results.push(result);
+      
+      // Delay between transfers
+      if (i < validTransfers.length - 1) {
+        await this.delay(500);
       }
     }
-
-    // Send all transactions
-    console.log(`\n🚀 Sending ${txPromises.length} transactions...`);
     
-    const sentTxs: Array<{
-      transfer: {to: string; amount: bigint};
-      tx: ethers.TransactionResponse;
-    }> = [];
-
-    for (const { transfer, txPromise } of txPromises) {
-      try {
-        const tx = await txPromise;
-        sentTxs.push({ transfer, tx });
-        console.log(`  ✓ Sent tx: ${tx.hash.slice(0, 16)}...`);
-      } catch (error: any) {
-        console.log(`  ✗ Failed to send: ${error.message}`);
-        results.push({
-          to: transfer.to,
-          amount: ethers.formatUnits(transfer.amount, 18),
-          success: false,
-          error: error.message
-        });
-      }
-    }
-
-    // Wait for all confirmations
-    console.log(`\n⏳ Waiting for ${sentTxs.length} confirmations...`);
-    
-    const confirmPromises = sentTxs.map(async ({ transfer, tx }) => {
-      try {
-        const receipt = await tx.wait(1); // Wait for 1 confirmation
-        return {
-          to: transfer.to,
-          amount: ethers.formatUnits(transfer.amount, 18),
-          success: receipt?.status === 1,
-          txHash: tx.hash,
-        };
-      } catch (error: any) {
-        return {
-          to: transfer.to,
-          amount: ethers.formatUnits(transfer.amount, 18),
-          success: false,
-          txHash: tx.hash,
-          error: error.message
-        };
-      }
-    });
-
-    const confirmResults = await Promise.all(confirmPromises);
-    results.push(...confirmResults);
-
     // Summary
     const successful = results.filter(r => r.success).length;
     const failed = results.filter(r => !r.success).length;
-    console.log(`\n📊 Transfer Summary: ${successful} success, ${failed} failed`);
-
+    console.log(`\n📊 Summary: ${successful}✅ ${failed}❌`);
+    
     return results;
   }
 
@@ -349,6 +421,7 @@ export class AutoLottery {
     }
     
     this.isProcessingDraw = true;
+    this.totalDraws++;
     
     try {
       if (!this.currentSnapshot) {
@@ -360,7 +433,7 @@ export class AutoLottery {
       const drawId = this.currentDrawId;
       
       console.log('\n' + '='.repeat(50));
-      console.log('🎱 DRAW #' + drawId + ' STARTING');
+      console.log('🎱 DRAW #' + drawId);
       console.log('='.repeat(50));
       
       // Get winning number
@@ -368,10 +441,17 @@ export class AutoLottery {
       console.log(`🎯 Winning Number: ${winningNumber}`);
       
       // Find winners
-      const winnersData = snapshot.holders.filter(h => h.number === winningNumber);
+      let winnersData = snapshot.holders.filter(h => h.number === winningNumber);
+      
+      // Sort by balance (highest first) and limit
+      winnersData = winnersData
+        .sort((a, b) => (b.balance > a.balance ? 1 : -1))
+        .slice(0, this.MAX_WINNERS_PER_DRAW);
+      
       const totalWinnerBalance = winnersData.reduce((sum, h) => sum + h.balance, 0n);
       
-      console.log(`👥 Winners found: ${winnersData.length}`);
+      console.log(`👥 Winners: ${winnersData.length}` + 
+        (winnersData.length === this.MAX_WINNERS_PER_DRAW ? ' (limited)' : ''));
       
       // Calculate amounts
       let devFee = 0n;
@@ -379,26 +459,30 @@ export class AutoLottery {
       
       if (this.demoMode) {
         prizePool = this.demoPrizePool;
-        devFee = (prizePool * 25n) / 75n; // Calculate what 1% would be
+        devFee = (prizePool * 25n) / 75n;
       } else {
         await this.updateBalances();
         devFee = (this.totalTaxBalance * BigInt(config.devSharePercent)) / 100n;
         prizePool = this.currentPrizePool;
       }
       
-      console.log(`💰 Dev Fee (1%): ${ethers.formatUnits(devFee, 18)}`);
-      console.log(`🏆 Prize Pool (3%): ${ethers.formatUnits(prizePool, 18)}`);
+      console.log(`💵 Tax Balance: ${ethers.formatUnits(this.totalTaxBalance, 18)}`);
+      console.log(`💰 Dev Fee: ${ethers.formatUnits(devFee, 18)}`);
+      console.log(`🏆 Prize Pool: ${ethers.formatUnits(prizePool, 18)}`);
+      if (!this.demoMode) {
+        console.log(`⛽ Gas Balance: ${ethers.formatEther(this.nativeBalance)} RB`);
+      }
       
-      // Prepare all transfers
+      // Prepare transfers
       const transfers: Array<{to: string; amount: bigint; type: 'dev' | 'winner'}> = [];
       const winners: WinnerShare[] = [];
       
-      // Add dev fee transfer
+      // Dev fee first
       if (devFee > 0n) {
         transfers.push({ to: this.devWalletAddress, amount: devFee, type: 'dev' });
       }
       
-      // Calculate and add winner transfers
+      // Winner transfers
       if (totalWinnerBalance > 0n && prizePool > 0n) {
         for (const winner of winnersData) {
           const prize = (winner.balance * prizePool) / totalWinnerBalance;
@@ -418,45 +502,48 @@ export class AutoLottery {
       }
       
       // Execute transfers
-      let transferStatus: 'pending' | 'success' | 'partial' | 'failed' = 'pending';
+      let transferStatus: 'pending' | 'success' | 'partial' | 'failed' | 'skipped' = 'pending';
       
-      if (this.autoTransferEnabled && !this.demoMode && transfers.length > 0) {
-        console.log(`\n💸 Processing ${transfers.length} transfers...`);
-        
-        const results = await this.executeBatchTransfer(
-          transfers.map(t => ({ to: t.to, amount: t.amount }))
-        );
-        
-        // Update winner txHashes
-        for (const result of results) {
-          // Check if it's dev fee
-          if (result.to.toLowerCase() === this.devWalletAddress.toLowerCase()) {
-            if (result.success) {
-              this.totalDevPaid += devFee;
-              console.log(`✅ Dev fee confirmed: ${result.txHash}`);
+      if (this.autoTransferEnabled && !this.demoMode) {
+        if (transfers.length === 0) {
+          transferStatus = 'skipped';
+          console.log('ℹ️ No transfers needed');
+        } else if (this.totalTaxBalance === 0n) {
+          transferStatus = 'skipped';
+          console.log('ℹ️ No funds to distribute');
+        } else {
+          console.log(`\n💸 Processing ${transfers.length} transfers...`);
+          
+          const results = await this.executeBatchTransfer(
+            transfers.map(t => ({ to: t.to, amount: t.amount }))
+          );
+          
+          // Update stats
+          for (const result of results) {
+            if (result.to.toLowerCase() === this.devWalletAddress.toLowerCase()) {
+              if (result.success) {
+                this.totalDevPaid += devFee;
+              }
+              continue;
             }
-            continue;
+            
+            const winner = winners.find(w => w.address.toLowerCase() === result.to.toLowerCase());
+            if (winner && result.success) {
+              winner.txHash = result.txHash;
+              this.totalPrizePaid += ethers.parseUnits(winner.prize, 18);
+            }
           }
           
-          // Find matching winner
-          const winner = winners.find(w => w.address.toLowerCase() === result.to.toLowerCase());
-          if (winner && result.success) {
-            winner.txHash = result.txHash;
-            this.totalPrizePaid += ethers.parseUnits(winner.prize, 18);
+          const successful = results.filter(r => r.success).length;
+          if (successful === results.length && results.length > 0) {
+            transferStatus = 'success';
+          } else if (successful > 0) {
+            transferStatus = 'partial';
+          } else {
+            transferStatus = 'failed';
           }
         }
-        
-        // Determine overall status
-        const successful = results.filter(r => r.success).length;
-        if (successful === results.length) {
-          transferStatus = 'success';
-        } else if (successful > 0) {
-          transferStatus = 'partial';
-        } else {
-          transferStatus = 'failed';
-        }
       } else if (this.demoMode) {
-        // Demo mode - simulate successful transfers
         for (const winner of winners) {
           winner.txHash = '0x' + 'demo'.repeat(16);
         }
@@ -478,7 +565,7 @@ export class AutoLottery {
         transferStatus,
       };
       
-      // Save to history
+      // Save history
       this.drawHistory.unshift(result);
       if (this.drawHistory.length > 100) {
         this.drawHistory.pop();
@@ -489,20 +576,17 @@ export class AutoLottery {
       
       // Summary
       console.log('\n' + '='.repeat(50));
-      console.log('🎉 DRAW #' + drawId + ' COMPLETE');
+      console.log(`🎉 DRAW #${drawId} COMPLETE`);
+      console.log(`   Number: ${winningNumber} | Winners: ${winners.length} | Status: ${transferStatus}`);
       console.log('='.repeat(50));
-      console.log(`Winning Number: ${winningNumber}`);
-      console.log(`Winners: ${winners.length}`);
-      console.log(`Transfer Status: ${transferStatus}`);
       
-      // Update balances
+      // Refresh balance
       if (!this.demoMode) {
         await this.updateBalances();
       }
       
-      // Broadcast event
+      // Broadcast
       if (this.onDraw) {
-        console.log('📢 Broadcasting draw result...');
         this.onDraw(result);
       }
       
@@ -527,6 +611,10 @@ export class AutoLottery {
     return (Number(BigInt(seed) % 50n) + 1);
   }
 
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   getStatus() {
     const timeUntilDraw = this.getTimeUntilDraw();
     const prizePool = this.demoMode ? this.demoPrizePool : this.currentPrizePool;
@@ -539,18 +627,23 @@ export class AutoLottery {
       timeUntilNextDraw: timeUntilDraw,
       hasSnapshot: !!this.currentSnapshot,
       prizePool: ethers.formatUnits(prizePool, 18),
+      totalTaxBalance: ethers.formatUnits(this.totalTaxBalance, 18),
+      nativeBalance: ethers.formatEther(this.nativeBalance),
+      hasEnoughGas: this.hasEnoughGas(),
       taxReceiverWallet: this.taxReceiverAddress,
       devWallet: this.devWalletAddress,
+      autoTransferEnabled: this.autoTransferEnabled,
       demoMode: this.demoMode,
       totalDevPaid: ethers.formatUnits(this.totalDevPaid, 18),
       totalPrizePaid: ethers.formatUnits(this.totalPrizePaid, 18),
+      totalDraws: this.totalDraws,
+      failedTransfers: this.failedTransfers,
       snapshot: this.currentSnapshot ? {
         drawId: this.currentSnapshot.drawId,
         eligibleCount: this.currentSnapshot.holders.length,
         hash: this.currentSnapshot.hash,
       } : null,
       stats: trackerStats,
-      // Add scanning status
       scanning: {
         isScanning: trackerStats.isScanning,
         progress: trackerStats.scanProgress,

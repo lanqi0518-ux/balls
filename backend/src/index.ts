@@ -140,6 +140,33 @@ async function main() {
     }
   });
   
+  // Add address to exclusion list
+  app.post('/api/tracker/exclude', (req, res) => {
+    const { address } = req.body;
+    
+    if (!address || typeof address !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'Address is required',
+      });
+    }
+    
+    try {
+      holderTracker.addExcludedAddress(address);
+      console.log(`🚫 Address excluded via API: ${address}`);
+      res.json({
+        success: true,
+        message: `Address ${address} has been excluded`,
+        data: holderTracker.getStats(),
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+  
   // SSE real-time events
   app.get('/api/events', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
