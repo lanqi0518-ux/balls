@@ -39,8 +39,8 @@ export const config = {
   // Draw interval (ms)
   drawInterval: parseInt(process.env.DRAW_INTERVAL || '60000'),
   
-  // Enable auto draw
-  autoDrawEnabled: process.env.AUTO_DRAW_ENABLED === 'true',
+  // Enable auto draw (default: true when TOKEN_ADDRESS is set)
+  autoDrawEnabled: process.env.AUTO_DRAW_ENABLED !== 'false',
 };
 
 // Validate config
