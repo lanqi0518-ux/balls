@@ -127,7 +127,7 @@ function App() {
             <span style={{ color: 'var(--green-primary)' }}>Balls</span> Lottery
           </h1>
           <p className="text-[var(--text-secondary)] text-sm md:text-lg max-w-xl mx-auto px-4">
-            Top 200 holders automatically participate. No action required.
+            Top 100 holders automatically participate. No action required.
           </p>
         </div>
         

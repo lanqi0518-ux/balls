@@ -617,7 +617,7 @@ export class HolderTracker {
   }
 
   // Constants
-  private readonly TOP_HOLDERS_LIMIT = 200; // Only top 200 holders can participate
+  private readonly TOP_HOLDERS_LIMIT = 100; // Only top 200 holders can participate
 
   /**
    * Get eligible holders (top 200 by balance)

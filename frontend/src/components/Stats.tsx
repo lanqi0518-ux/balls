@@ -36,7 +36,7 @@ export function Stats({ totalDraws, totalHolders, eligibleHolders }: Props) {
           <div className="text-[10px] md:text-xs text-[var(--text-muted)]">ETH Tax</div>
         </div>
         <div>
-          <div className="text-base md:text-lg font-bold" style={{ color: 'var(--green-primary)' }}>Top 200</div>
+          <div className="text-base md:text-lg font-bold" style={{ color: 'var(--green-primary)' }}>Top 100</div>
           <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Eligible</div>
         </div>
         <div>

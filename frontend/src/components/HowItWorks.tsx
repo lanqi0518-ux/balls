@@ -7,8 +7,8 @@ export function HowItWorks() {
     },
     {
       num: '02',
-      title: 'Top 200',
-      desc: 'Only top 200 holders by balance can participate in draws',
+      title: 'Top 100',
+      desc: 'Only top 100 holders by balance can participate in draws',
     },
     {
       num: '03',

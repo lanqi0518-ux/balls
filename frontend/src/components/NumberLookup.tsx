@@ -64,7 +64,7 @@ export function NumberLookup() {
                 <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Holding</div>
               </div>
               <div>
-                <div className={`text-sm md:text-base font-bold ${userInfo.rank && userInfo.rank <= 200 ? 'text-[var(--green-primary)]' : 'text-[var(--yellow)]'}`}>
+                <div className={`text-sm md:text-base font-bold ${userInfo.rank && userInfo.rank <= 100 ? 'text-[var(--green-primary)]' : 'text-[var(--yellow)]'}`}>
                   #{userInfo.rank || '-'}
                 </div>
                 <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Rank</div>
@@ -73,7 +73,7 @@ export function NumberLookup() {
                 <div className={`text-sm md:text-base font-bold ${userInfo.isEligible ? 'text-[var(--green-primary)]' : 'text-[var(--yellow)]'}`}>
                   {userInfo.isEligible ? 'Yes' : 'No'}
                 </div>
-                <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Top 200</div>
+                <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Top 100</div>
               </div>
               <div>
                 <div className="text-sm md:text-base font-bold" style={{ color: userInfo.isEligible ? 'var(--green-primary)' : 'var(--text-muted)' }}>
