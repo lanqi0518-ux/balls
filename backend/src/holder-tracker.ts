@@ -403,7 +403,9 @@ export class HolderTracker {
           try {
             const balance = await this.tokenContract!.balanceOf(from);
             this.updateHolder(from, balance);
-          } catch { /* ignore */ }
+          } catch (err: any) {
+            console.error(`⚠️ Failed to get balance for sender ${fromAddr.slice(0,10)}...:`, err.message?.slice(0, 50));
+          }
         }
         
         // Update receiver - ALWAYS use current time for new purchases
@@ -417,7 +419,9 @@ export class HolderTracker {
             // If new holder or was removed (balance was 0), use current time
             const useExistingTime = existing && existing.balance > 0n;
             this.updateHolder(to, balance, useExistingTime ? existing.firstSeen : undefined);
-          } catch { /* ignore */ }
+          } catch (err: any) {
+            console.error(`⚠️ Failed to get balance for receiver ${toAddr.slice(0,10)}...:`, err.message?.slice(0, 50));
+          }
         }
       });
     };
@@ -456,6 +460,10 @@ export class HolderTracker {
         
         setupListener();
         console.log('✅ Reconnected');
+        
+        // Refresh all balances after reconnect to catch any missed events
+        console.log('🔄 Refreshing all balances after reconnect...');
+        this.refreshAllBalancesAfterReconnect();
       }
     }, 30000); // Check every 30 seconds
     
@@ -521,6 +529,41 @@ export class HolderTracker {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Refresh all balances after RPC reconnect
+   * This ensures we don't miss any transfers during disconnect
+   */
+  private async refreshAllBalancesAfterReconnect(): Promise<void> {
+    if (!this.tokenContract || this.holders.size === 0) return;
+    
+    let updated = 0;
+    let removed = 0;
+    
+    const holders = Array.from(this.holders.entries());
+    
+    for (const [address, data] of holders) {
+      try {
+        const balance = await this.tokenContract.balanceOf(address);
+        
+        if (balance === 0n) {
+          this.holders.delete(address);
+          this.numberToHolders.get(data.number)?.delete(address);
+          removed++;
+        } else if (balance !== data.balance) {
+          data.balance = balance;
+          data.lastUpdated = Math.floor(Date.now() / 1000);
+          updated++;
+        }
+      } catch {
+        // Ignore errors, will be caught in next refresh
+      }
+      
+      await this.delay(20);
+    }
+    
+    console.log(`🔄 Post-reconnect refresh: updated ${updated}, removed ${removed}`);
   }
 
   /**

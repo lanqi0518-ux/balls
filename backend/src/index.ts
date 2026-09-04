@@ -52,7 +52,72 @@ async function main() {
 
   // Health check
   app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    const status = autoLottery.getStatus();
+    res.json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      mode: status.demoMode ? 'demo' : 'live',
+      autoTransfer: status.autoTransferEnabled,
+      holders: status.stats.totalHolders,
+      eligible: status.stats.eligibleHolders,
+      draws: status.totalDraws,
+      hasEnoughGas: status.hasEnoughGas,
+    });
+  });
+  
+  // Deep health check (includes RPC test)
+  app.get('/health/deep', async (_req, res) => {
+    const status = autoLottery.getStatus();
+    const checks: Record<string, boolean | string> = {
+      api: true,
+      mode: status.demoMode ? 'demo' : 'live',
+      autoTransfer: status.autoTransferEnabled,
+      hasEnoughGas: status.hasEnoughGas,
+      rpc: false,
+      tokenContract: false,
+    };
+    
+    // Test RPC connection
+    if (!status.demoMode) {
+      try {
+        const { ethers } = await import('ethers');
+        const provider = new ethers.JsonRpcProvider(config.rpcUrl);
+        const blockNumber = await provider.getBlockNumber();
+        checks.rpc = true;
+        checks.blockNumber = blockNumber.toString();
+        
+        // Test token contract
+        if (config.tokenAddress) {
+          const contract = new ethers.Contract(
+            config.tokenAddress,
+            ['function balanceOf(address) view returns (uint256)'],
+            provider
+          );
+          const balance = await contract.balanceOf(config.taxReceiverWallet);
+          checks.tokenContract = true;
+          checks.taxReceiverBalance = ethers.formatUnits(balance, 18);
+        }
+      } catch (error: any) {
+        checks.rpcError = error.message?.slice(0, 100);
+      }
+    } else {
+      checks.rpc = 'skipped (demo mode)';
+      checks.tokenContract = 'skipped (demo mode)';
+    }
+    
+    const allPassed = checks.rpc === true || checks.rpc === 'skipped (demo mode)';
+    
+    res.status(allPassed ? 200 : 503).json({
+      status: allPassed ? 'healthy' : 'degraded',
+      timestamp: new Date().toISOString(),
+      checks,
+      stats: {
+        holders: status.stats.totalHolders,
+        eligible: status.stats.eligibleHolders,
+        totalDraws: status.totalDraws,
+        failedTransfers: status.failedTransfers,
+      },
+    });
   });
   
   // Get lottery status
@@ -140,6 +205,59 @@ async function main() {
     }
   });
   
+  // Verify transfer configuration (admin only)
+  app.get('/api/admin/verify-config', async (_req, res) => {
+    const status = autoLottery.getStatus();
+    
+    const verification = {
+      timestamp: new Date().toISOString(),
+      mode: status.demoMode ? 'DEMO' : 'LIVE',
+      config: {
+        tokenAddress: config.tokenAddress || '(not set)',
+        taxReceiverWallet: config.taxReceiverWallet,
+        devWallet: config.devWallet,
+        devSharePercent: config.devSharePercent,
+        excludedAddresses: config.excludedAddresses,
+        hasPrivateKey: !!config.taxReceiverPrivateKey,
+      },
+      status: {
+        autoTransferEnabled: status.autoTransferEnabled,
+        totalTaxBalance: status.totalTaxBalance,
+        prizePool: status.prizePool,
+        nativeBalance: status.nativeBalance,
+        hasEnoughGas: status.hasEnoughGas,
+        totalDraws: status.totalDraws,
+        failedTransfers: status.failedTransfers,
+        totalDevPaid: status.totalDevPaid,
+        totalPrizePaid: status.totalPrizePaid,
+      },
+      holders: {
+        total: status.stats.totalHolders,
+        eligible: status.stats.eligibleHolders,
+        excluded: status.stats.excludedCount,
+      },
+      checks: {
+        canExecuteTransfers: status.autoTransferEnabled && status.hasEnoughGas,
+        hasFunds: parseFloat(status.totalTaxBalance) > 0,
+        hasHolders: status.stats.eligibleHolders > 0,
+      },
+    };
+    
+    // Overall readiness
+    const isReady = verification.checks.canExecuteTransfers && 
+                    verification.checks.hasFunds && 
+                    verification.checks.hasHolders;
+    
+    res.json({
+      success: true,
+      ready: isReady,
+      readyMessage: isReady 
+        ? '✅ System is ready to process draws and transfers'
+        : '⚠️ System is not fully ready - check the verification details',
+      data: verification,
+    });
+  });
+
   // Add address to exclusion list
   app.post('/api/tracker/exclude', (req, res) => {
     const { address } = req.body;
