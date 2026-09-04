@@ -714,16 +714,26 @@ export class AutoLottery {
         number: this.holderTracker.getNumber(addr),
         balance: '0',
         isEligible: false,
+        isInTop200: false,
         shareInNumber: 0,
       };
     }
     
-    const sameNumberHolders = this.holderTracker.getEligibleHolders()
-      .filter(h => h.number === holder.number);
+    // Get top 200 eligible holders
+    const top200 = this.holderTracker.getEligibleHolders();
+    const isInTop200 = top200.some(h => h.address === addr);
+    
+    const sameNumberHolders = top200.filter(h => h.number === holder.number);
     const totalInNumber = sameNumberHolders.reduce((sum, h) => sum + h.balance, 0n);
     const shareInNumber = totalInNumber > 0n 
       ? Number((holder.balance * 10000n) / totalInNumber) / 100 
       : 0;
+    
+    // Find user's rank by balance
+    const allHoldersSorted = holders.sort((a, b) => 
+      b.balance > a.balance ? 1 : b.balance < a.balance ? -1 : 0
+    );
+    const rank = allHoldersSorted.findIndex(h => h.address === addr) + 1;
     
     return {
       address: addr,
@@ -731,8 +741,10 @@ export class AutoLottery {
       number: holder.number,
       balance: ethers.formatUnits(holder.balance, 18),
       holdingSince: holder.firstSeen,
-      isEligible: this.holderTracker.isEligible(addr),
-      shareInNumber,
+      isEligible: isInTop200, // Only eligible if in top 200
+      isInTop200,
+      rank, // User's rank by balance
+      shareInNumber: isInTop200 ? shareInNumber : 0,
       sameNumberHolders: sameNumberHolders.length,
     };
   }

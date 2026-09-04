@@ -51,6 +51,8 @@ interface UserInfo {
   balance: string;
   holdingSince?: number;
   isEligible: boolean;
+  isInTop200?: boolean;
+  rank?: number;
   pendingPrize?: string;
   shareInNumber?: number;
   sameNumberHolders?: number;

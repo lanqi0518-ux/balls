@@ -56,7 +56,7 @@ export function NumberLookup() {
           </div>
           
           {userInfo && (
-            <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-white/5 grid grid-cols-3 gap-2 md:gap-4 text-center">
+            <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-white/5 grid grid-cols-4 gap-2 md:gap-3 text-center">
               <div>
                 <div className={`text-sm md:text-base font-bold ${userInfo.isHolder ? 'text-[var(--green-primary)]' : 'text-[var(--red)]'}`}>
                   {userInfo.isHolder ? 'Yes' : 'No'}
@@ -64,14 +64,20 @@ export function NumberLookup() {
                 <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Holding</div>
               </div>
               <div>
+                <div className={`text-sm md:text-base font-bold ${userInfo.rank && userInfo.rank <= 200 ? 'text-[var(--green-primary)]' : 'text-[var(--yellow)]'}`}>
+                  #{userInfo.rank || '-'}
+                </div>
+                <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Rank</div>
+              </div>
+              <div>
                 <div className={`text-sm md:text-base font-bold ${userInfo.isEligible ? 'text-[var(--green-primary)]' : 'text-[var(--yellow)]'}`}>
                   {userInfo.isEligible ? 'Yes' : 'No'}
                 </div>
-                <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Eligible</div>
+                <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Top 200</div>
               </div>
               <div>
-                <div className="text-sm md:text-base font-bold" style={{ color: 'var(--green-primary)' }}>
-                  {userInfo.shareInNumber?.toFixed(1) || 0}%
+                <div className="text-sm md:text-base font-bold" style={{ color: userInfo.isEligible ? 'var(--green-primary)' : 'var(--text-muted)' }}>
+                  {userInfo.isEligible ? `${userInfo.shareInNumber?.toFixed(1) || 0}%` : '-'}
                 </div>
                 <div className="text-[10px] md:text-xs text-[var(--text-muted)]">Share</div>
               </div>

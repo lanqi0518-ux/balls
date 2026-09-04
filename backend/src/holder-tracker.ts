@@ -741,7 +741,8 @@ export class HolderTracker {
    */
   getStats(): {
     totalHolders: number;
-    eligibleHolders: number;
+    holdersWithTime: number; // Holders meeting 60s requirement
+    eligibleHolders: number; // Top 200 only
     topHoldersLimit: number;
     minHoldingDuration: number;
     isScanning: boolean;
@@ -750,15 +751,16 @@ export class HolderTracker {
     excludedCount: number;
   } {
     // Count all holders meeting time requirement
-    let timeEligible = 0;
+    let holdersWithTime = 0;
     for (const [address] of this.holders) {
       if (this.isEligible(address)) {
-        timeEligible++;
+        holdersWithTime++;
       }
     }
     
     return {
       totalHolders: this.holders.size,
+      holdersWithTime, // All holders with 60s+ holding time
       eligibleHolders: this.getEligibleHolders().length, // Top 200 only
       topHoldersLimit: this.TOP_HOLDERS_LIMIT,
       minHoldingDuration: this.minHoldingDuration,
