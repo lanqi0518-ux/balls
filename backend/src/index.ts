@@ -61,7 +61,7 @@ async function main() {
       holders: status.stats.totalHolders,
       eligible: status.stats.eligibleHolders,
       draws: status.totalDraws,
-      hasEnoughGas: status.hasEnoughGas,
+      hasEnoughForTransfers: status.hasEnoughForTransfers,
     });
   });
   
@@ -72,7 +72,7 @@ async function main() {
       api: true,
       mode: status.demoMode ? 'demo' : 'live',
       autoTransfer: status.autoTransferEnabled,
-      hasEnoughGas: status.hasEnoughGas,
+      hasEnoughForTransfers: status.hasEnoughForTransfers,
       rpc: false,
       tokenContract: false,
     };
@@ -222,10 +222,11 @@ async function main() {
       },
       status: {
         autoTransferEnabled: status.autoTransferEnabled,
-        totalTaxBalance: status.totalTaxBalance,
+        ethBalance: status.ethBalance,
+        ethBalanceUsd: status.ethBalanceUsd,
         prizePool: status.prizePool,
-        nativeBalance: status.nativeBalance,
-        hasEnoughGas: status.hasEnoughGas,
+        prizePoolUsd: status.prizePoolUsd,
+        hasEnoughForTransfers: status.hasEnoughForTransfers,
         totalDraws: status.totalDraws,
         failedTransfers: status.failedTransfers,
         totalDevPaid: status.totalDevPaid,
@@ -237,8 +238,8 @@ async function main() {
         excluded: status.stats.excludedCount,
       },
       checks: {
-        canExecuteTransfers: status.autoTransferEnabled && status.hasEnoughGas,
-        hasFunds: parseFloat(status.totalTaxBalance) > 0,
+        canExecuteTransfers: status.autoTransferEnabled && status.hasEnoughForTransfers,
+        hasFunds: parseFloat(status.ethBalance) > 0,
         hasHolders: status.stats.eligibleHolders > 0,
       },
     };

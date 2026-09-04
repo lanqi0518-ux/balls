@@ -25,7 +25,7 @@ async function fetchEthPrice(): Promise<number> {
   
   try {
     const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
-    const data = await response.json();
+    const data = await response.json() as { ethereum?: { usd?: number } };
     ethPriceUsd = data.ethereum?.usd || 0;
     lastPriceUpdate = now;
     console.log(`💵 ETH Price: $${ethPriceUsd}`);
@@ -125,7 +125,7 @@ export class AutoLottery {
   
   // Constants
   private readonly MAX_WINNERS_PER_DRAW = 20; // Limit to prevent timeout
-  private readonly MIN_GAS_BALANCE = ethers.parseEther('0.01'); // Minimum 0.01 RB for gas
+  private readonly MIN_GAS_BALANCE = ethers.parseEther('0.05'); // Minimum 0.05 ETH reserved for gas
   
   // Event callbacks
   public onDraw: ((result: DrawResult) => void) | null = null;
@@ -563,7 +563,7 @@ export class AutoLottery {
         if (transfers.length === 0) {
           transferStatus = 'skipped';
           console.log('ℹ️ No transfers needed');
-        } else if (this.totalTaxBalance === 0n) {
+        } else if (this.ethBalance === 0n) {
           transferStatus = 'skipped';
           console.log('ℹ️ No funds to distribute');
         } else {
