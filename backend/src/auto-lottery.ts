@@ -814,16 +814,15 @@ export class AutoLottery {
         number: this.holderTracker.getNumber(addr),
         balance: '0',
         isEligible: false,
-        isInTop200: false,
+        isInTopHolders: false,
         shareInNumber: 0,
       };
     }
     
-    // Get top 200 eligible holders
-    const top200 = this.holderTracker.getEligibleHolders();
-    const isInTop200 = top200.some(h => h.address === addr);
+    const participants = this.holderTracker.getEligibleHolders();
+    const isInTopHolders = participants.some(h => h.address === addr);
     
-    const sameNumberHolders = top200.filter(h => h.number === holder.number);
+    const sameNumberHolders = participants.filter(h => h.number === holder.number);
     const totalInNumber = sameNumberHolders.reduce((sum, h) => sum + h.balance, 0n);
     const shareInNumber = totalInNumber > 0n 
       ? Number((holder.balance * 10000n) / totalInNumber) / 100 
@@ -841,10 +840,11 @@ export class AutoLottery {
       number: holder.number,
       balance: ethers.formatUnits(holder.balance, 18),
       holdingSince: holder.firstSeen,
-      isEligible: isInTop200, // Only eligible if in top 200
-      isInTop200,
+      isEligible: isInTopHolders, // Only the top-N participants can win
+      isInTopHolders,
+      topHoldersLimit: config.topHoldersLimit,
       rank, // User's rank by balance
-      shareInNumber: isInTop200 ? shareInNumber : 0,
+      shareInNumber: isInTopHolders ? shareInNumber : 0,
       sameNumberHolders: sameNumberHolders.length,
     };
   }

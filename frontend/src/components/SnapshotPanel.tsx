@@ -6,19 +6,28 @@ interface Props {
     drawId: number
     eligibleCount: number
     hash: string
+    commitment?: string
   } | null
   hasSnapshot: boolean
   eligibleCount: number
+  topHoldersLimit?: number
 }
 
-export const SnapshotPanel = memo(function SnapshotPanel({ snapshot, hasSnapshot }: Props) {
+export const SnapshotPanel = memo(function SnapshotPanel({
+  snapshot,
+  hasSnapshot,
+  topHoldersLimit,
+}: Props) {
   const { distribution } = useNumberDistribution()
 
   return (
     <div className="card mb-6 md:mb-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 md:mb-6">
         <h3 className="text-xs md:text-sm text-[var(--text-muted)] uppercase tracking-wider">
-          Number Distribution <span style={{ color: 'var(--green-primary)' }}>(Top 100)</span>
+          Number Distribution{' '}
+          <span style={{ color: 'var(--green-primary)' }}>
+            (Top {topHoldersLimit ?? 100})
+          </span>
         </h3>
         
         {hasSnapshot && (
@@ -59,8 +68,15 @@ export const SnapshotPanel = memo(function SnapshotPanel({ snapshot, hasSnapshot
             <span className="mx-2 md:mx-3 text-[var(--text-muted)]">·</span>
             <span>{snapshot.eligibleCount} participants</span>
           </div>
-          <div className="text-[10px] md:text-xs text-[var(--text-muted)] font-mono">
-            {snapshot.hash.slice(0, 12)}...
+          <div className="text-[10px] md:text-xs text-[var(--text-muted)] font-mono flex flex-col sm:items-end gap-1">
+            <span title={snapshot.hash}>snapshot {snapshot.hash.slice(0, 12)}...</span>
+            {/* Published before the draw; the seed behind it is revealed with
+                the result so the winning number can be rechecked. */}
+            {snapshot.commitment && (
+              <span title={snapshot.commitment}>
+                commit {snapshot.commitment.slice(0, 12)}...
+              </span>
+            )}
           </div>
         </div>
       )}

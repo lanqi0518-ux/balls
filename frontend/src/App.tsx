@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { PrizePool } from './components/PrizePool'
 import { Countdown } from './components/Countdown'
 import { RecentDraws } from './components/RecentDraws'
@@ -9,20 +9,30 @@ import { LiveDrawAnimation } from './components/LiveDrawAnimation'
 import { NumberLookup } from './components/NumberLookup'
 import { useRealtimeStatus, useRecentDraws } from './hooks/useRealtime'
 
+interface Notification {
+  id: number
+  message: string
+}
+
 function App() {
   const { status, isConnected, latestDraw } = useRealtimeStatus()
   const { draws, refetch: refetchDraws } = useRecentDraws(10)
   const [showDrawAnimation, setShowDrawAnimation] = useState(false)
   const [animationResult, setAnimationResult] = useState<typeof latestDraw>(null)
-  const [notifications, setNotifications] = useState<string[]>([])
+  const [notifications, setNotifications] = useState<Notification[]>([])
   const processedDraws = useRef<Set<number>>(new Set())
+  const notificationId = useRef(0)
 
   // Handle new draw
   useEffect(() => {
     if (latestDraw && !processedDraws.current.has(latestDraw.drawId)) {
-      console.log('🎰 New draw received:', latestDraw)
       processedDraws.current.add(latestDraw.drawId)
-      
+
+      // A draw a minute would otherwise grow this set without bound
+      if (processedDraws.current.size > 200) {
+        processedDraws.current = new Set([latestDraw.drawId])
+      }
+
       // Show animation
       setAnimationResult(latestDraw)
       setShowDrawAnimation(true)
@@ -36,15 +46,19 @@ function App() {
   }, [latestDraw, refetchDraws])
 
   const addNotification = (message: string) => {
-    setNotifications(prev => [message, ...prev].slice(0, 3))
+    // Remove by id. Dropping the last entry instead removed the wrong toast
+    // whenever a second one arrived before the first had expired.
+    const id = notificationId.current++
+    setNotifications(prev => [{ id, message }, ...prev].slice(0, 3))
     setTimeout(() => {
-      setNotifications(prev => prev.slice(0, -1))
+      setNotifications(prev => prev.filter(n => n.id !== id))
     }, 5000)
   }
 
-  const closeAnimation = () => {
+  // Stable so the animation's auto-close timer is not reset on every render
+  const closeAnimation = useCallback(() => {
     setShowDrawAnimation(false)
-  }
+  }, [])
 
   return (
     <div className="min-h-screen">
@@ -90,9 +104,9 @@ function App() {
       
       {/* Notifications */}
       <div className="toast-container">
-        {notifications.map((msg, index) => (
-          <div key={index} className="toast">
-            <span>{msg}</span>
+        {notifications.map(({ id, message }) => (
+          <div key={id} className="toast">
+            <span>{message}</span>
           </div>
         ))}
       </div>
@@ -122,7 +136,7 @@ function App() {
             <span style={{ color: 'var(--green-primary)' }}>Balls</span> Lottery
           </h1>
           <p className="text-[var(--text-secondary)] text-sm md:text-lg max-w-xl mx-auto px-4">
-            Top 100 holders automatically participate. No action required.
+            Top {status?.stats.topHoldersLimit ?? 100} holders automatically participate. No action required.
           </p>
         </div>
         
@@ -140,7 +154,10 @@ function App() {
             <p className="text-[var(--text-muted)] text-xs md:text-sm uppercase tracking-wider mb-3 md:mb-4">
               Next Draw
             </p>
-            <Countdown />
+            <Countdown
+              secondsRemaining={status?.timeUntilNextDraw}
+              intervalSeconds={status?.drawIntervalMs ? status.drawIntervalMs / 1000 : undefined}
+            />
             {status?.hasSnapshot && (
               <p className="mt-3 md:mt-4 text-xs md:text-sm" style={{ color: 'var(--green-primary)' }}>
                 ✓ Snapshot Locked
@@ -164,6 +181,7 @@ function App() {
           snapshot={status?.snapshot || null}
           hasSnapshot={status?.hasSnapshot || false}
           eligibleCount={status?.stats.eligibleHolders || 0}
+          topHoldersLimit={status?.stats.topHoldersLimit}
         />
         
         {/* Stats & Lookup */}

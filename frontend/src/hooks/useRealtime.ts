@@ -8,7 +8,9 @@ interface LotteryStatus {
   isRunning: boolean;
   currentDrawId: number;
   timeUntilNextDraw: number;
-  nextDrawTime: number;
+  nextDrawAt?: number;
+  drawIntervalMs?: number;
+  snapshotLeadMs?: number;
   hasSnapshot: boolean;
   // ETH-based prize pool
   prizePool: string;
@@ -31,6 +33,7 @@ interface LotteryStatus {
     drawId: number;
     eligibleCount: number;
     hash: string;
+    commitment?: string;
   } | null;
   stats: {
     totalHolders: number;
@@ -38,6 +41,7 @@ interface LotteryStatus {
     holdersWithTime?: number;
     topHoldersLimit?: number;
     minHoldingDuration: number;
+    scanComplete?: boolean;
   };
 }
 
@@ -58,6 +62,10 @@ interface DrawResult {
   totalWinnerBalance?: string;
   winners?: WinnerShare[];
   snapshotHash: string;
+  rollover?: boolean;
+  // Revealed with the result so the draw can be rechecked
+  commitment?: string;
+  serverSeed?: string;
 }
 
 interface UserInfo {
@@ -67,26 +75,11 @@ interface UserInfo {
   balance: string;
   holdingSince?: number;
   isEligible: boolean;
-  isInTop200?: boolean;
+  isInTopHolders?: boolean;
   rank?: number;
   pendingPrize?: string;
   shareInNumber?: number;
   sameNumberHolders?: number;
-}
-
-/**
- * Real-time status hook
- */
-function statusUnchanged(prev: LotteryStatus, next: LotteryStatus): boolean {
-  return (
-    prev.prizePool === next.prizePool &&
-    prev.prizePoolUsd === next.prizePoolUsd &&
-    prev.ethPriceUsd === next.ethPriceUsd &&
-    prev.hasSnapshot === next.hasSnapshot &&
-    prev.currentDrawId === next.currentDrawId &&
-    prev.stats?.eligibleHolders === next.stats?.eligibleHolders &&
-    prev.stats?.totalHolders === next.stats?.totalHolders
-  );
 }
 
 export function useRealtimeStatus() {
@@ -123,8 +116,11 @@ export function useRealtimeStatus() {
 
         eventSource.addEventListener('status', (event) => {
           try {
-            const data = JSON.parse((event as MessageEvent).data) as LotteryStatus;
-            setStatus((prev) => (prev && statusUnchanged(prev, data) ? prev : data));
+            // Take every update. A previous version compared eight hand-picked
+            // fields and reused the old object otherwise, so changes to
+            // hasEnoughForTransfers, autoTransferEnabled, isRunning, totalDraws
+            // and failedTransfers never reached the UI.
+            setStatus(JSON.parse((event as MessageEvent).data) as LotteryStatus);
           } catch {}
         });
 

@@ -19,6 +19,10 @@ interface Props {
   onClose: () => void
 }
 
+// Draws run about once a minute, so the overlay has to get out of the way on
+// its own. It used to stay up until the user clicked Close, covering the page.
+const AUTO_CLOSE_MS = 12000
+
 export function LiveDrawAnimation({ isVisible, result, onClose }: Props) {
   const [phase, setPhase] = useState<'spinning' | 'reveal' | 'winners'>('spinning')
   const [displayNumber, setDisplayNumber] = useState(1)
@@ -28,6 +32,8 @@ export function LiveDrawAnimation({ isVisible, result, onClose }: Props) {
       setPhase('spinning')
       return
     }
+
+    const timeouts: ReturnType<typeof setTimeout>[] = []
 
     // Spinning animation
     let count = 0
@@ -40,16 +46,19 @@ export function LiveDrawAnimation({ isVisible, result, onClose }: Props) {
         setDisplayNumber(result.winningNumber)
         
         // Show winners after 1.5s
-        setTimeout(() => {
+        timeouts.push(setTimeout(() => {
           setPhase('winners')
-        }, 1500)
+        }, 1500))
       }
     }, 100)
 
+    timeouts.push(setTimeout(onClose, AUTO_CLOSE_MS))
+
     return () => {
       clearInterval(spinInterval)
+      timeouts.forEach(clearTimeout)
     }
-  }, [isVisible, result.winningNumber])
+  }, [isVisible, result.winningNumber, onClose])
 
   if (!isVisible) return null
 
