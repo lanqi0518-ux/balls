@@ -1,59 +1,68 @@
-import { memo } from 'react'
+import { memo, type ReactNode } from 'react'
 
 interface Props {
   prizePool: string
   prizePoolUsd?: string
   ethPriceUsd?: number
   prizePoolWallet?: string
+  children?: ReactNode
 }
 
-function PrizePoolInner({ prizePool, prizePoolUsd, ethPriceUsd, prizePoolWallet }: Props) {
+function PrizePoolInner({
+  prizePool,
+  prizePoolUsd,
+  ethPriceUsd,
+  prizePoolWallet,
+  children,
+}: Props) {
   const usdAmount = Number(prizePoolUsd) || 0
   const ethAmount = Number(prizePool) || 0
 
+  // Powerball prints the jackpot as a whole number of dollars — mirror that.
+  const usdDisplay = usdAmount >= 1
+    ? `$${Math.round(usdAmount).toLocaleString()}`
+    : `$${usdAmount.toFixed(2)}`
+
   return (
-    <div className="prize-pool">
-      <div className="prize-label">Current Jackpot</div>
-      
-      <div className="prize-amount">
-        ${usdAmount.toLocaleString(undefined, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}
+    <section className="jackpot-hero">
+      <div className="jackpot-label">Estimated Jackpot</div>
+
+      <h2 className="jackpot-amount">{usdDisplay}</h2>
+
+      <div className="jackpot-subamount">
+        <span className="text-gold display">{ethAmount.toFixed(4)}</span> ETH
       </div>
-      
-      <div className="text-[var(--text-secondary)] text-sm md:text-lg font-semibold mt-1 md:mt-2">
-        {ethAmount.toFixed(4)} ETH
-      </div>
-      
+
       {ethPriceUsd && ethPriceUsd > 0 && (
-        <div className="text-[var(--text-muted)] text-xs mt-1">
-          ETH = ${ethPriceUsd.toLocaleString()}
+        <div className="jackpot-eth-price">
+          Cash value at ETH ${ethPriceUsd.toLocaleString(undefined, {
+            maximumFractionDigits: 2,
+          })}
         </div>
       )}
-      
-      {prizePoolWallet && (
-        <div className="mt-4 md:mt-6 flex items-center justify-center gap-2 flex-wrap">
-          <span className="text-[var(--text-muted)] text-[10px] md:text-xs">Prize Pool:</span>
-          <a 
-            href={`https://robinhoodchain.blockscout.com/address/${prizePoolWallet}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[10px] md:text-xs font-mono hover:underline"
-            style={{ color: 'var(--green-primary)' }}
-          >
-            {prizePoolWallet.slice(0, 8)}...{prizePoolWallet.slice(-6)}
-          </a>
-        </div>
-      )}
-      
-      <div className="mt-3 md:mt-4 flex justify-center">
-        <div className="live-indicator">
+
+      <div className="jackpot-meta">
+        <span className="jackpot-chip">
           <span className="live-dot" />
-          LIVE
-        </div>
+          LIVE POOL
+        </span>
+
+        {prizePoolWallet && (
+          <span className="jackpot-chip">
+            Wallet
+            <a
+              href={`https://robinhoodchain.blockscout.com/address/${prizePoolWallet}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {prizePoolWallet.slice(0, 6)}…{prizePoolWallet.slice(-4)}
+            </a>
+          </span>
+        )}
       </div>
-    </div>
+
+      {children && <div className="mt-8">{children}</div>}
+    </section>
   )
 }
 
