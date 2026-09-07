@@ -1,4 +1,5 @@
 import { memo, type ReactNode } from 'react'
+import { useAnimatedNumber } from '../hooks/useAnimatedNumber'
 
 interface Props {
   prizePool: string
@@ -15,8 +16,10 @@ function PrizePoolInner({
   prizePoolWallet,
   children,
 }: Props) {
-  const usdAmount = Number(prizePoolUsd) || 0
-  const ethAmount = Number(prizePool) || 0
+  // Between the 10 s SSE pushes we interpolate the jackpot so it visibly
+  // ticks upward like a real lottery counter instead of jumping in steps.
+  const usdAmount = useAnimatedNumber(Number(prizePoolUsd) || 0)
+  const ethAmount = useAnimatedNumber(Number(prizePool) || 0)
 
   // Powerball prints the jackpot as a whole number of dollars — mirror that.
   const usdDisplay = usdAmount >= 1
