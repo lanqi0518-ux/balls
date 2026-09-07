@@ -4,7 +4,7 @@
 # The scheduler is single-writer (in-memory state, once-per-70s draw) so keep
 # to ONE machine unless you also introduce a Redis-backed lock.
 
-app = "balls-lottery"          # `fly launch` will rename this the first time
+app = "balls-lanqi"
 primary_region = "ord"
 kill_signal = "SIGINT"
 kill_timeout = "15s"
