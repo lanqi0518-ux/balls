@@ -97,6 +97,59 @@ contract LotteryTokenTest is Test {
         assertTrue(token.isHolder(user2));
     }
     
+    /// @dev 卖光代币会把地址从它的号码分组里移除。这个删除曾经是线性扫描整个
+    ///      分组，而号码只有 50 个，所以持币者一多，普通的一次卖出就会因为
+    ///      gas 超限而失败，代币会变得无法转账。
+    function testSellCostDoesNotGrowWithNumberGroupSize() public {
+        uint256 stateId = vm.snapshotState();
+        uint256 gasInSmallGroup = _measureSellGas(5);
+
+        vm.revertToState(stateId);
+        uint256 gasInLargeGroup = _measureSellGas(60);
+
+        // 线性扫描下，多出的 55 个成员每个都要多读一次 storage（冷读 2100 gas），
+        // 差值会有十万量级；按位置直接删除时两者几乎相同。
+        assertApproxEqAbs(
+            gasInLargeGroup,
+            gasInSmallGroup,
+            5_000,
+            "removal cost scales with group size"
+        );
+    }
+
+    /// @dev 让 user1 所在的号码分组有 fillerCount 个其它成员，然后测量他卖光的 gas。
+    ///      user1 最后才加入，因此位于数组末尾，也就是线性扫描的最坏位置。
+    function _measureSellGas(uint256 fillerCount) internal returns (uint256) {
+        uint8 targetNumber = token.getNumber(user1);
+
+        uint256 added;
+        for (uint160 i = 1000; added < fillerCount && i < 20000; i++) {
+            address filler = address(i);
+            if (token.getNumber(filler) == targetNumber && !token.isHolder(filler)) {
+                vm.prank(owner);
+                token.transfer(filler, 1_000 * 10**18);
+                added++;
+            }
+        }
+        assertEq(added, fillerCount, "failed to fill the number group");
+
+        vm.prank(owner);
+        token.transfer(user1, 1_000 * 10**18);
+        assertEq(token.getHoldersCountByNumber(targetNumber), fillerCount + 1);
+
+        uint256 balance = token.balanceOf(user1);
+
+        vm.prank(user1);
+        uint256 gasBefore = gasleft();
+        token.transfer(user2, balance);
+        uint256 gasUsed = gasBefore - gasleft();
+
+        assertFalse(token.isHolder(user1));
+        assertEq(token.getHoldersCountByNumber(targetNumber), fillerCount);
+
+        return gasUsed;
+    }
+
     function testNumberMapping() public {
         vm.startPrank(owner);
         

@@ -61,6 +61,8 @@ contract PonsLottery is Ownable, ReentrancyGuard {
     mapping(address => uint256) public holdingSince;
     mapping(address => uint8) public holderNumber;
     mapping(uint8 => address[]) public numberToHolders;
+    // 地址在 numberToHolders[number] 中的位置+1，用于 O(1) 删除
+    mapping(address => uint256) public numberArrayIndex;
     
     // 快照
     mapping(uint256 => Snapshot) public snapshots;
@@ -165,6 +167,7 @@ contract PonsLottery is Ownable, ReentrancyGuard {
         uint8 number = getNumber(holder);
         holderNumber[holder] = number;
         numberToHolders[number].push(holder);
+        numberArrayIndex[holder] = numberToHolders[number].length;
         
         emit HolderRegistered(holder, number, block.timestamp);
     }
@@ -192,15 +195,23 @@ contract PonsLottery is Ownable, ReentrancyGuard {
         emit HolderRemoved(holder);
     }
     
+    /// @dev O(1) 删除，用尾元素填补空位
     function _removeFromNumberMapping(address holder, uint8 number) internal {
+        uint256 position = numberArrayIndex[holder];
+        if (position == 0) return;
+
         address[] storage list = numberToHolders[number];
-        for (uint256 i = 0; i < list.length; i++) {
-            if (list[i] == holder) {
-                list[i] = list[list.length - 1];
-                list.pop();
-                break;
-            }
+        uint256 index = position - 1;
+        uint256 lastIndex = list.length - 1;
+
+        if (index != lastIndex) {
+            address lastHolder = list[lastIndex];
+            list[index] = lastHolder;
+            numberArrayIndex[lastHolder] = index + 1;
         }
+
+        list.pop();
+        numberArrayIndex[holder] = 0;
     }
 
     // ============ 号码计算 ============
