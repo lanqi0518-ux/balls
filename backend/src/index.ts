@@ -72,6 +72,9 @@ async function main() {
       eligible: status.stats.eligibleHolders,
       draws: status.totalDraws,
       hasEnoughForTransfers: status.hasEnoughForTransfers,
+      // False when some block ranges could not be read, meaning the holder
+      // list is missing anyone who only traded in those blocks
+      scanComplete: status.stats.scanComplete,
     });
   });
   

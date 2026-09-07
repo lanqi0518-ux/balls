@@ -31,9 +31,16 @@ export class HolderTracker {
   private isScanning = false;
   private scanProgress = 0;
   private lastScannedBlock = 0;
+  private missedBlockRanges: Array<{ fromBlock: number; toBlock: number }> = [];
   
   // Refresh interval
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
+  private connectionCheckInterval: ReturnType<typeof setInterval> | null = null;
+
+  // Transfer events are handled one at a time. Each one triggers balanceOf
+  // lookups, and running them concurrently lets a slow reply for an earlier
+  // event overwrite the balance written by a later one.
+  private eventQueue: Promise<void> = Promise.resolve();
   
   // ============ EXCLUDED ADDRESSES ============
   // These addresses are NOT real holders (LP pools, contracts, etc.)
@@ -210,6 +217,7 @@ export class HolderTracker {
     const allAddresses = new Set<string>();
     let totalEvents = 0;
     let consecutiveEmptyChunks = 0;
+    let failedRanges: Array<{ fromBlock: number; toBlock: number }> = [];
     
     // Scan in chunks from recent to older
     const maxBlocksBack = 500000;
@@ -218,60 +226,112 @@ export class HolderTracker {
     for (let toBlock = currentBlock; toBlock > startBlock; toBlock -= this.BLOCKS_PER_QUERY) {
       const fromBlock = Math.max(startBlock, toBlock - this.BLOCKS_PER_QUERY + 1);
       
-      // Retry logic for each chunk
-      let success = false;
-      for (let attempt = 1; attempt <= 3 && !success; attempt++) {
-        try {
-          const filter = this.tokenContract.filters.Transfer();
-          const events = await this.tokenContract.queryFilter(filter, fromBlock, toBlock);
-          
-          if (events.length > 0) {
-            consecutiveEmptyChunks = 0;
-            
-            for (const event of events) {
-              const log = event as ethers.EventLog;
-              if (log.args) {
-                const from = (log.args[0] as string).toLowerCase();
-                const to = (log.args[1] as string).toLowerCase();
-                
-                if (!this.isExcluded(from)) allAddresses.add(from);
-                if (!this.isExcluded(to)) allAddresses.add(to);
-              }
-            }
-            
-            totalEvents += events.length;
-            console.log(`  📊 Block ${fromBlock}-${toBlock} | +${events.length} events | Total: ${allAddresses.size} addresses`);
-          } else {
-            consecutiveEmptyChunks++;
-          }
-          
-          this.lastScannedBlock = fromBlock;
-          this.scanProgress = Math.floor(((currentBlock - fromBlock) / (currentBlock - startBlock)) * 100);
-          
-          success = true;
-          
-          // Stop if 10 consecutive empty chunks (50k blocks)
-          if (consecutiveEmptyChunks >= 10) {
-            console.log(`  📍 No events in last ${consecutiveEmptyChunks * this.BLOCKS_PER_QUERY} blocks, stopping scan`);
-            toBlock = startBlock; // Exit loop
-          }
-          
-        } catch (error: any) {
-          console.error(`  ⚠️ Attempt ${attempt} failed for blocks ${fromBlock}-${toBlock}:`, error.message);
-          await this.delay(1000 * attempt);
-        }
+      const events = await this.queryTransfers(fromBlock, toBlock);
+
+      if (events === null) {
+        // Every retry failed. Remember the gap instead of silently moving on
+        // and reporting a holder list that is missing whoever traded here.
+        failedRanges.push({ fromBlock, toBlock });
+        await this.delay(100);
+        continue;
+      }
+
+      if (events.length > 0) {
+        consecutiveEmptyChunks = 0;
+        this.collectAddresses(events, allAddresses);
+        totalEvents += events.length;
+        console.log(`  📊 Block ${fromBlock}-${toBlock} | +${events.length} events | Total: ${allAddresses.size} addresses`);
+      } else {
+        consecutiveEmptyChunks++;
+      }
+
+      this.lastScannedBlock = fromBlock;
+      this.scanProgress = Math.floor(((currentBlock - fromBlock) / (currentBlock - startBlock)) * 100);
+
+      // Stop if 10 consecutive empty chunks (50k blocks)
+      if (consecutiveEmptyChunks >= 10) {
+        console.log(`  📍 No events in last ${consecutiveEmptyChunks * this.BLOCKS_PER_QUERY} blocks, stopping scan`);
+        break;
       }
       
       await this.delay(100);
     }
-    
+
+    // Give the gaps one more pass before giving up on them
+    if (failedRanges.length > 0) {
+      console.log(`\n🔁 Retrying ${failedRanges.length} block ranges that failed...`);
+      const stillFailing: Array<{ fromBlock: number; toBlock: number }> = [];
+
+      for (const range of failedRanges) {
+        const events = await this.queryTransfers(range.fromBlock, range.toBlock);
+        if (events === null) {
+          stillFailing.push(range);
+        } else {
+          this.collectAddresses(events, allAddresses);
+          totalEvents += events.length;
+        }
+        await this.delay(100);
+      }
+
+      failedRanges = stillFailing;
+    }
+
+    this.missedBlockRanges = failedRanges;
     this.isScanning = false;
     this.scanProgress = 100;
     
     console.log(`\n📊 Scan complete: ${totalEvents} events, ${allAddresses.size} addresses`);
+
+    if (failedRanges.length > 0) {
+      const missedBlocks = failedRanges.reduce(
+        (sum, r) => sum + (r.toBlock - r.fromBlock + 1),
+        0
+      );
+      console.error(
+        `⚠️ Scan is INCOMPLETE: ${failedRanges.length} ranges (${missedBlocks} blocks) could not be read. ` +
+        `Holders that only traded in those blocks are missing. Call /api/tracker/rescan once the RPC recovers.`
+      );
+    }
     
     // Check balances for all addresses
     await this.checkBalances(allAddresses);
+  }
+
+  /**
+   * Read Transfer events for one block range. Returns null when every retry
+   * failed, so the caller can record the gap rather than treat it as empty.
+   */
+  private async queryTransfers(
+    fromBlock: number,
+    toBlock: number
+  ): Promise<ethers.Log[] | null> {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const filter = this.tokenContract!.filters.Transfer();
+        return await this.tokenContract!.queryFilter(filter, fromBlock, toBlock);
+      } catch (error: any) {
+        console.error(
+          `  ⚠️ Attempt ${attempt} failed for blocks ${fromBlock}-${toBlock}:`,
+          error.message
+        );
+        await this.delay(1000 * attempt);
+      }
+    }
+
+    return null;
+  }
+
+  private collectAddresses(events: ethers.Log[], into: Set<string>): void {
+    for (const event of events) {
+      const log = event as ethers.EventLog;
+      if (!log.args) continue;
+
+      const from = (log.args[0] as string).toLowerCase();
+      const to = (log.args[1] as string).toLowerCase();
+
+      if (!this.isExcluded(from)) into.add(from);
+      if (!this.isExcluded(to)) into.add(to);
+    }
   }
 
   /**
@@ -349,39 +409,8 @@ export class HolderTracker {
     console.log('\n👂 Listening for new transfers...');
     
     const setupListener = () => {
-      this.tokenContract!.on('Transfer', async (from, to, value) => {
-        const fromAddr = from.toLowerCase();
-        const toAddr = to.toLowerCase();
-        
-        if (!this.isExcluded(fromAddr) && !this.isExcluded(toAddr)) {
-          console.log(`📨 Transfer: ${fromAddr.slice(0, 8)}... → ${toAddr.slice(0, 8)}... (${ethers.formatUnits(value, 18)})`);
-        }
-        
-        // Update sender - check their new balance
-        if (!this.isExcluded(fromAddr)) {
-          try {
-            const balance = await this.tokenContract!.balanceOf(from);
-            this.updateHolder(from, balance);
-          } catch (err: any) {
-            console.error(`⚠️ Failed to get balance for sender ${fromAddr.slice(0,10)}...:`, err.message?.slice(0, 50));
-          }
-        }
-        
-        // Update receiver - ALWAYS use current time for new purchases
-        // This ensures the 60-second countdown starts fresh for each buy
-        if (!this.isExcluded(toAddr)) {
-          try {
-            const balance = await this.tokenContract!.balanceOf(to);
-            const existing = this.holders.get(toAddr);
-            
-            // If holder exists and already has balance, keep their firstSeen
-            // If new holder or was removed (balance was 0), use current time
-            const useExistingTime = existing && existing.balance > 0n;
-            this.updateHolder(to, balance, useExistingTime ? existing.firstSeen : undefined);
-          } catch (err: any) {
-            console.error(`⚠️ Failed to get balance for receiver ${toAddr.slice(0,10)}...:`, err.message?.slice(0, 50));
-          }
-        }
+      this.tokenContract!.on('Transfer', (from, to, value) => {
+        this.enqueueTransfer(from, to, value);
       });
     };
     
@@ -393,7 +422,7 @@ export class HolderTracker {
     });
     
     // Periodic connection check
-    setInterval(async () => {
+    this.connectionCheckInterval = setInterval(async () => {
       try {
         await this.provider!.getBlockNumber();
       } catch (error: any) {
@@ -427,6 +456,52 @@ export class HolderTracker {
     }, 30000); // Check every 30 seconds
     
     console.log('✅ Event listener active with auto-reconnect');
+  }
+
+  /**
+   * Queue a Transfer for processing. Handling has to be serialised: each event
+   * triggers balanceOf lookups, and if two run concurrently a slow reply for
+   * an earlier transfer can overwrite the balance written by a later one.
+   */
+  private enqueueTransfer(from: string, to: string, value: bigint): Promise<void> {
+    this.eventQueue = this.eventQueue
+      .then(() => this.handleTransfer(from, to, value))
+      .catch(err => console.error('⚠️ Transfer handler failed:', err?.message));
+
+    return this.eventQueue;
+  }
+
+  private async handleTransfer(from: string, to: string, value: bigint): Promise<void> {
+    const fromAddr = from.toLowerCase();
+    const toAddr = to.toLowerCase();
+
+    if (!this.isExcluded(fromAddr) && !this.isExcluded(toAddr)) {
+      console.log(`📨 Transfer: ${fromAddr.slice(0, 8)}... → ${toAddr.slice(0, 8)}... (${ethers.formatUnits(value, 18)})`);
+    }
+
+    // Update sender - check their new balance
+    if (!this.isExcluded(fromAddr)) {
+      try {
+        const balance = await this.tokenContract!.balanceOf(from);
+        this.updateHolder(from, balance);
+      } catch (err: any) {
+        console.error(`⚠️ Failed to get balance for sender ${fromAddr.slice(0,10)}...:`, err.message?.slice(0, 50));
+      }
+    }
+
+    // Update receiver. A holder that already had a balance keeps their
+    // original firstSeen; someone buying in fresh starts the clock now.
+    if (!this.isExcluded(toAddr)) {
+      try {
+        const balance = await this.tokenContract!.balanceOf(to);
+        const existing = this.holders.get(toAddr);
+
+        const useExistingTime = existing && existing.balance > 0n;
+        this.updateHolder(to, balance, useExistingTime ? existing.firstSeen : undefined);
+      } catch (err: any) {
+        console.error(`⚠️ Failed to get balance for receiver ${toAddr.slice(0,10)}...:`, err.message?.slice(0, 50));
+      }
+    }
   }
 
   /**
@@ -532,10 +607,16 @@ export class HolderTracker {
     if (!this.isRunning) return;
     
     this.tokenContract?.removeAllListeners('Transfer');
+    this.provider?.removeAllListeners();
     
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);
       this.refreshInterval = null;
+    }
+
+    if (this.connectionCheckInterval) {
+      clearInterval(this.connectionCheckInterval);
+      this.connectionCheckInterval = null;
     }
     
     this.isRunning = false;
@@ -550,6 +631,7 @@ export class HolderTracker {
     
     console.log('\n🔄 Force rescan initiated...');
     this.holders.clear();
+    this.missedBlockRanges = [];
     for (let i = 1; i <= 50; i++) {
       this.numberToHolders.set(i, new Set());
     }
@@ -701,6 +783,8 @@ export class HolderTracker {
     scanProgress: number;
     lastScannedBlock: number;
     excludedCount: number;
+    scanComplete: boolean;
+    missedBlockRanges: number;
   } {
     const eligible = this.getEligibleHolders();
 
@@ -714,6 +798,8 @@ export class HolderTracker {
       scanProgress: this.scanProgress,
       lastScannedBlock: this.lastScannedBlock,
       excludedCount: this.EXCLUDED_ADDRESSES.size,
+      scanComplete: this.missedBlockRanges.length === 0,
+      missedBlockRanges: this.missedBlockRanges.length,
     };
   }
 }

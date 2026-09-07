@@ -595,6 +595,9 @@ export class AutoLottery {
       
       // Execute transfers: publisher 1% forward + winner prizes in the same draw
       let transferStatus: 'pending' | 'success' | 'partial' | 'failed' | 'skipped' = 'pending';
+      // Only counts what actually landed, so the UI cannot claim the team was
+      // paid when the signer was missing or the transfer failed.
+      let devFeeForwarded = 0n;
       
       if (this.autoTransferEnabled) {
         if (!hasWinners) {
@@ -618,6 +621,7 @@ export class AutoLottery {
             results.push(feeResult);
             if (feeResult.success) {
               this.totalDevPaid += publisherFee;
+              devFeeForwarded = publisherFee;
             }
             await this.delay(500);
           } else if (this.hasSeparatePublisherWallet() && publisherFee > 0n && !this.publisherSigner) {
@@ -658,7 +662,7 @@ export class AutoLottery {
         timestamp: Math.floor(Date.now() / 1000),
         winningNumber,
         prizePool: ethers.formatEther(prizePool), // ETH
-        devFee: hasWinners ? ethers.formatEther(publisherFee) : '0', // forwarded 1%
+        devFee: ethers.formatEther(devFeeForwarded), // 1% actually forwarded
         winnersCount: winners.length,
         totalWinnerBalance: ethers.formatUnits(totalWinnerBalance, 18), // BALLS tokens
         winners,
