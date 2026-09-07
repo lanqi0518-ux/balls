@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
+import { isAddress } from 'ethers';
 import { config, validateConfig } from './config.js';
+import { requireAdmin } from './auth.js';
 import { HolderTracker } from './holder-tracker.js';
 import { AutoLottery } from './auto-lottery.js';
 
@@ -41,7 +43,9 @@ async function main() {
   
   // Create Express app
   const app = express();
-  app.use(cors());
+  app.use(cors(
+    config.allowedOrigins.length > 0 ? { origin: config.allowedOrigins } : {}
+  ));
   app.use(express.json());
   
   // ============ API Routes ============
@@ -146,6 +150,11 @@ async function main() {
   // Get user info
   app.get('/api/user/:address', (req, res) => {
     const { address } = req.params;
+
+    if (!isAddress(address)) {
+      return res.status(400).json({ success: false, error: 'Invalid address' });
+    }
+
     res.json({
       success: true,
       data: autoLottery.getUserInfo(address),
@@ -178,6 +187,12 @@ async function main() {
   // Lookup number by address
   app.get('/api/number/:address', (req, res) => {
     const { address } = req.params;
+
+    // getNumber() hashes the address and throws on malformed input
+    if (!isAddress(address)) {
+      return res.status(400).json({ success: false, error: 'Invalid address' });
+    }
+
     const number = holderTracker.getNumber(address);
     res.json({
       success: true,
@@ -194,7 +209,7 @@ async function main() {
   });
   
   // Force rescan all holders
-  app.post('/api/tracker/rescan', async (_req, res) => {
+  app.post('/api/tracker/rescan', requireAdmin, async (_req, res) => {
     try {
       console.log('📡 Manual rescan requested via API');
       await holderTracker.rescan();
@@ -212,7 +227,7 @@ async function main() {
   });
   
   // Verify transfer configuration (admin only)
-  app.get('/api/admin/verify-config', async (_req, res) => {
+  app.get('/api/admin/verify-config', requireAdmin, async (_req, res) => {
     const status = autoLottery.getStatus();
     
     const verification = {
@@ -267,13 +282,13 @@ async function main() {
   });
 
   // Add address to exclusion list
-  app.post('/api/tracker/exclude', (req, res) => {
+  app.post('/api/tracker/exclude', requireAdmin, (req, res) => {
     const { address } = req.body;
     
-    if (!address || typeof address !== 'string') {
+    if (!address || typeof address !== 'string' || !isAddress(address)) {
       return res.status(400).json({
         success: false,
-        error: 'Address is required',
+        error: 'A valid address is required',
       });
     }
     
@@ -316,11 +331,23 @@ async function main() {
   });
   
   // Broadcast status every 10 seconds (draw/snapshot push immediately)
-  setInterval(() => {
+  const statusBroadcast = setInterval(() => {
     if (sseClients.size > 0) {
       broadcast('status', autoLottery.getStatus());
     }
   }, 10000);
+
+  // Comment-only heartbeat. Proxies such as nginx and Cloudflare drop idle
+  // connections, and a draw can be a full interval away with nothing sent.
+  const heartbeat = setInterval(() => {
+    sseClients.forEach(client => {
+      try {
+        client.write(': ping\n\n');
+      } catch {
+        sseClients.delete(client);
+      }
+    });
+  }, 15000);
   
   // Start server
   const port = config.port || 10000;
@@ -341,8 +368,12 @@ async function main() {
   // Graceful shutdown
   const shutdown = () => {
     console.log('\nShutting down...');
+    clearInterval(statusBroadcast);
+    clearInterval(heartbeat);
     autoLottery.stop();
     holderTracker.stop();
+    sseClients.forEach(client => client.end());
+    sseClients.clear();
     process.exit(0);
   };
   
