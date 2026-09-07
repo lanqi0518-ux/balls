@@ -78,6 +78,8 @@ contract TaxReceiver is Ownable {
      */
     function forwardTax() external {
         require(address(token) != address(0), "Token not set");
+        // 否则奖池那一份会卡在本合约里，而事件却报告它已经转出去了
+        require(lotteryContract != address(0), "Lottery contract not set");
         
         uint256 balance = token.balanceOf(address(this));
         require(balance > 0, "No balance");
@@ -91,7 +93,7 @@ contract TaxReceiver is Ownable {
         }
         
         // 转给抽奖合约
-        if (toPrize > 0 && lotteryContract != address(0)) {
+        if (toPrize > 0) {
             token.safeTransfer(lotteryContract, toPrize);
         }
         

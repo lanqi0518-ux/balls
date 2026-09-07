@@ -50,6 +50,21 @@ contract LotteryTokenTest is Test {
         assertEq(number1, token.getNumber(user1));
     }
     
+    /// @dev _update 只在 lotteryContract 已设置时收税，而且是静默跳过的。
+    ///      如果允许先放开交易，这段时间里的买卖全部免税，奖池一分钱拿不到。
+    function testTradingCannotOpenBeforeLotteryIsSet() public {
+        vm.startPrank(owner);
+        LotteryToken fresh = new LotteryToken("T", "T", teamWallet);
+
+        vm.expectRevert("Set lottery contract first");
+        fresh.enableTrading();
+
+        fresh.setLotteryContract(address(lottery));
+        fresh.enableTrading();
+        assertTrue(fresh.tradingEnabled());
+        vm.stopPrank();
+    }
+
     function testTaxOnTransfer() public {
         vm.startPrank(owner);
         

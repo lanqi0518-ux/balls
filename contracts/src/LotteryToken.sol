@@ -125,6 +125,9 @@ contract LotteryToken is ERC20, Ownable, ReentrancyGuard {
      */
     function enableTrading() external onlyOwner {
         require(!tradingEnabled, "Trading already enabled");
+        // _update 只在 lotteryContract 已设置时才收税，而且是静默跳过。
+        // 若在设置之前就放开交易，这期间的所有买卖都不收税，奖池拿不到钱。
+        require(lotteryContract != address(0), "Set lottery contract first");
         tradingEnabled = true;
         emit TradingEnabled();
     }
