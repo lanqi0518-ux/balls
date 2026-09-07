@@ -138,6 +138,14 @@ export class AutoLottery {
   private readonly MIN_GAS_BALANCE = ethers.parseEther('0.05'); // Minimum 0.05 ETH reserved for gas
   private readonly drawIntervalMs = config.drawInterval;
   private readonly snapshotLeadMs = config.snapshotLeadTime;
+
+  // Demo mode: fabricate holders, prize-pool growth and draws so the site
+  // can be shown off without a deployed token contract.
+  private readonly demoMode = config.demoMode;
+  private demoHolders: Array<{ address: string; number: number; balance: bigint }> = [];
+  // Seed with ~0.5 ETH so the first jackpot the site loads isn't zero
+  private demoPoolWei = ethers.parseEther('0.5');
+  private demoPoolLastGrownAt = Date.now();
   
   // Event callbacks
   public onDraw: ((result: DrawResult) => void) | null = null;
@@ -178,7 +186,10 @@ export class AutoLottery {
       console.log('ℹ️ Set PUBLISHER_WALLET if the auto 1% lands in a different wallet from the 3% prize pool');
     }
 
-    if (config.tokenAddress) {
+    if (this.demoMode) {
+      console.log('🎭 DEMO_MODE — server will fabricate holders, prize growth and draws');
+      this.buildDemoHolders();
+    } else if (config.tokenAddress) {
       this.tokenContract = new ethers.Contract(
         config.tokenAddress,
         ERC20_ABI,
@@ -187,6 +198,26 @@ export class AutoLottery {
     } else {
       console.log('⚠️ No TOKEN_ADDRESS - draws paused until contract is set');
       console.log('💡 Prize pool still reads the real tax-wallet ETH balance');
+    }
+  }
+
+  /**
+   * Populate a stable pool of ~120 fake holders spread across all 50 numbers.
+   * Addresses are derived deterministically so they persist across reboots,
+   * which keeps things like "your number" for a demo wallet stable.
+   */
+  private buildDemoHolders() {
+    this.demoHolders = [];
+    for (let i = 0; i < 120; i++) {
+      const seed = ethers.keccak256(ethers.toUtf8Bytes(`balls-demo-holder-${i}`));
+      // 40 hex chars off the hash → address-shaped string for the UI
+      const address = '0x' + seed.slice(2, 42);
+      // Uniform-ish spread across numbers 1..50 with some clumping for realism
+      const number = ((i * 17 + 3) % 50) + 1;
+      // Balance range 500..5500 BALLS so shares vary in the winners split
+      const balls = 500 + ((i * 47) % 5000);
+      const balance = ethers.parseUnits(String(balls), 18);
+      this.demoHolders.push({ address, number, balance });
     }
   }
 
@@ -213,7 +244,15 @@ export class AutoLottery {
     console.log(`Prize Pool Wallet: ${this.taxReceiverAddress}`);
     console.log(`Team Wallet: ${this.devWalletAddress}`);
     console.log(`Draw Time: every ${this.drawIntervalMs / 1000}s, snapshot ${this.snapshotLeadMs / 1000}s earlier`);
-    console.log(`Mode: ${this.tokenContract ? 'Live' : 'Waiting for TOKEN_ADDRESS (real wallet balance)'}`);
+    console.log(
+      `Mode: ${
+        this.demoMode
+          ? 'DEMO (fake holders + fake prize growth)'
+          : this.tokenContract
+            ? 'Live'
+            : 'Waiting for TOKEN_ADDRESS (real wallet balance)'
+      }`
+    );
     console.log(`Auto Transfer: ${this.autoTransferEnabled ? 'ENABLED' : 'DISABLED'}`);
     console.log(`Max Winners/Draw: ${this.MAX_WINNERS_PER_DRAW}`);
 
@@ -261,8 +300,18 @@ export class AutoLottery {
    * Publisher 1% is tracked separately and forwarded at draw time.
    */
   private async updateBalances() {
+    if (this.demoMode) {
+      this.growDemoPool();
+      this.ethBalance = this.demoPoolWei;
+      this.currentPrizePool = this.getSpendable(this.ethBalance);
+      this.publisherBalance = 0n;
+      this.publisherFee = 0n;
+      this.ethPriceUsd = await fetchEthPrice();
+      return;
+    }
+
     if (!this.provider) return;
-    
+
     try {
       this.ethBalance = await this.provider.getBalance(this.taxReceiverAddress);
       this.currentPrizePool = this.getSpendable(this.ethBalance);
@@ -274,11 +323,65 @@ export class AutoLottery {
         this.publisherBalance = 0n;
         this.publisherFee = 0n;
       }
-      
+
       this.ethPriceUsd = await fetchEthPrice();
     } catch (error: any) {
       console.error('❌ Failed to update balance:', error.message);
     }
+  }
+
+  /**
+   * Grow the demo prize pool linearly with wall-clock time so the UI's
+   * live-ticking jackpot keeps climbing. About 0.02 ETH added per second,
+   * or ~1.4 ETH per 70-second draw cycle at $2500 ETH ≈ $3.5k jackpot.
+   */
+  private growDemoPool() {
+    const now = Date.now();
+    const elapsedMs = Math.max(0, now - this.demoPoolLastGrownAt);
+    if (elapsedMs === 0) return;
+    // 0.00002 ETH per ms → 0.02 ETH per second → ~1.4 ETH over 70s
+    const growthWei = ethers.parseEther('0.00002') * BigInt(elapsedMs);
+    this.demoPoolWei += growthWei;
+    this.demoPoolLastGrownAt = now;
+  }
+
+  /**
+   * Stats surface expected by the API — mimics HolderTracker.getStats() so
+   * the UI shows meaningful numbers in demo mode.
+   */
+  private buildDemoStats() {
+    const total = this.demoHolders.length;
+    const eligible = this.currentSnapshot?.holders.length ?? Math.min(total, 25);
+    return {
+      totalHolders: total,
+      holdersWithTime: total,
+      eligibleHolders: eligible,
+      topHoldersLimit: config.topHoldersLimit,
+      minHoldingDuration: config.minHoldingDuration,
+      isScanning: false,
+      scanProgress: 100,
+      lastScannedBlock: 0,
+      excludedCount: 0,
+      scanComplete: true,
+      missedBlockRanges: 0,
+    };
+  }
+
+  /**
+   * Return a randomised subset of the demo holder pool to simulate the
+   * "who was eligible at snapshot" list. Sized so ~1 in 3 draws has a winner.
+   */
+  private getDemoEligible() {
+    // Pick ~18-30 holders each snapshot; that gives ~40-60% chance the winning
+    // number lands on someone (with 50 numbers), so rollovers still happen
+    // often enough to look real.
+    const size = 18 + Math.floor(Math.random() * 13);
+    const pool = [...this.demoHolders];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return pool.slice(0, size);
   }
 
   /**
@@ -290,7 +393,7 @@ export class AutoLottery {
   }
 
   private tick() {
-    if (!this.tokenContract) return;
+    if (!this.tokenContract && !this.demoMode) return;
 
     const now = Date.now();
 
@@ -311,7 +414,9 @@ export class AutoLottery {
 
   private takeSnapshot() {
     const nextDrawId = this.currentDrawId + 1;
-    const eligible = this.holderTracker.getEligibleHolders();
+    const eligible = this.demoMode
+      ? this.getDemoEligible()
+      : this.holderTracker.getEligibleHolders();
     const timestamp = Math.floor(Date.now() / 1000);
     
     const holders = eligible.map(h => ({
@@ -668,7 +773,17 @@ export class AutoLottery {
           }
         }
       }
-      
+
+      if (this.demoMode) {
+        // No real transfers happen in demo mode, but the UI still wants to see
+        // a completed draw. Winners "sweep" the pool; rollovers keep growing.
+        transferStatus = hasWinners ? 'success' : 'skipped';
+        if (hasWinners) {
+          this.demoPoolWei = ethers.parseEther('0.1'); // small residual so the next cycle starts non-zero
+          this.demoPoolLastGrownAt = Date.now();
+        }
+      }
+
       // Build result
       const result: DrawResult = {
         drawId,
@@ -749,8 +864,10 @@ export class AutoLottery {
 
   private buildStatus() {
     const prizePool = this.currentPrizePool;
-    const trackerStats = this.holderTracker.getStats();
-    
+    const trackerStats = this.demoMode
+      ? this.buildDemoStats()
+      : this.holderTracker.getStats();
+
     const prizePoolEth = parseFloat(ethers.formatEther(prizePool));
     const prizePoolUsd = prizePoolEth * this.ethPriceUsd;
     const ethBalanceUsd = parseFloat(ethers.formatEther(this.ethBalance)) * this.ethPriceUsd;
@@ -775,8 +892,8 @@ export class AutoLottery {
       publisherFee: ethers.formatEther(this.publisherFee),
       devWallet: this.devWalletAddress,
       autoTransferEnabled: this.autoTransferEnabled,
-      demoMode: false,
-      tokenConfigured: !!this.tokenContract,
+      demoMode: this.demoMode,
+      tokenConfigured: this.demoMode ? true : !!this.tokenContract,
       prizeInEth: true,
       totalDevPaid: ethers.formatEther(this.totalDevPaid),
       totalPrizePaid: ethers.formatEther(this.totalPrizePaid),
@@ -850,7 +967,12 @@ export class AutoLottery {
   }
 
   getNumberDistribution() {
-    const holders = this.holderTracker.getEligibleHolders();
+    // In demo mode reuse the current snapshot when we have one so the strip on
+    // the UI matches the eligibility list; otherwise fall back to the full
+    // fake holder pool for a stable pre-first-draw view.
+    const holders = this.demoMode
+      ? (this.currentSnapshot?.holders ?? this.demoHolders)
+      : this.holderTracker.getEligibleHolders();
     const result: Record<number, {count: number; totalBalance: string}> = {};
     
     for (let i = 1; i <= 50; i++) {

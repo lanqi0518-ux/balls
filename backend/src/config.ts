@@ -62,6 +62,12 @@ export const config = {
     .split(',')
     .map(o => o.trim())
     .filter(Boolean),
+
+  // When true, the server fabricates its own holders, prize pool growth and
+  // draws so the site is fully interactive without a deployed token contract.
+  // Overrides TOKEN_ADDRESS while set — set DEMO_MODE=false and provide a
+  // real TOKEN_ADDRESS to switch to production.
+  demoMode: process.env.DEMO_MODE === 'true',
 };
 
 /**
@@ -87,13 +93,14 @@ export function validateConfig(): void {
   console.log(`  Min holding: ${config.minHoldingDuration}s`);
   console.log(`  Top holders: ${config.topHoldersLimit}`);
   console.log(`  Auto draw: ${config.autoDrawEnabled ? 'ENABLED' : 'DISABLED'}`);
-  
+  console.log(`  Demo mode: ${config.demoMode ? 'ENABLED (fake holders + fake draws)' : 'disabled'}`);
+
   console.log('\n🚫 Excluded Addresses (not counted as holders):');
   config.excludedAddresses.forEach(addr => {
     console.log(`  - ${addr}`);
   });
-  
-  if (!config.tokenAddress) {
+
+  if (!config.tokenAddress && !config.demoMode) {
     console.log('\n⚠️ TOKEN_ADDRESS not set - draws paused, prize pool uses real tax-wallet ETH');
   }
 
