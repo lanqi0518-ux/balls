@@ -1,0 +1,38 @@
+# VCS / editor
+.git
+.gitignore
+.gitattributes
+.vscode
+.idea
+*.log
+
+# CI / docs / meta
+.github
+docs
+README.md
+CHANGELOG.md
+LICENSE
+
+# Node dependency trees — reinstalled inside the image
+**/node_modules
+
+# Build artifacts — regenerated inside the image
+**/dist
+**/build
+frontend/public
+!frontend/public/logo*   # ship the actual /public/ static assets
+
+# Contract toolchain — not needed at runtime
+contracts
+foundry.toml
+
+# Local secrets / env — pass them via `fly secrets set` instead
+.env
+.env.*
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+
+# Test outputs
+coverage
+.nyc_output

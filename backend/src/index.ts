@@ -1,10 +1,21 @@
 import express from 'express';
 import cors from 'cors';
 import { isAddress } from 'ethers';
+import path from 'node:path';
+import fs from 'node:fs';
 import { config, validateConfig } from './config.js';
 import { requireAdmin } from './auth.js';
 import { HolderTracker } from './holder-tracker.js';
 import { AutoLottery } from './auto-lottery.js';
+
+// Path to the built frontend bundle. In the shipped Docker image the frontend
+// is compiled and copied to <cwd>/public. When developing locally against the
+// frontend dev server this directory may not exist yet — that's fine, we skip
+// mounting it and rely on Vite's dev server. Resolving off process.cwd() keeps
+// this working under both CommonJS and ESM builds.
+const FRONTEND_DIR = process.env.FRONTEND_DIR
+  ? path.resolve(process.env.FRONTEND_DIR)
+  : path.resolve(process.cwd(), 'public');
 
 async function main() {
   console.log('🎱 Balls Lottery - Automated Backend');
@@ -47,16 +58,31 @@ async function main() {
     config.allowedOrigins.length > 0 ? { origin: config.allowedOrigins } : {}
   ));
   app.use(express.json());
-  
-  // ============ API Routes ============
-  
-  // Root
-  app.get('/', (_req, res) => {
-    res.json({ 
+
+  // Attach short-lived edge-cache hints to read-only GETs so a CDN sitting in
+  // front of us can absorb bursty traffic. SSE and mutating routes are left
+  // alone so they always hit the origin.
+  const CACHEABLE_GETS = new Set([
+    '/api/status',
+    '/api/draws',
+    '/api/distribution',
+    '/api/holders',
+    '/api/tracker/stats',
+  ]);
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && CACHEABLE_GETS.has(req.path)) {
+      res.setHeader('Cache-Control', 'public, max-age=5, s-maxage=5');
+    }
+    next();
+  });
+
+  // API landing page — kept behind /api so the SPA can own the root path.
+  app.get('/api', (_req, res) => {
+    res.json({
       name: 'Balls Lottery API',
       status: 'running',
       clients: sseClients.size,
-      endpoints: ['/health', '/api/status', '/api/draws', '/api/events']
+      endpoints: ['/health', '/api/status', '/api/draws', '/api/events'],
     });
   });
 
@@ -351,7 +377,41 @@ async function main() {
       }
     });
   }, 15000);
-  
+
+  // Serve the built frontend from the same process, so a single container
+  // ships both. Registered LAST so every /api/* and /health route above wins.
+  //   - hashed asset filenames get a year of immutable caching
+  //   - index.html is served fresh so a new deploy is picked up on next load
+  //   - anything else that isn't a file (SPA routes) falls back to index.html
+  if (fs.existsSync(FRONTEND_DIR)) {
+    console.log(`📦 Serving frontend from ${FRONTEND_DIR}`);
+
+    app.use(
+      express.static(FRONTEND_DIR, {
+        index: false,
+        etag: true,
+        maxAge: 0,
+        setHeaders: (res, filePath) => {
+          if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          } else {
+            res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+          }
+        },
+      }),
+    );
+
+    const indexPath = path.join(FRONTEND_DIR, 'index.html');
+    app.get('*', (req, res, next) => {
+      if (req.method !== 'GET') return next();
+      if (req.path.startsWith('/api') || req.path.startsWith('/health')) return next();
+      res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+      res.sendFile(indexPath);
+    });
+  } else {
+    console.log(`ℹ️  No frontend build at ${FRONTEND_DIR} — API-only mode`);
+  }
+
   // Start server
   const port = config.port || 10000;
   app.listen(port, () => {
