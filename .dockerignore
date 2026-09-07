@@ -19,8 +19,11 @@ LICENSE
 # Build artifacts — regenerated inside the image
 **/dist
 **/build
-frontend/public
-!frontend/public/logo*   # ship the actual /public/ static assets
+
+# frontend/public is intentionally NOT excluded — Vite copies it into
+# dist/ during `npm run build`, so it must be present in the Docker
+# build context. Excluding it (even with a `!logo*` re-include) drops
+# the whole tree, and favicon.svg / logo.svg ship as 404s.
 
 # Contract toolchain — not needed at runtime
 contracts

@@ -1,10 +1,40 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Balls">
   <defs>
-    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FFD700"/>
-      <stop offset="100%" style="stop-color:#FFA500"/>
-    </linearGradient>
+    <!-- Simplified 3D ball; specular and shadow removed for tab-icon crispness -->
+    <radialGradient id="body" cx="0.36" cy="0.30" r="0.72">
+      <stop offset="0%"   stop-color="#ff8590"/>
+      <stop offset="45%"  stop-color="#ef3247"/>
+      <stop offset="100%" stop-color="#a11026"/>
+    </radialGradient>
   </defs>
-  <circle cx="50" cy="50" r="45" fill="url(#gold)" stroke="#fff" stroke-width="4"/>
-  <text x="50" y="65" text-anchor="middle" font-size="40" font-weight="bold" fill="#000">🎰</text>
+
+  <!-- Ball -->
+  <circle cx="32" cy="32" r="30" fill="url(#body)"/>
+
+  <!--
+    Bold "B" glyph, scaled to 64×64 canvas.
+    Kept as a path so browser tabs don't depend on system fonts.
+  -->
+  <path fill="#ffffff" fill-rule="evenodd" d="
+    M 20 15
+    H 34
+    C 41 15 45 19 45 24
+    C 45 28 42 30 39 31
+    C 43 32 47 35 47 40
+    C 47 45 42 49 34 49
+    H 20
+    Z
+    M 27 21
+    V 28
+    H 33
+    C 36 28 38 27 38 25
+    C 38 22 36 21 33 21
+    Z
+    M 27 34
+    V 43
+    H 34
+    C 37 43 40 41 40 38
+    C 40 35 37 34 34 34
+    Z
+  "/>
 </svg>
