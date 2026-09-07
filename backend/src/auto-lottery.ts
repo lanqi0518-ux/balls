@@ -107,15 +107,16 @@ export class AutoLottery {
   
   // Timers
   private intervalTimer: ReturnType<typeof setInterval> | null = null;
+  private balanceTimer: ReturnType<typeof setInterval> | null = null;
   private isRunning = false;
   private isProcessingDraw = false;
   
   // Auto transfer
   private autoTransferEnabled = false;
   
-  // Track state
-  private lastDrawMinute = -1;
-  private snapshotTakenForMinute = -1;
+  // Schedule state (absolute epoch ms, aligned to the draw interval)
+  private nextDrawAt = 0;
+  private snapshotTakenForDrawAt = 0;
   private statusCache: { at: number; value: ReturnType<AutoLottery['buildStatus']> } | null = null;
   
   // Stats
@@ -127,6 +128,8 @@ export class AutoLottery {
   // Constants
   private readonly MAX_WINNERS_PER_DRAW = 20; // Limit to prevent timeout
   private readonly MIN_GAS_BALANCE = ethers.parseEther('0.05'); // Minimum 0.05 ETH reserved for gas
+  private readonly drawIntervalMs = config.drawInterval;
+  private readonly snapshotLeadMs = config.snapshotLeadTime;
   
   // Event callbacks
   public onDraw: ((result: DrawResult) => void) | null = null;
@@ -179,33 +182,44 @@ export class AutoLottery {
     }
   }
 
+  /**
+   * Draws run on a wall-clock aligned grid so every instance and every client
+   * agrees on when the next one happens.
+   */
+  private alignedDrawAfter(timestampMs: number): number {
+    return (Math.floor(timestampMs / this.drawIntervalMs) + 1) * this.drawIntervalMs;
+  }
+
   private getTimeUntilDraw(): number {
-    const now = new Date();
-    const seconds = now.getSeconds();
-    if (seconds === 0) return 1;
-    if (seconds >= 1) return 61 - seconds;
-    return 1;
+    if (!this.nextDrawAt) return Math.ceil(this.drawIntervalMs / 1000);
+    return Math.max(0, Math.ceil((this.nextDrawAt - Date.now()) / 1000));
   }
 
   start() {
     if (this.isRunning) return;
     this.isRunning = true;
-    
+
+    this.nextDrawAt = this.alignedDrawAfter(Date.now());
+
     console.log('\n🎱 Starting Balls Lottery');
     console.log(`Prize Pool Wallet: ${this.taxReceiverAddress}`);
     console.log(`Team Wallet: ${this.devWalletAddress}`);
-    console.log(`Draw Time: Every minute at :01`);
+    console.log(`Draw Time: every ${this.drawIntervalMs / 1000}s, snapshot ${this.snapshotLeadMs / 1000}s earlier`);
     console.log(`Mode: ${this.tokenContract ? 'Live' : 'Waiting for TOKEN_ADDRESS (real wallet balance)'}`);
     console.log(`Auto Transfer: ${this.autoTransferEnabled ? 'ENABLED' : 'DISABLED'}`);
     console.log(`Max Winners/Draw: ${this.MAX_WINNERS_PER_DRAW}`);
-    
-    this.intervalTimer = setInterval(() => {
-      this.tick();
-    }, 500);
-    
+
+    if (config.autoDrawEnabled) {
+      this.intervalTimer = setInterval(() => {
+        this.tick();
+      }, 500);
+    } else {
+      console.log('⏸️ AUTO_DRAW_ENABLED=false - scheduler not started');
+    }
+
     // Start balance updates if configured
     this.updateBalances();
-    setInterval(() => this.updateBalances(), 10000);
+    this.balanceTimer = setInterval(() => this.updateBalances(), 10000);
   }
 
   stop() {
@@ -214,6 +228,11 @@ export class AutoLottery {
     if (this.intervalTimer) {
       clearInterval(this.intervalTimer);
       this.intervalTimer = null;
+    }
+
+    if (this.balanceTimer) {
+      clearInterval(this.balanceTimer);
+      this.balanceTimer = null;
     }
     
     this.isRunning = false;
@@ -265,25 +284,19 @@ export class AutoLottery {
   private tick() {
     if (!this.tokenContract) return;
 
-    const now = new Date();
-    const currentMinute = now.getMinutes();
-    const currentSecond = now.getSeconds();
-    
-    const nextDrawMinute = (currentSecond >= 1) ? (currentMinute + 1) % 60 : currentMinute;
-    
-    // Take snapshot at :50-:59
-    if (currentSecond >= 50 && currentSecond <= 59) {
-      if (this.snapshotTakenForMinute !== nextDrawMinute) {
-        this.snapshotTakenForMinute = nextDrawMinute;
-        this.takeSnapshot();
-      }
+    const now = Date.now();
+
+    // Freeze the participant list snapshotLeadMs before the draw.
+    if (now >= this.nextDrawAt - this.snapshotLeadMs && this.snapshotTakenForDrawAt !== this.nextDrawAt) {
+      this.snapshotTakenForDrawAt = this.nextDrawAt;
+      this.takeSnapshot();
     }
-    
-    // Execute draw at :01 or :02
-    if ((currentSecond === 1 || currentSecond === 2) && 
-        currentMinute !== this.lastDrawMinute && 
-        !this.isProcessingDraw) {
-      this.lastDrawMinute = currentMinute;
+
+    if (now >= this.nextDrawAt && !this.isProcessingDraw) {
+      // Advance the schedule before awaiting so a slow draw cannot fire twice,
+      // and so a draw that overruns skips to the next grid slot instead of
+      // firing back-to-back.
+      this.nextDrawAt = this.alignedDrawAfter(now);
       this.executeDraw();
     }
   }
@@ -315,7 +328,7 @@ export class AutoLottery {
     const prizePoolEth = ethers.formatEther(prizePool);
     const prizeUsd = (parseFloat(prizePoolEth) * this.ethPriceUsd).toFixed(2);
     
-    console.log('\n📸 Snapshot Locked (Top 100 Holders)');
+    console.log(`\n📸 Snapshot Locked (Top ${config.topHoldersLimit} Holders)`);
     console.log(`Draw: #${nextDrawId} | Eligible: ${holders.length} | Prize Pool: ${prizePoolEth} ETH ($${prizeUsd})`);
     
     if (this.onSnapshot) {
@@ -674,10 +687,6 @@ export class AutoLottery {
       }
       console.log('='.repeat(50));
       
-      // ⚠️ IMPORTANT: Reset all firstSeen timestamps after each draw
-      // This ensures only addresses holding for 60+ seconds in THIS round are eligible
-      this.holderTracker.resetAllFirstSeen();
-      
       await this.updateBalances();
       
       // Broadcast
@@ -737,6 +746,9 @@ export class AutoLottery {
       isProcessingDraw: this.isProcessingDraw,
       currentDrawId: this.currentDrawId,
       timeUntilNextDraw: this.getTimeUntilDraw(),
+      nextDrawAt: this.nextDrawAt,
+      drawIntervalMs: this.drawIntervalMs,
+      snapshotLeadMs: this.snapshotLeadMs,
       hasSnapshot: !!this.currentSnapshot,
       prizePool: ethers.formatEther(prizePool),
       prizePoolUsd: prizePoolUsd.toFixed(2),

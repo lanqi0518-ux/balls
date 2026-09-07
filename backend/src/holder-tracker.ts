@@ -22,7 +22,7 @@ export class HolderTracker {
   private numberToHolders: Map<number, Set<string>> = new Map();
   
   // Minimum holding duration (seconds)
-  private minHoldingDuration = 60;
+  private minHoldingDuration = config.minHoldingDuration;
   
   // Running state
   private isRunning = false;
@@ -318,7 +318,9 @@ export class HolderTracker {
         }
         
         if (balance > 0n) {
-          this.updateHolder(address, balance, now - 120);
+          // Addresses found by the historical scan already held before this
+          // process started, so credit them the full holding requirement.
+          this.updateHolder(address, balance, now - this.minHoldingDuration);
           withBalance++;
         }
         checked++;
@@ -574,10 +576,11 @@ export class HolderTracker {
   }
 
   // Constants
-  private readonly TOP_HOLDERS_LIMIT = 100; // Only top 200 holders can participate
+  private readonly TOP_HOLDERS_LIMIT = config.topHoldersLimit;
 
   /**
-   * Get eligible holders (top 200 by balance)
+   * Get eligible holders: those past the holding requirement, capped to the
+   * top TOP_HOLDERS_LIMIT by balance.
    */
   getEligibleHolders(): Array<{address: string; balance: bigint; number: number}> {
     const eligible: Array<{address: string; balance: bigint; number: number}> = [];
@@ -600,7 +603,18 @@ export class HolderTracker {
   }
 
   /**
-   * Get eligible holders by number (only from top 200)
+   * Count holders that satisfy the holding requirement, before the top-N cap.
+   */
+  countHoldersPastHoldingTime(): number {
+    let count = 0;
+    for (const address of this.holders.keys()) {
+      if (this.isEligible(address)) count++;
+    }
+    return count;
+  }
+
+  /**
+   * Get eligible holders by number (only from the top-N participants)
    */
   getEligibleHoldersByNumber(number: number): string[] {
     return this.getEligibleHolders()
@@ -675,28 +689,12 @@ export class HolderTracker {
   }
 
   /**
-   * Reset all firstSeen timestamps to now
-   * Called after each draw to start fresh eligibility countdown
-   */
-  resetAllFirstSeen(): void {
-    const now = Math.floor(Date.now() / 1000);
-    let count = 0;
-    
-    for (const [address, data] of this.holders) {
-      data.firstSeen = now;
-      count++;
-    }
-    
-    console.log(`🔄 Reset firstSeen for ${count} holders`);
-  }
-
-  /**
    * Get stats
    */
   getStats(): {
     totalHolders: number;
-    holdersWithTime: number; // Holders meeting 60s requirement
-    eligibleHolders: number; // Top 200 only
+    holdersWithTime: number; // Holders meeting the holding requirement
+    eligibleHolders: number; // After the top-N cap
     topHoldersLimit: number;
     minHoldingDuration: number;
     isScanning: boolean;
@@ -708,7 +706,7 @@ export class HolderTracker {
 
     return {
       totalHolders: this.holders.size,
-      holdersWithTime: eligible.length,
+      holdersWithTime: this.countHoldersPastHoldingTime(),
       eligibleHolders: eligible.length,
       topHoldersLimit: this.TOP_HOLDERS_LIMIT,
       minHoldingDuration: this.minHoldingDuration,
