@@ -6,28 +6,30 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+// ============ 接口 ============
+// Solidity only allows struct/enum definitions inside a contract body, so this
+// interface has to live at file level.
+interface ILotteryToken {
+    function getEligibleHoldersByNumber(uint8 number) external view returns (address[] memory);
+    function getEligibleHoldersCount() external view returns (uint256);
+    function getEligibleHoldersSnapshot() external view returns (
+        address[] memory eligibleAddresses,
+        uint8[] memory assignedNumbers,
+        uint256[] memory balances,
+        uint256[] memory holdingDurations
+    );
+    function getNumberDistribution() external view returns (uint256[50] memory);
+    function balanceOf(address account) external view returns (uint256);
+    function getNumber(address holder) external pure returns (uint8);
+    function isEligibleForDraw(address holder) external view returns (bool);
+}
+
 /**
  * @title PowerballLottery
  * @dev Powerball风格的抽奖合约，开奖前公开快照
  */
 contract PowerballLottery is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
-
-    // ============ 接口 ============
-    interface ILotteryToken {
-        function getEligibleHoldersByNumber(uint8 number) external view returns (address[] memory);
-        function getEligibleHoldersCount() external view returns (uint256);
-        function getEligibleHoldersSnapshot() external view returns (
-            address[] memory eligibleAddresses,
-            uint8[] memory assignedNumbers,
-            uint256[] memory balances,
-            uint256[] memory holdingDurations
-        );
-        function getNumberDistribution() external view returns (uint256[50] memory);
-        function balanceOf(address account) external view returns (uint256);
-        function getNumber(address holder) external pure returns (uint8);
-        function isEligibleForDraw(address holder) external view returns (bool);
-    }
 
     // ============ 结构体 ============
     struct Draw {

@@ -4,3 +4,9 @@ Thumbs.db
 node_modules/
 dist
 .env
+
+# Foundry build artifacts
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/foundry.lock
