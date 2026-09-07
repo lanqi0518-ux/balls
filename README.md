@@ -1,6 +1,7 @@
 # 🎰 Powerball Lottery - 链上抽奖代币
 
-每分钟自动开奖的链上Powerball抽奖系统，部署在 Robinhood Chain 上。
+自动开奖的链上 Powerball 抽奖系统，部署在 Robinhood Chain 上。默认每 70 秒开一次奖，
+其中 10 秒用于冻结名单、60 秒留给新买家满足持币时长。
 
 ## 📁 项目结构
 
@@ -45,10 +46,14 @@ powerball-lottery/
 - 开奖前 `SNAPSHOT_LEAD_TIME`（默认 10 秒）冻结参与者名单
 
 ### 开奖机制
-- 每 `DRAW_INTERVAL`（默认 60 秒）自动开奖一次
+- 每 `DRAW_INTERVAL`（默认 70 秒）自动开奖一次：10 秒快照锁定 + 60 秒买家窗口
 - 随机抽取 1-50 中的一个号码
 - 持有该号码的所有地址按余额比例瓜分奖池
 - 该轮无人持有中奖号码时，奖池滚入下一轮
+
+> 默认让 `DRAW_INTERVAL - SNAPSHOT_LEAD_TIME` 恰好等于 `MIN_HOLDING_DURATION`，
+> 这样新买家在一次开奖后立刻买入，正好有 60 秒达到持币门槛，能赶上下一次开奖。
+> 若把 `DRAW_INTERVAL` 改小至 60 秒，新买家最多需要多等一轮才能生效。
 
 ### 开奖可验证性
 链下开奖采用 commit-reveal：

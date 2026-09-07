@@ -33,15 +33,21 @@ export const config = {
   ],
   
   port: parseInt(process.env.PORT || '3001'),
-  drawInterval: parseInt(process.env.DRAW_INTERVAL || '60000'),
+  // 70s per draw: 10s snapshot lead + 60s buyer window. Sized so that a fresh
+  // buyer arriving right after a draw has exactly minHoldingDuration seconds
+  // to clear the requirement before the next snapshot freezes the list.
+  // Shorter intervals still work, but any buyer who arrives during the
+  // (drawInterval - snapshotLeadTime - minHoldingDuration) tail has to sit
+  // out one round before becoming eligible.
+  drawInterval: parseInt(process.env.DRAW_INTERVAL || '70000'),
   autoDrawEnabled: process.env.AUTO_DRAW_ENABLED !== 'false',
 
   // How long before a draw the participant list is frozen.
   snapshotLeadTime: parseInt(process.env.SNAPSHOT_LEAD_TIME || '10000'),
 
-  // How long an address must hold before it can win. Must stay below
-  // (drawInterval - snapshotLeadTime), otherwise a buyer can never become
-  // eligible in time for the next snapshot.
+  // How long an address must hold before it can win. Matches the default
+  // buyer window (drawInterval - snapshotLeadTime = 60s) so a fresh buyer
+  // can qualify for the very next draw.
   minHoldingDuration: parseInt(process.env.MIN_HOLDING_DURATION || '60'),
 
   // Number of top holders by balance that take part in a draw.

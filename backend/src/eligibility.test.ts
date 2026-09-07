@@ -112,4 +112,16 @@ describe('schedule configuration', () => {
     config.minHoldingDuration = 0;
     expect(() => validateConfig()).toThrow(/must be positive/);
   });
+
+  it('sizes the default buyer window to fit the default holding requirement', () => {
+    // Regression: the default schedule used to leave only 50s between one
+    // snapshot being frozen and the next one being taken, while the holding
+    // requirement was 60s. Every fresh buyer therefore had to sit out one
+    // round before qualifying. Keep them aligned so a buyer arriving right
+    // after a draw has exactly one holding period to clear before the next
+    // snapshot.
+    expect(getEligibilityWindowMs()).toBeGreaterThanOrEqual(
+      config.minHoldingDuration * 1000
+    );
+  });
 });
