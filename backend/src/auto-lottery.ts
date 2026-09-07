@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 import { HolderTracker } from './holder-tracker.js';
 import { config } from './config.js';
+import { createCommitment, computeWinningNumber } from './draw-random.js';
 
 // ERC20 ABI (for token holder tracking only)
 const ERC20_ABI = [
@@ -62,6 +63,10 @@ interface DrawResult {
   totalWinnerBalance: string;
   winners: WinnerShare[];
   snapshotHash: string;
+  // Published before the draw, revealed with it: verifyDraw() rechecks that
+  // keccak(serverSeed) equals the commitment and reproduces winningNumber.
+  commitment: string;
+  serverSeed: string;
   autoTransfer: boolean;
   transferStatus: 'pending' | 'success' | 'partial' | 'failed' | 'skipped';
   rollover: boolean; // True if no winners, prize rolls over
@@ -100,6 +105,9 @@ export class AutoLottery {
     timestamp: number;
     holders: Array<{address: string; number: number; balance: bigint}>;
     hash: string;
+    // Secret until the draw is published; only the commitment is broadcast
+    serverSeed: string;
+    commitment: string;
   } | null = null;
   
   // History
@@ -321,7 +329,11 @@ export class AutoLottery {
       })).sort((a, b) => a.address.localeCompare(b.address)),
     })));
     
-    this.currentSnapshot = { drawId: nextDrawId, timestamp, holders, hash };
+    // Commit to a secret seed now, reveal it with the result. Publishing the
+    // commitment before the draw is what makes the outcome checkable.
+    const { serverSeed, commitment } = createCommitment();
+
+    this.currentSnapshot = { drawId: nextDrawId, timestamp, holders, hash, serverSeed, commitment };
     
     const prizePool = this.currentPrizePool;
     
@@ -330,9 +342,10 @@ export class AutoLottery {
     
     console.log(`\n📸 Snapshot Locked (Top ${config.topHoldersLimit} Holders)`);
     console.log(`Draw: #${nextDrawId} | Eligible: ${holders.length} | Prize Pool: ${prizePoolEth} ETH ($${prizeUsd})`);
+    console.log(`🔒 Commitment: ${commitment}`);
     
     if (this.onSnapshot) {
-      this.onSnapshot({ drawId: nextDrawId, eligibleCount: holders.length, hash, timestamp });
+      this.onSnapshot({ drawId: nextDrawId, eligibleCount: holders.length, hash, timestamp, commitment });
     }
   }
 
@@ -667,6 +680,8 @@ export class AutoLottery {
         totalWinnerBalance: ethers.formatUnits(totalWinnerBalance, 18), // BALLS tokens
         winners,
         snapshotHash: snapshot.hash,
+        commitment: snapshot.commitment,
+        serverSeed: snapshot.serverSeed,
         autoTransfer: this.autoTransferEnabled,
         transferStatus,
         rollover: !hasWinners, // No winners = rollover
@@ -706,17 +721,12 @@ export class AutoLottery {
   }
 
   private generateWinningNumber(drawId: number): number {
-    const seed = ethers.keccak256(ethers.solidityPacked(
-      ['uint256', 'uint256', 'bytes32', 'uint256'],
-      [
-        drawId,
-        Math.floor(Date.now() / 1000),
-        this.currentSnapshot?.hash || ethers.ZeroHash,
-        this.holderTracker.getStats().eligibleHolders,
-      ]
-    ));
-    
-    return (Number(BigInt(seed) % 50n) + 1);
+    const snapshot = this.currentSnapshot;
+    if (!snapshot) {
+      throw new Error('Cannot draw a number without a snapshot');
+    }
+
+    return computeWinningNumber(snapshot.serverSeed, drawId, snapshot.hash);
   }
 
   private delay(ms: number): Promise<void> {
@@ -776,6 +786,8 @@ export class AutoLottery {
         drawId: this.currentSnapshot.drawId,
         eligibleCount: this.currentSnapshot.holders.length,
         hash: this.currentSnapshot.hash,
+        // Commitment only; the seed stays secret until the draw is published
+        commitment: this.currentSnapshot.commitment,
       } : null,
       stats: trackerStats,
       scanning: {
