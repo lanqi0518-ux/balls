@@ -22,6 +22,7 @@ interface ILotteryToken {
     function balanceOf(address account) external view returns (uint256);
     function getNumber(address holder) external pure returns (uint8);
     function isEligibleForDraw(address holder) external view returns (bool);
+    function getHoldersCount() external view returns (uint256);
 }
 
 /**
@@ -78,6 +79,10 @@ contract PowerballLottery is Ownable, ReentrancyGuard {
     
     // 未领取奖金
     mapping(address => uint256) public pendingPrizes;
+
+    // 已承诺但尚未被领取的奖金总额。合约余额里的这一部分属于中奖者，
+    // 不能再次当作奖池分配，否则后续领奖会因余额不足而失败。
+    uint256 public totalPendingPrizes;
     
     // 开奖者奖励
     uint256 public drawerRewardBps = 100;
@@ -104,6 +109,8 @@ contract PowerballLottery is Ownable, ReentrancyGuard {
     
     function setDrawInterval(uint256 interval_) external onlyOwner {
         require(interval_ >= 30 && interval_ <= 86400, "Invalid interval");
+        // 否则 canTakeSnapshot() 里的 nextDrawTime - snapshotLeadTime 会下溢
+        require(interval_ > snapshotLeadTime, "Interval below snapshot lead");
         drawInterval = interval_;
     }
     
@@ -202,15 +209,30 @@ contract PowerballLottery is Ownable, ReentrancyGuard {
 
     // ============ 核心抽奖逻辑 ============
     
+    /**
+     * @dev 可分配的奖池：合约余额减去已承诺给中奖者的未领取奖金
+     */
+    function _availablePrizePool() internal view returns (uint256) {
+        uint256 balance = IERC20(address(lotteryToken)).balanceOf(address(this));
+        return balance > totalPendingPrizes ? balance - totalPendingPrizes : 0;
+    }
+
     function canDraw() public view returns (bool) {
         if (block.timestamp < lastDrawTime + drawInterval) return false;
         
-        uint256 prizePool = IERC20(address(lotteryToken)).balanceOf(address(this));
-        if (prizePool < minPrizePool) return false;
+        if (_availablePrizePool() < minPrizePool) return false;
         
         uint256 nextDrawId = currentDrawId + 1;
-        if (!snapshots[nextDrawId].finalized) return false;
-        if (snapshots[nextDrawId].eligibleCount == 0) return false;
+        Snapshot storage snapshot = snapshots[nextDrawId];
+
+        // draw() 会在需要时自行补拍快照，因此这里要报告 draw() 的真实结果，
+        // 否则会出现 canDraw() 为 false 但 draw() 能成功的矛盾。
+        if (!snapshot.finalized) {
+            if (!canTakeSnapshot()) return false;
+            return lotteryToken.getEligibleHoldersCount() > 0;
+        }
+
+        if (snapshot.eligibleCount == 0) return false;
         
         return true;
     }
@@ -229,7 +251,8 @@ contract PowerballLottery is Ownable, ReentrancyGuard {
         lastDrawTime = block.timestamp;
         totalDraws++;
         
-        uint256 prizePool = IERC20(address(lotteryToken)).balanceOf(address(this));
+        // 只分配尚未被承诺出去的余额，避免把上几轮未领取的奖金重复发放
+        uint256 prizePool = _availablePrizePool();
         
         uint256 drawerReward = (prizePool * drawerRewardBps) / 10000;
         uint256 actualPrizePool = prizePool - drawerReward;
@@ -262,8 +285,11 @@ contract PowerballLottery is Ownable, ReentrancyGuard {
                     claimed: false
                 }));
             }
+            // 整除余数留在合约里滚入下一轮，因此按实际承诺额记账
+            uint256 committed = prizePerWinner * winnersCount;
+            totalPendingPrizes += committed;
             draws[drawId].distributed = true;
-            totalDistributed += actualPrizePool;
+            totalDistributed += committed;
         } else {
             emit PrizeRolledOver(drawId, actualPrizePool);
         }
@@ -303,6 +329,15 @@ contract PowerballLottery is Ownable, ReentrancyGuard {
         return winners;
     }
     
+    /**
+     * @dev 生成中奖号码
+     * @notice 种子里不能包含调用者可自由选择的输入。原实现混入了 msg.sender 和
+     *         合约代币余额：由于开奖者能拿到 drawerRewardBps 的奖励，攻击者可以
+     *         穷举开奖地址、或在开奖前向合约转入代币来把结果调成自己的号码。
+     *         现在只使用调用者无法选择的链上值。这仍不是密码学安全的随机数
+     *         （验证者可在一定范围内操纵 timestamp 与 prevrandao），生产环境
+     *         应改用 Chainlink VRF 之类的可验证随机数预言机。
+     */
     function _generateWinningNumber(uint256 drawId) internal view returns (uint8) {
         uint256 randomSeed = uint256(keccak256(abi.encodePacked(
             blockhash(block.number - 1),
@@ -310,9 +345,7 @@ contract PowerballLottery is Ownable, ReentrancyGuard {
             block.prevrandao,
             drawId,
             snapshots[drawId].eligibleCount,
-            snapshots[drawId].snapshotHash,
-            IERC20(address(lotteryToken)).balanceOf(address(this)),
-            msg.sender
+            snapshots[drawId].snapshotHash
         )));
         
         return uint8(randomSeed % 50) + 1;
@@ -323,6 +356,7 @@ contract PowerballLottery is Ownable, ReentrancyGuard {
         require(prize > 0, "No prize to claim");
         
         pendingPrizes[msg.sender] = 0;
+        totalPendingPrizes -= prize;
         IERC20(address(lotteryToken)).safeTransfer(msg.sender, prize);
         
         emit PrizeClaimed(msg.sender, prize);
@@ -331,7 +365,11 @@ contract PowerballLottery is Ownable, ReentrancyGuard {
     // ============ 查询函数 ============
     
     function getCurrentPrizePool() external view returns (uint256) {
-        return IERC20(address(lotteryToken)).balanceOf(address(this));
+        return _availablePrizePool();
+    }
+
+    function getEligibleHoldersCount() external view returns (uint256) {
+        return lotteryToken.getEligibleHoldersCount();
     }
     
     function getTimeUntilNextDraw() external view returns (uint256) {
@@ -386,12 +424,21 @@ contract PowerballLottery is Ownable, ReentrancyGuard {
         return (
             totalDraws,
             totalDistributed,
-            IERC20(address(lotteryToken)).balanceOf(address(this)),
-            lotteryToken.getEligibleHoldersCount()
+            _availablePrizePool(),
+            lotteryToken.getHoldersCount()
         );
     }
     
+    /**
+     * @dev 紧急提取
+     * @notice 不能动用已承诺给中奖者但尚未领取的奖金，否则 claimPrize() 会失败
+     */
     function emergencyWithdraw(address token, uint256 amount) external onlyOwner {
+        if (token == address(lotteryToken)) {
+            uint256 balance = IERC20(token).balanceOf(address(this));
+            require(balance >= amount, "Amount exceeds balance");
+            require(balance - amount >= totalPendingPrizes, "Would strand unclaimed prizes");
+        }
         IERC20(token).safeTransfer(owner(), amount);
     }
 }

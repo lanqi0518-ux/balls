@@ -152,6 +152,27 @@ contract PowerballLotteryTest is Test {
         vm.prank(user1);
         token.transfer(user2, 10_000 * 10**18);
     }
+
+    /// @dev 给 1-50 每个号码都安排一个持币者，这样开奖必定命中，
+    ///      测试才不会依赖随机号码碰巧落在少数几个持币者身上。
+    function _seedHolderForEveryNumber() internal {
+        bool[51] memory covered;
+        uint256 found;
+
+        for (uint160 i = 1000; found < 50 && i < 10000; i++) {
+            address holder = address(i);
+            uint8 number = token.getNumber(holder);
+
+            if (!covered[number]) {
+                covered[number] = true;
+                found++;
+                vm.prank(owner);
+                token.transfer(holder, 1_000 * 10**18);
+            }
+        }
+
+        assertEq(found, 50, "failed to cover all 50 numbers");
+    }
     
     function testCanDrawAfterInterval() public {
         // 初始状态：刚部署，需要等待
@@ -239,5 +260,104 @@ contract PowerballLotteryTest is Test {
         assertEq(totalDraws, 0);
         assertTrue(currentPool > 0);
         assertTrue(holders > 0);
+    }
+
+    /// @dev 奖池曾经直接取合约余额，而余额里含有已承诺但未领取的奖金，
+    ///      于是每一轮都把同一笔钱重新发一遍，承诺总额最终超过实际持有量。
+    function testUnclaimedPrizesAreNotRedistributed() public {
+        _seedHolderForEveryNumber();
+
+        for (uint256 round = 0; round < 5; round++) {
+            vm.warp(block.timestamp + 61);
+            vm.roll(block.number + 1);
+            lottery.draw();
+
+            // 合约必须始终留得出所有已承诺的奖金
+            assertGe(
+                token.balanceOf(address(lottery)),
+                lottery.totalPendingPrizes(),
+                "contract cannot cover the prizes it promised"
+            );
+
+            // 可分配奖池不含已承诺部分
+            assertEq(
+                lottery.getCurrentPrizePool(),
+                token.balanceOf(address(lottery)) - lottery.totalPendingPrizes()
+            );
+        }
+
+        assertTrue(lottery.totalPendingPrizes() > 0, "expected at least one winner in 5 rounds");
+    }
+
+    /// @dev 每一位中奖者都必须真的能把奖金领走
+    function testEveryWinnerCanClaim() public {
+        address[] memory candidates = new address[](3);
+        candidates[0] = owner;
+        candidates[1] = user1;
+        candidates[2] = user2;
+
+        for (uint256 round = 0; round < 5; round++) {
+            vm.warp(block.timestamp + 61);
+            vm.roll(block.number + 1);
+            lottery.draw();
+        }
+
+        for (uint256 i = 0; i < candidates.length; i++) {
+            uint256 pending = lottery.getPendingPrize(candidates[i]);
+            if (pending == 0) continue;
+
+            uint256 before = token.balanceOf(candidates[i]);
+            vm.prank(candidates[i]);
+            lottery.claimPrize();
+
+            assertEq(token.balanceOf(candidates[i]) - before, pending);
+            assertEq(lottery.getPendingPrize(candidates[i]), 0);
+        }
+
+        assertEq(lottery.totalPendingPrizes(), 0);
+    }
+
+    function testEmergencyWithdrawCannotStrandPrizes() public {
+        _seedHolderForEveryNumber();
+
+        vm.warp(block.timestamp + 61);
+        vm.roll(block.number + 1);
+        lottery.draw();
+
+        uint256 pending = lottery.totalPendingPrizes();
+        assertTrue(pending > 0, "expected a winner");
+
+        uint256 balance = token.balanceOf(address(lottery));
+
+        vm.prank(owner);
+        vm.expectRevert("Would strand unclaimed prizes");
+        lottery.emergencyWithdraw(address(token), balance);
+
+        // 只提取未被承诺的部分是允许的
+        vm.prank(owner);
+        lottery.emergencyWithdraw(address(token), balance - pending);
+
+        assertEq(token.balanceOf(address(lottery)), pending);
+    }
+
+    /// @dev 开奖者能拿到 1% 奖励，所以中奖号码不能依赖调用者可选的输入
+    function testWinningNumberDoesNotDependOnCaller() public {
+        uint256 snapshotId = vm.snapshotState();
+
+        vm.warp(block.timestamp + 61);
+        vm.roll(block.number + 1);
+        vm.prank(address(0xA11CE));
+        lottery.draw();
+        uint8 numberFromAlice = lottery.getDrawInfo(1).winningNumber;
+
+        vm.revertToState(snapshotId);
+
+        vm.warp(block.timestamp + 61);
+        vm.roll(block.number + 1);
+        vm.prank(address(0xB0B));
+        lottery.draw();
+        uint8 numberFromBob = lottery.getDrawInfo(1).winningNumber;
+
+        assertEq(numberFromAlice, numberFromBob);
     }
 }
