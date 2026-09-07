@@ -46,6 +46,13 @@ contract PonsLottery is Ownable, ReentrancyGuard {
     uint256 public drawInterval = 60; // 1分钟
     uint256 public minHoldingDuration = 60; // 最少持币1分钟
     uint256 public snapshotLeadTime = 10; // 开奖前10秒快照
+
+    // 参与门槛：注册和参与开奖都要求至少持有这么多代币
+    uint256 public minHoldingBalance = 1e18;
+
+    // 持币者名单上限。快照要遍历整个名单并写入 storage，没有上限的话
+    // 名单一大 takeSnapshot() 和 draw() 就会因为超出区块 gas 上限而无法执行。
+    uint256 public maxHolders = 500;
     
     // 持币者追踪
     address[] public holders;
@@ -63,6 +70,16 @@ contract PonsLottery is Ownable, ReentrancyGuard {
     // 开奖记录
     mapping(uint256 => Draw) public draws;
     mapping(address => uint256) public pendingPrizes;
+
+    // 已承诺但未领取的奖金总额。原实现靠遍历 holders 数组求和，中奖者一旦卖光
+    // 被 removeHolder() 移出数组，他的奖金就不再计入预留，会被当成新税费重新
+    // 分配掉，导致他之后领不到钱。
+    uint256 public totalPendingPrizes;
+
+    // 已经完成分成、可用于开奖的奖池。必须单独记账：若只用
+    // 「余额 - 未领取奖金」来判断新税费，同一笔钱会被反复当成新税费，
+    // 每调用一次结算就再抽走一次团队分成，最终把奖池掏空。
+    uint256 public prizePool;
     
     // 统计
     uint256 public totalDistributed;
@@ -90,55 +107,28 @@ contract PonsLottery is Ownable, ReentrancyGuard {
     // ============ 接收税费 ============
     
     /**
-     * @dev 处理收到的税费（Pons 会调用 transfer 发送税费）
-     * @notice 需要在收到代币后调用此函数分配
-     */
-    function processTax(uint256 amount) external nonReentrant {
-        require(amount > 0, "No amount");
-        
-        // 计算分配
-        uint256 toTeam = (amount * teamShareBps) / 10000;
-        uint256 toPrize = amount - toTeam;
-        
-        // 转给团队
-        if (toTeam > 0) {
-            token.safeTransfer(teamWallet, toTeam);
-            totalTeamReceived += toTeam;
-        }
-        
-        // 剩余留在合约作为奖池
-        emit TaxReceived(amount, toPrize, toTeam);
-    }
-    
-    /**
-     * @dev 自动处理所有新收到的代币
+     * @dev 处理所有新收到的税费
+     * @notice 取代了原来的 processTax(uint256)。那个版本让调用者自己指定金额，
+     *         既不鉴权也不校验金额与实际新增税费的关系，任何人都可以传入合约
+     *         全部余额反复调用，每次把 teamShareBps 的比例转给团队钱包，从而
+     *         把整个奖池搬空。这里改为只结算「余额减去已承诺奖金」的部分。
      */
     function processAllTax() external nonReentrant {
-        uint256 balance = token.balanceOf(address(this));
-        uint256 reservedForPrizes = _getTotalPendingPrizes();
-        
-        if (balance > reservedForPrizes) {
-            uint256 newTax = balance - reservedForPrizes;
-            
-            uint256 toTeam = (newTax * teamShareBps) / 10000;
-            
-            if (toTeam > 0) {
-                token.safeTransfer(teamWallet, toTeam);
-                totalTeamReceived += toTeam;
-            }
-            
-            emit TaxReceived(newTax, newTax - toTeam, toTeam);
-        }
+        _processNewTax();
     }
 
     // ============ 持币者注册 ============
     
     /**
      * @dev 持币者自行注册（或由后端批量注册）
+     * @notice 注册即开始计时，所以必须要求一个最小持币量。否则攻击者可以用大量
+     *         只持有 1 wei 的地址提前注册占号，等奖池变大时再加仓，绕过持币时长
+     *         要求并稀释真实持币者的中奖概率。
      */
     function registerHolder(address holder) external {
-        require(token.balanceOf(holder) > 0, "No balance");
+        require(token.balanceOf(holder) >= minHoldingBalance, "Below minimum balance");
         require(!isHolder[holder], "Already registered");
+        require(holders.length < maxHolders, "Holder list full");
         
         _addHolder(holder);
     }
@@ -149,7 +139,8 @@ contract PonsLottery is Ownable, ReentrancyGuard {
     function registerHolders(address[] calldata holderList) external {
         for (uint256 i = 0; i < holderList.length; i++) {
             address holder = holderList[i];
-            if (token.balanceOf(holder) > 0 && !isHolder[holder]) {
+            if (holders.length >= maxHolders) break;
+            if (token.balanceOf(holder) >= minHoldingBalance && !isHolder[holder]) {
                 _addHolder(holder);
             }
         }
@@ -220,7 +211,7 @@ contract PonsLottery is Ownable, ReentrancyGuard {
     
     function isEligible(address holder) public view returns (bool) {
         if (!isHolder[holder]) return false;
-        if (token.balanceOf(holder) == 0) return false;
+        if (token.balanceOf(holder) < minHoldingBalance) return false;
         if (holdingSince[holder] == 0) return false;
         return (block.timestamp - holdingSince[holder]) >= minHoldingDuration;
     }
@@ -306,9 +297,9 @@ contract PonsLottery is Ownable, ReentrancyGuard {
         uint256 drawId = currentDrawId;
         lastDrawTime = block.timestamp;
         
-        uint256 prizePool = _getAvailablePrizePool();
-        uint256 drawerReward = (prizePool * drawerRewardBps) / 10000;
-        uint256 actualPrize = prizePool - drawerReward;
+        uint256 availablePool = prizePool;
+        uint256 drawerReward = (availablePool * drawerRewardBps) / 10000;
+        uint256 actualPrize = availablePool - drawerReward;
         
         uint8 winningNumber = _generateNumber(drawId);
         
@@ -332,11 +323,16 @@ contract PonsLottery is Ownable, ReentrancyGuard {
             for (uint256 i = 0; i < winnersCount; i++) {
                 pendingPrizes[winners[i]] += prizePerWinner;
             }
-            totalDistributed += actualPrize;
+            // 整除余数留在 prizePool 里滚入下一轮，因此按实际承诺额记账
+            uint256 committed = prizePerWinner * winnersCount;
+            totalPendingPrizes += committed;
+            totalDistributed += committed;
+            prizePool -= committed;
         }
         
         // 开奖者奖励
         if (drawerReward > 0) {
+            prizePool -= drawerReward;
             token.safeTransfer(msg.sender, drawerReward);
         }
         
@@ -346,30 +342,28 @@ contract PonsLottery is Ownable, ReentrancyGuard {
     }
     
     function _processNewTax() internal {
-        uint256 balance = token.balanceOf(address(this));
-        uint256 reserved = _getTotalPendingPrizes();
-        
-        if (balance > reserved) {
-            uint256 newTax = balance - reserved;
-            uint256 toTeam = (newTax * teamShareBps) / 10000;
-            
-            if (toTeam > 0) {
-                token.safeTransfer(teamWallet, toTeam);
-                totalTeamReceived += toTeam;
-            }
+        uint256 newTax = _unaccountedBalance();
+        if (newTax == 0) return;
+
+        uint256 toTeam = (newTax * teamShareBps) / 10000;
+
+        if (toTeam > 0) {
+            token.safeTransfer(teamWallet, toTeam);
+            totalTeamReceived += toTeam;
         }
+
+        prizePool += newTax - toTeam;
+
+        emit TaxReceived(newTax, newTax - toTeam, toTeam);
     }
-    
-    function _getAvailablePrizePool() internal view returns (uint256) {
+
+    /**
+     * @dev 尚未分成过的余额，也就是自上次结算以来新收到的税费
+     */
+    function _unaccountedBalance() internal view returns (uint256) {
         uint256 balance = token.balanceOf(address(this));
-        uint256 reserved = _getTotalPendingPrizes();
-        return balance > reserved ? balance - reserved : 0;
-    }
-    
-    function _getTotalPendingPrizes() internal view returns (uint256 total) {
-        for (uint256 i = 0; i < holders.length; i++) {
-            total += pendingPrizes[holders[i]];
-        }
+        uint256 accounted = totalPendingPrizes + prizePool;
+        return balance > accounted ? balance - accounted : 0;
     }
     
     function _getWinners(uint256 drawId, uint8 winningNumber) internal view returns (address[] memory) {
@@ -392,14 +386,21 @@ contract PonsLottery is Ownable, ReentrancyGuard {
         return winners;
     }
     
+    /**
+     * @dev 生成中奖号码
+     * @notice 种子里不能含有调用者可以自由改变的输入。合约代币余额被移除了：
+     *         任何人都能在开奖前向合约转账来改变它，从而反复试出对自己有利的
+     *         号码，而开奖者还能拿到 drawerRewardBps 的奖励。这仍不是密码学
+     *         安全的随机数，生产环境应改用 Chainlink VRF 之类的预言机。
+     */
     function _generateNumber(uint256 drawId) internal view returns (uint8) {
         return uint8(uint256(keccak256(abi.encodePacked(
             blockhash(block.number - 1),
             block.timestamp,
             block.prevrandao,
             drawId,
-            snapshots[drawId].snapshotHash,
-            token.balanceOf(address(this))
+            snapshots[drawId].eligibleCount,
+            snapshots[drawId].snapshotHash
         ))) % 50) + 1;
     }
 
@@ -410,6 +411,7 @@ contract PonsLottery is Ownable, ReentrancyGuard {
         require(prize > 0, "No prize");
         
         pendingPrizes[msg.sender] = 0;
+        totalPendingPrizes -= prize;
         token.safeTransfer(msg.sender, prize);
         
         emit PrizeClaimed(msg.sender, prize);
@@ -418,7 +420,9 @@ contract PonsLottery is Ownable, ReentrancyGuard {
     // ============ 查询函数 ============
     
     function getCurrentPrizePool() external view returns (uint256) {
-        return _getAvailablePrizePool();
+        // 把尚未结算的税费也算进来，这样展示值不会等到有人触发结算才跳变
+        uint256 unaccounted = _unaccountedBalance();
+        return prizePool + unaccounted - (unaccounted * teamShareBps) / 10000;
     }
     
     function getTimeUntilNextDraw() external view returns (uint256) {
@@ -473,7 +477,19 @@ contract PonsLottery is Ownable, ReentrancyGuard {
     
     function setDrawInterval(uint256 interval) external onlyOwner {
         require(interval >= 30 && interval <= 86400, "Invalid");
+        // 否则 canTakeSnapshot() 里的 nextDrawTime - snapshotLeadTime 会下溢
+        require(interval > snapshotLeadTime, "Interval below snapshot lead");
         drawInterval = interval;
+    }
+
+    function setMinHoldingBalance(uint256 amount) external onlyOwner {
+        require(amount > 0, "Must be positive");
+        minHoldingBalance = amount;
+    }
+
+    function setMaxHolders(uint256 limit) external onlyOwner {
+        require(limit >= holders.length, "Below current holder count");
+        maxHolders = limit;
     }
     
     function setMinHoldingDuration(uint256 duration) external onlyOwner {
