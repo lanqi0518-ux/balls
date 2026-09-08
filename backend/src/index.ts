@@ -54,6 +54,32 @@ async function main() {
   
   // Create Express app
   const app = express();
+
+  // Canonical-host redirect: when CANONICAL_HOST is set (e.g. "example.com"),
+  // 301 every request whose Host header differs from it to that host, so that
+  // www.example.com, bare IP hits, or the .fly.dev backdoor all funnel users
+  // to one URL. Fly's internal *.fly.dev hostname and local dev traffic stay
+  // exempt so healthchecks and localhost testing keep working.
+  const canonicalHost = (process.env.CANONICAL_HOST || '').toLowerCase().trim();
+  if (canonicalHost) {
+    console.log(`🌐 Canonical host: https://${canonicalHost} (other hosts will 301 here)`);
+    app.use((req, res, next) => {
+      const rawHost = (req.headers.host || '').toLowerCase();
+      const host = rawHost.split(':')[0]; // drop :port
+      if (
+        !host ||
+        host === canonicalHost ||
+        host === 'localhost' ||
+        host.startsWith('127.') ||
+        host.endsWith('.fly.dev') ||
+        host.endsWith('.internal')
+      ) {
+        return next();
+      }
+      return res.redirect(301, `https://${canonicalHost}${req.originalUrl}`);
+    });
+  }
+
   app.use(cors(
     config.allowedOrigins.length > 0 ? { origin: config.allowedOrigins } : {}
   ));
