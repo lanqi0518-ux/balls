@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Logo } from "@/components/ui/Logo";
 import { LinkButton } from "@/components/ui/Button";
 import { ArrowRight, Menu, X } from "@/components/ui/Icons";
+import { ConnectButton } from "@/components/wallet/ConnectButton";
 import { cn } from "@/lib/cn";
 
 const LINKS = [
@@ -54,9 +55,7 @@ export function MarketingNav() {
           </div>
 
           <div className="hidden lg:flex items-center gap-2">
-            <LinkButton href="/app" variant="ghost" size="sm">
-              Sign in
-            </LinkButton>
+            <ConnectButton size="sm" variant="secondary" label="Connect" />
             <LinkButton
               href="/app"
               variant="primary"

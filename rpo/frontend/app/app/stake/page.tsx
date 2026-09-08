@@ -1,34 +1,89 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useAccount } from "wagmi";
 import { Button, LinkButton } from "@/components/ui/Button";
+import { ConnectButton } from "@/components/wallet/ConnectButton";
 import { Badge } from "@/components/ui/Badge";
 import { ArrowUpRight } from "@/components/ui/Icons";
-
-function computeBoost(share: number): number {
-  const s = Math.min(1, Math.max(0, share));
-  const boost = 1 + 2 * Math.sqrt(s);
-  return Math.min(3, boost);
-}
-
-const TOTAL_STAKED = 1_700_000;
+import { computeBoost, useDemoStore } from "@/lib/demoStore";
+import { useTx } from "@/lib/useTx";
+import { fmtUSD, fmtNum } from "@/lib/format";
 
 export default function StakePage() {
-  const [amount, setAmount] = useState("20000");
-  const stake = parseFloat(amount) || 0;
-  const share = stake / (TOTAL_STAKED + stake);
-  const boost = computeBoost(share);
+  const { isConnected } = useAccount();
+  const {
+    balanceRPO,
+    stakedRPO,
+    totalStakedPool,
+    stake,
+    unstake,
+  } = useDemoStore();
+  const { pending, run } = useTx();
+
+  const [mode, setMode] = useState<"stake" | "unstake">("stake");
+  const [amountStr, setAmountStr] = useState("20000");
+  const amount = Number(amountStr) || 0;
+
+  const currentBoost = computeBoost(stakedRPO, totalStakedPool);
+  const projectedBoost = useMemo(() => {
+    if (mode === "stake") {
+      return computeBoost(stakedRPO + amount, totalStakedPool + amount);
+    }
+    return computeBoost(
+      Math.max(0, stakedRPO - amount),
+      Math.max(0, totalStakedPool - amount)
+    );
+  }, [mode, amount, stakedRPO, totalStakedPool]);
+
+  const share = stakedRPO / Math.max(1, totalStakedPool);
+
+  const validation = useMemo(() => {
+    if (!isConnected) return { ok: false, hint: "Connect wallet" };
+    if (amount <= 0) return { ok: false, hint: "Enter an amount" };
+    if (mode === "stake" && amount > balanceRPO)
+      return {
+        ok: false,
+        hint: `Insufficient $RPO (have ${fmtNum(balanceRPO, 0)})`,
+      };
+    if (mode === "unstake" && amount > stakedRPO)
+      return {
+        ok: false,
+        hint: `Only ${fmtNum(stakedRPO, 0)} staked`,
+      };
+    return { ok: true, hint: mode === "stake" ? "Stake" : "Unstake" };
+  }, [isConnected, amount, mode, balanceRPO, stakedRPO]);
+
+  const handleSubmit = () => {
+    if (!validation.ok) return;
+    if (mode === "stake") {
+      run(() => stake(amount), {
+        loading: `Signing stake(${fmtNum(amount, 0)} $RPO) …`,
+        success: `Staked ${fmtNum(amount, 0)} $RPO`,
+      });
+    } else {
+      run(() => unstake(amount), {
+        loading: `Signing unstake(${fmtNum(amount, 0)} $RPO) …`,
+        success: `Unstaked ${fmtNum(amount, 0)} $RPO — 14d cooldown`,
+      });
+    }
+  };
+
+  const setPreset = (raw: number) => setAmountStr(String(raw));
 
   return (
     <div className="p-5 lg:p-10 max-w-5xl">
       <header className="mb-10">
         <div className="eyebrow mb-3">$RPO</div>
-        <h1 className="font-display text-4xl lg:text-5xl text-fg">
+        <h1 className="font-display text-4xl lg:text-5xl text-ink-900">
           Stake to boost allocation.
         </h1>
-        <p className="mt-4 text-fg-muted max-w-2xl">
+        <p className="mt-4 text-ink-500 max-w-2xl">
           Locking $RPO multiplies your weight on every SubscriptionVault, up
-          to 3×. The curve is <span className="font-mono text-forest-500">boost = 1 + 2·√share</span>{" "}
+          to 3×. The curve is{" "}
+          <span className="font-mono text-forest-500 bg-forest-50 px-1.5 py-0.5 rounded">
+            boost = 1 + 2·√share
+          </span>{" "}
           — early stakers keep the advantage without letting whales monopolize
           allocations.
         </p>
@@ -36,71 +91,135 @@ export default function StakePage() {
 
       <div className="grid lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3 space-y-6">
-          <div className="card-elevated p-8">
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-xs uppercase tracking-[0.14em] text-fg-dim">
-                Stake amount
+          <div className="card-floating p-8">
+            {/* Mode switcher */}
+            <div className="grid grid-cols-2 rounded-full border border-line bg-paper-100 p-1 mb-6">
+              {(["stake", "unstake"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  className={
+                    "text-sm py-2 rounded-full transition-colors " +
+                    (mode === m
+                      ? "bg-white text-ink-900 shadow-soft"
+                      : "text-ink-500 hover:text-ink-900")
+                  }
+                >
+                  {m === "stake" ? "Stake" : "Unstake"}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-xs uppercase tracking-[0.18em] text-ink-500">
+                Amount
               </div>
-              <div className="text-xs text-fg-dim">
-                Balance: <span className="font-mono">— $RPO</span>
+              <div className="text-xs text-ink-500">
+                {mode === "stake" ? "Balance" : "Staked"}:{" "}
+                <span className="font-mono text-ink-900">
+                  {fmtNum(mode === "stake" ? balanceRPO : stakedRPO, 0)} $RPO
+                </span>
               </div>
             </div>
 
             <div className="rounded-xl bg-paper-100 border border-line p-4 flex items-center gap-3">
               <input
-                className="bg-transparent text-3xl font-mono text-fg outline-none flex-1 tabular-nums"
-                value={amount}
+                className="bg-transparent text-3xl font-mono text-ink-900 outline-none flex-1 tabular-nums placeholder:text-ink-400"
+                value={amountStr}
                 onChange={(e) =>
-                  setAmount(e.target.value.replace(/[^0-9.]/g, ""))
+                  setAmountStr(e.target.value.replace(/[^0-9.]/g, ""))
                 }
                 inputMode="decimal"
               />
-              <div className="text-sm text-fg-muted">$RPO</div>
+              <div className="text-sm text-ink-500">$RPO</div>
             </div>
 
             <div className="mt-4 grid grid-cols-4 gap-2">
-              {["10k", "25k", "50k", "100k"].map((preset) => {
-                const raw = preset.replace("k", "000");
-                return (
-                  <button
-                    key={preset}
-                    onClick={() => setAmount(raw)}
-                    className="rounded-lg border border-line hover:border-forest-300 hover:text-forest-500 text-sm text-fg-muted py-2 transition-colors"
-                  >
-                    {preset}
-                  </button>
-                );
-              })}
+              {(mode === "stake"
+                ? [10_000, 25_000, 50_000, 100_000]
+                : [
+                    Math.round(stakedRPO * 0.25),
+                    Math.round(stakedRPO * 0.5),
+                    Math.round(stakedRPO * 0.75),
+                    stakedRPO,
+                  ]).map((v, i) => (
+                <button
+                  key={i}
+                  onClick={() => setPreset(v)}
+                  className="rounded-lg border border-line hover:border-ink-900 hover:bg-paper-100 text-sm text-ink-500 hover:text-ink-900 py-2 transition-colors"
+                >
+                  {v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
+                </button>
+              ))}
             </div>
 
             <div className="mt-6 space-y-2 text-sm border-t border-line pt-4">
               <Row k="Lock period" v="14 days minimum" />
               <Row
-                k="Your projected boost"
-                v={`${boost.toFixed(2)}×`}
-                tone="mint"
+                k={
+                  mode === "stake" ? "Projected boost" : "Boost after unstake"
+                }
+                v={`${projectedBoost.toFixed(2)}×`}
+                tone="forest"
               />
-              <Row k="Share of pool" v={`${(share * 100).toFixed(3)}%`} />
-              <Row k="Est. next-IPO alloc bump" v={`+${((boost - 1) * 100).toFixed(0)}%`} tone="mint" />
+              <Row
+                k="Share of pool"
+                v={`${(share * 100).toFixed(3)}% → ${(
+                  (mode === "stake"
+                    ? (stakedRPO + amount) / (totalStakedPool + amount)
+                    : Math.max(0, stakedRPO - amount) /
+                      Math.max(1, totalStakedPool - amount)) * 100
+                ).toFixed(3)}%`}
+              />
+              <Row
+                k="Boost change"
+                v={`${projectedBoost >= currentBoost ? "+" : ""}${(
+                  projectedBoost - currentBoost
+                ).toFixed(2)}×`}
+                tone={projectedBoost >= currentBoost ? "forest" : "rose"}
+              />
             </div>
 
-            <div className="mt-4">
-              <div className="flex items-center justify-between text-xs text-fg-muted mb-2">
+            <div className="mt-6">
+              <div className="flex items-center justify-between text-xs text-ink-500 mb-2">
                 <span>1×</span>
                 <span>3× cap</span>
               </div>
               <div className="h-1.5 rounded-full bg-paper-200 overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-forest-500 to-peach-500 transition-all duration-300"
-                  style={{ width: `${((boost - 1) / 2) * 100}%` }}
+                  className="h-full rounded-full bg-gradient-to-r from-forest-500 to-peach-500 transition-all duration-500"
+                  style={{
+                    width: `${((projectedBoost - 1) / 2) * 100}%`,
+                  }}
                 />
               </div>
             </div>
 
             <div className="mt-6 flex gap-3">
-              <Button variant="primary" size="lg" fullWidth>
-                Stake $RPO
-              </Button>
+              {isConnected ? (
+                <Button
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  disabled={!validation.ok || pending}
+                  onClick={handleSubmit}
+                >
+                  {pending
+                    ? "Signing…"
+                    : validation.ok
+                    ? mode === "stake"
+                      ? "Stake $RPO"
+                      : "Unstake $RPO"
+                    : validation.hint}
+                </Button>
+              ) : (
+                <ConnectButton
+                  size="md"
+                  variant="primary"
+                  className="w-full [&>div]:w-full [&_button]:w-full [&_button]:justify-center"
+                  label="Connect wallet"
+                />
+              )}
               <LinkButton
                 href="https://pons.dev"
                 external
@@ -108,12 +227,12 @@ export default function StakePage() {
                 size="lg"
                 trailingIcon={<ArrowUpRight className="h-4 w-4" />}
               >
-                Buy $RPO
+                Buy
               </LinkButton>
             </div>
 
-            <div className="mt-6 text-xs text-fg-dim leading-relaxed">
-              Unstake takes 14 days to cool down. 80% of every 2% platform fee
+            <div className="mt-6 text-xs text-ink-500 leading-relaxed">
+              Unstake starts a 14-day cooldown. 80% of every 2% platform fee
               is spent on open-market $RPO buybacks on Pons, streamed back to
               this contract as protocol accrual.
             </div>
@@ -122,14 +241,28 @@ export default function StakePage() {
 
         <aside className="lg:col-span-2 space-y-6">
           <div className="card p-6">
-            <div className="text-xs uppercase tracking-[0.14em] text-fg-dim mb-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-ink-500 mb-4">
+              Your stake
+            </div>
+            <div className="space-y-3 text-sm">
+              <Row k="Staked" v={`${fmtNum(stakedRPO, 0)} $RPO`} />
+              <Row k="Current boost" v={`${currentBoost.toFixed(2)}×`} tone="forest" />
+              <Row k="Wallet balance" v={`${fmtNum(balanceRPO, 0)} $RPO`} />
+            </div>
+          </div>
+
+          <div className="card p-6">
+            <div className="text-xs uppercase tracking-[0.18em] text-ink-500 mb-4">
               Pool
             </div>
             <div className="space-y-3 text-sm">
-              <Row k="Total staked" v={`${(TOTAL_STAKED / 1000).toFixed(0)}k`} />
+              <Row
+                k="Total staked"
+                v={`${(totalStakedPool / 1000).toFixed(0)}k`}
+              />
               <Row k="% of supply" v="39%" />
-              <Row k="24h buybacks" v="$4.3k" tone="mint" />
-              <Row k="Cumulative buybacks" v="$168k" tone="mint" />
+              <Row k="24h buybacks" v="$4.3k" tone="forest" />
+              <Row k="Cumulative buybacks" v={fmtUSD(168_000)} tone="forest" />
             </div>
           </div>
 
@@ -139,7 +272,7 @@ export default function StakePage() {
               <Badge>Pons LP</Badge>
               <Badge>SPY-pair</Badge>
             </div>
-            <div className="text-sm text-fg-muted leading-relaxed">
+            <div className="text-sm text-ink-500 leading-relaxed">
               $RPO launched fair on{" "}
               <a
                 href="https://pons.dev"
@@ -166,16 +299,19 @@ function Row({
 }: {
   k: string;
   v: string;
-  tone?: "mint";
+  tone?: "forest" | "rose";
 }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-fg-muted">{k}</span>
+      <span className="text-ink-500">{k}</span>
       <span
         className={
-          tone === "mint"
-            ? "text-forest-500 font-mono tabular-nums"
-            : "text-fg font-mono tabular-nums"
+          "font-mono tabular-nums " +
+          (tone === "forest"
+            ? "text-forest-500 font-semibold"
+            : tone === "rose"
+            ? "text-rose-600"
+            : "text-ink-900")
         }
       >
         {v}

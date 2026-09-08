@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { Logo } from "@/components/ui/Logo";
+import { ConnectButton } from "@/components/wallet/ConnectButton";
 import {
   Calendar,
   Wallet,
@@ -91,9 +91,6 @@ export function AppSidebar() {
 }
 
 export function AppTopBar() {
-  const { address, isConnected } = useAccount();
-  const { connect, connectors } = useConnect();
-  const { disconnect } = useDisconnect();
   const pathname = usePathname();
 
   return (
@@ -116,25 +113,7 @@ export function AppTopBar() {
             Product
           </Link>
           <div className="hidden sm:block h-4 w-px bg-line" />
-          {isConnected ? (
-            <button
-              onClick={() => disconnect()}
-              className="btn-secondary text-sm py-1.5"
-              title={address}
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-forest-500" />
-              {address?.slice(0, 6)}…{address?.slice(-4)}
-            </button>
-          ) : (
-            <button
-              onClick={() =>
-                connectors[0] && connect({ connector: connectors[0] })
-              }
-              className="btn-primary text-sm py-1.5"
-            >
-              Connect wallet
-            </button>
-          )}
+          <ConnectButton size="sm" variant="primary" />
         </div>
       </div>
 
