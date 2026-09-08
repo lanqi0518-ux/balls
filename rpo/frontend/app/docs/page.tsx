@@ -1,181 +1,158 @@
-import { Metadata } from "next";
 import Link from "next/link";
 import { MarketingShell, PageHero } from "@/components/marketing/MarketingShell";
-import { Section, SectionHeader } from "@/components/ui/Section";
-import { Container } from "@/components/ui/Container";
-import { LinkButton } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { ArrowUpRight, Book, Layers, Bolt } from "@/components/ui/Icons";
+import { ArrowUpRight, Book, Bolt, Shield, Coin } from "@/components/ui/Icons";
 
-export const metadata: Metadata = {
-  title: "Docs",
-  description: "Technical documentation for developers and integrators.",
+export const metadata = {
+  title: "Documentation",
+  description:
+    "Integrate RPO — REST API, TypeScript SDK, and Solidity contract reference.",
 };
 
-const GUIDES = [
-  {
-    Icon: Bolt,
-    title: "Quickstart",
-    body: "Deploy a local fork and subscribe your first vault in under 10 minutes.",
-    href: "/docs#quickstart",
-  },
-  {
-    Icon: Layers,
-    title: "Contract reference",
-    body: "Registry, Vault, Booster, Adapter, Looper — signatures, invariants, and events.",
-    href: "/docs#contracts",
-  },
+const CATS = [
   {
     Icon: Book,
-    title: "Integrator guide",
-    body: "Embed the SubscriptionVault widget or read /rhj/assets via our TypeScript SDK.",
-    href: "/docs#integrator",
+    title: "Whitepaper",
+    body: "The full technical protocol description in 12 sections.",
+    href: "/whitepaper",
+  },
+  {
+    Icon: Bolt,
+    title: "REST API",
+    body: "Read active IPOs, subscription state and boost multipliers without a wallet.",
+    href: "/docs/api",
+  },
+  {
+    Icon: Coin,
+    title: "TypeScript SDK",
+    body: "@rpo/sdk — typed wrappers around every write path. wagmi-ready.",
+    href: "/docs/sdk",
+  },
+  {
+    Icon: Shield,
+    title: "Contract reference",
+    body: "IPORegistry, SubscriptionVault, AllocationBooster, RialtoAdapter, LeverageLooper.",
+    href: "/docs/contracts",
   },
 ];
 
-const CONTRACTS = [
-  { name: "IPORegistry", addr: "0x0000…0000", note: "Announces and deploys per-IPO vaults." },
-  { name: "SubscriptionVault", addr: "CREATE2 per ticker", note: "One instance per IPO. Custody + allocation." },
-  { name: "AllocationBooster", addr: "0x0000…0000", note: "$RPO staking, boost math." },
-  { name: "RialtoAdapter", addr: "0x0000…0000", note: "Router: Rialto → Uni V3 → 0x RFQ." },
-  { name: "LeverageLooper", addr: "0x0000…0000", note: "Morpho collateral + auto re-subscribe." },
+const QUICK = [
+  {
+    h: "Watch new IPOs",
+    body: "GET https://api.rpo.xyz/v1/ipos?status=subscribing",
+  },
+  {
+    h: "Subscribe with the SDK",
+    body: "await rpo.vault('STRIPE').subscribe({ amount: 500n })",
+  },
+  {
+    h: "Compute your boost",
+    body: "const boost = await rpo.booster.boostOf('0xabc…')",
+  },
+  {
+    h: "Deploy a keeper",
+    body: "docker run rpo/keeper:latest --vault 0x… --rpc $RPC_URL",
+  },
 ];
 
-export default function DocsPage() {
+export default function DocsHomePage() {
   return (
     <MarketingShell>
       <PageHero
-        eyebrow="Documentation"
-        title={
-          <>
-            Everything a developer needs to{" "}
-            <span className="italic text-forest-500">integrate</span> RPO.
-          </>
-        }
-        description="Reference ABIs, deployment addresses, TypeScript helpers, and integration recipes. Full markdown source in the repo — this page is the canonical hub."
+        eyebrow="Developers"
+        title="Everything you need to build on RPO."
+        description="Contracts are deployed on Robinhood Chain (id 4663). Read paths need no wallet; write paths accept USDG on any wagmi-compatible connector."
       />
 
-      <Section>
-        <div className="grid md:grid-cols-3 gap-4">
-          {GUIDES.map(({ Icon, title, body, href }) => (
+      <section className="section">
+        <div className="container-wide grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {CATS.map((c) => (
             <Link
-              key={title}
-              href={href}
-              className="card-hover p-8 flex flex-col gap-4 group"
+              key={c.href}
+              href={c.href}
+              className="card-hover p-6 flex flex-col gap-3 group"
             >
-              <div className="h-10 w-10 rounded-lg bg-forest-50 text-forest-500 flex items-center justify-center">
-                <Icon className="h-5 w-5" />
+              <c.Icon className="h-5 w-5 text-forest-500" />
+              <div className="font-semibold text-ink-900">{c.title}</div>
+              <div className="text-sm text-ink-500 leading-relaxed flex-1">
+                {c.body}
               </div>
-              <h3 className="font-display text-2xl text-fg">{title}</h3>
-              <p className="text-sm text-fg-muted leading-relaxed flex-1">
-                {body}
-              </p>
-              <div className="text-sm text-forest-500 inline-flex items-center gap-1 group-hover:gap-2 transition-all">
-                Read <ArrowUpRight className="h-3.5 w-3.5" />
+              <div className="text-sm text-ink-900 inline-flex items-center gap-1 group-hover:gap-2 transition-all">
+                Open <ArrowUpRight className="h-3.5 w-3.5" />
               </div>
             </Link>
           ))}
         </div>
-      </Section>
+      </section>
 
-      <Section id="quickstart" className="border-t border-line bg-paper-100">
-        <SectionHeader eyebrow="Quickstart" title="Deploy locally in 10 minutes." />
-        <div className="card p-6 lg:p-8 bg-paper-100">
-          <pre className="text-xs lg:text-sm font-mono text-fg leading-relaxed whitespace-pre overflow-x-auto">
-{`# Clone
-git clone https://github.com/lanqi0518-ux/balls.git rpo
-cd rpo/contracts
-
-# Install Foundry deps
-forge install foundry-rs/forge-std --no-commit
-forge install OpenZeppelin/openzeppelin-contracts --no-commit
-
-# Test
-forge test -vv
-
-# Deploy to Robinhood Chain (needs env)
-cp .env.example .env  # fill in PRIVATE_KEY, RH_CHAIN_RPC, RPO_TOKEN, ...
-forge script script/Deploy.s.sol \\
-  --broadcast --rpc-url $RH_CHAIN_RPC --verify`}
-          </pre>
-        </div>
-      </Section>
-
-      <Section id="contracts">
-        <SectionHeader
-          eyebrow="Contracts"
-          title="Deployed addresses."
-          description="Verify each address against the audit report before integrating."
-        />
-        <div className="card divide-y divide-line overflow-hidden">
-          {CONTRACTS.map((c) => (
-            <div
-              key={c.name}
-              className="p-6 flex items-center justify-between gap-6 hover:bg-paper-100 transition-colors"
-            >
-              <div className="min-w-0">
-                <div className="text-fg font-semibold">{c.name}</div>
-                <div className="text-xs text-fg-muted mt-1">{c.note}</div>
+      <section className="section-tight border-t border-line bg-paper-100">
+        <div className="container-wide">
+          <div className="eyebrow mb-4">Quick tour</div>
+          <h2 className="font-display text-3xl text-ink-900 mb-10">
+            Four integrations, one afternoon.
+          </h2>
+          <div className="grid md:grid-cols-2 gap-4">
+            {QUICK.map((q) => (
+              <div key={q.h} className="card p-6">
+                <div className="text-sm font-semibold text-ink-900 mb-3">
+                  {q.h}
+                </div>
+                <pre className="bg-ink-900 text-ink-100 rounded-xl p-4 text-[13px] font-mono overflow-x-auto">
+                  <code>{q.body}</code>
+                </pre>
               </div>
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <span className="font-mono text-xs text-fg-muted">
-                  {c.addr}
-                </span>
-                <Badge>Mainnet</Badge>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container-wide">
+          <div className="grid lg:grid-cols-2 gap-8">
+            <div className="card p-8">
+              <Badge variant="forest" dot>
+                RPC endpoints
+              </Badge>
+              <div className="mt-5 space-y-3 text-sm">
+                {[
+                  { k: "Public HTTP", v: "https://rpc.robinhoodchain.com" },
+                  { k: "Alchemy", v: "https://rhc-mainnet.g.alchemy.com/v2/{key}" },
+                  { k: "WebSocket", v: "wss://rpc.robinhoodchain.com/ws" },
+                  { k: "Chain ID", v: "4663" },
+                ].map((r) => (
+                  <div
+                    key={r.k}
+                    className="flex items-center justify-between border-b border-line last:border-0 py-2"
+                  >
+                    <span className="text-ink-500">{r.k}</span>
+                    <span className="font-mono text-ink-900 text-xs">
+                      {r.v}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
-          ))}
+
+            <div className="card p-8">
+              <Badge variant="peach" dot>
+                Subgraph
+              </Badge>
+              <div className="mt-5 text-sm text-ink-500 mb-4">
+                RPO indexes every vault event to a public subgraph. Free tier
+                is 100k queries/mo; keys are provisioned instantly.
+              </div>
+              <div className="rounded-xl bg-ink-900 text-ink-100 p-4 font-mono text-[13px]">
+                <div className="text-ink-400">
+                  # POST https://api.rpo.xyz/subgraph
+                </div>
+                <div className="mt-2">
+                  {`{ ipos(where: {status:"Subscribing"}) { ticker target subscribed launchAt } }`}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </Section>
-
-      <Section id="integrator" className="border-t border-line">
-        <SectionHeader
-          eyebrow="Integrator"
-          title="SDK-level snippet"
-          description="Read the current IPO calendar directly from the registry."
-        />
-        <Container variant="copy" className="!px-0">
-          <div className="card p-6 lg:p-8 bg-paper-100">
-            <pre className="text-xs lg:text-sm font-mono text-fg leading-relaxed whitespace-pre overflow-x-auto">
-{`import { createPublicClient, http } from "viem";
-import { robinhoodChain } from "@rpo/sdk/chain";
-import { registryAbi, registryAddress } from "@rpo/sdk/abi";
-
-const client = createPublicClient({
-  chain: robinhoodChain,
-  transport: http(),
-});
-
-const ipos = await client.readContract({
-  address: registryAddress,
-  abi: registryAbi,
-  functionName: "getActiveIPOs",
-});
-
-console.log(ipos);
-// [{ ticker: "STRIPE", vault: 0x…, subscriptionDeadline: … }, …]`}
-            </pre>
-          </div>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <LinkButton
-              href="https://github.com/lanqi0518-ux/balls"
-              external
-              variant="outline"
-              size="md"
-              trailingIcon={<ArrowUpRight className="h-4 w-4" />}
-            >
-              GitHub repo
-            </LinkButton>
-            <LinkButton
-              href="/security"
-              variant="ghost"
-              size="md"
-            >
-              Security & audits
-            </LinkButton>
-          </div>
-        </Container>
-      </Section>
+      </section>
     </MarketingShell>
   );
 }
