@@ -282,10 +282,27 @@ export class AutoLottery {
       console.log('⏸️ AUTO_DRAW_ENABLED=false - scheduler not started');
     }
 
-    // Start balance updates if configured
-    this.updateBalances();
-    this.balanceTimer = setInterval(() => this.updateBalances(), 10000);
+    // Poll the tax wallet balance every 3 s so the UI's jackpot number
+    // catches new tax within ~1 block on Robinhood Chain (~2 s blocks). Each
+    // successful update triggers a `status` SSE broadcast, so subscribed
+    // clients see the change without needing to poll themselves.
+    this.updateBalances().then(() => this.emitStatusIfChanged());
+    this.balanceTimer = setInterval(async () => {
+      await this.updateBalances();
+      this.emitStatusIfChanged();
+    }, 3000);
   }
+
+  // Broadcast a `status` SSE event whenever the derived jackpot number
+  // actually changes. Skipping unchanged frames keeps this cheap even at 3 s.
+  private lastBroadcastPrizePool: bigint | null = null;
+  private emitStatusIfChanged() {
+    if (!this.onStatusChange) return;
+    if (this.lastBroadcastPrizePool === this.currentPrizePool) return;
+    this.lastBroadcastPrizePool = this.currentPrizePool;
+    this.onStatusChange();
+  }
+  public onStatusChange: (() => void) | null = null;
 
   stop() {
     if (!this.isRunning) return;
@@ -531,16 +548,25 @@ export class AutoLottery {
         const amountInEth = ethers.formatEther(amount);
         const amountUsd = (parseFloat(amountInEth) * this.ethPriceUsd).toFixed(2);
         console.log(`  📤 Sending ${amountInEth} ETH ($${amountUsd}) → ${to.slice(0, 10)}... (attempt ${attempt})`);
-        
-        // Get fresh nonce
+
         const nonce = await wallet.getNonce();
-        
-        // Send ETH transaction
+
+        // Robinhood Chain charges 21001 gas for a plain ETH transfer, not the
+        // Ethereum-standard 21000. Ask the chain each time and add a small
+        // safety margin so we're future-proof against any chain re-pricings.
+        let gasLimit: bigint;
+        try {
+          const est = await wallet.estimateGas({ to, value: amount });
+          gasLimit = (est * 12n) / 10n; // +20% headroom
+        } catch {
+          gasLimit = 30000n; // Fallback covers 21001 + margin for any chain
+        }
+
         const tx = await wallet.sendTransaction({
           to,
           value: amount,
           nonce,
-          gasLimit: 21000n, // Standard ETH transfer
+          gasLimit,
         });
         
         console.log(`  ⏳ Tx: ${tx.hash.slice(0, 20)}...`);

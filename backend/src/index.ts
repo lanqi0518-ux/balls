@@ -47,6 +47,12 @@ async function main() {
     broadcast('draw', result);
     broadcast('status', autoLottery.getStatus());
   };
+  // Whenever the wallet balance polling detects a change (new tax landed,
+  // draw drained the pool, operator top-up), push a fresh status frame so
+  // subscribed browsers update in near-real time.
+  autoLottery.onStatusChange = () => {
+    broadcast('status', autoLottery.getStatus());
+  };
   autoLottery.onSnapshot = (snapshot) => {
     broadcast('snapshot', snapshot);
     broadcast('status', autoLottery.getStatus());
