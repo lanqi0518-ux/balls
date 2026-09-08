@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { LogoMark } from "@/components/ui/Logo";
-import { Twitter, Github, Discord, Book } from "@/components/ui/Icons";
+import { NewsletterForm } from "@/components/forms/NewsletterForm";
+import { Twitter, Github, Discord, Book, Mail } from "@/components/ui/Icons";
 
 const COLS = [
   {
@@ -11,33 +12,47 @@ const COLS = [
       { label: "Positions", href: "/app/positions" },
       { label: "Stake $RPO", href: "/app/stake" },
       { label: "Leaderboard", href: "/app/leaderboard" },
+      { label: "Status", href: "/status" },
     ],
   },
   {
-    title: "Product",
+    title: "Learn",
     links: [
       { label: "How it works", href: "/how-it-works" },
-      { label: "Security", href: "/security" },
+      { label: "Whitepaper", href: "/whitepaper" },
+      { label: "Tokenomics", href: "/tokenomics" },
+      { label: "Governance", href: "/governance" },
       { label: "FAQ", href: "/faq" },
-      { label: "Roadmap", href: "/about#roadmap" },
     ],
   },
   {
     title: "Developers",
     links: [
       { label: "Docs", href: "/docs" },
+      { label: "REST API", href: "/docs/api" },
+      { label: "TypeScript SDK", href: "/docs/sdk" },
+      { label: "Contracts", href: "/docs/contracts" },
       { label: "GitHub", href: "https://github.com/lanqi0518-ux/balls", external: true },
-      { label: "Contracts", href: "/docs#contracts" },
-      { label: "Audit report", href: "/security#audits" },
+    ],
+  },
+  {
+    title: "Security",
+    links: [
+      { label: "Security", href: "/security" },
+      { label: "Audits", href: "/audits" },
+      { label: "Bug bounty", href: "/bounty" },
+      { label: "Risk disclosure", href: "/legal/risk" },
     ],
   },
   {
     title: "Company",
     links: [
       { label: "About", href: "/about" },
-      { label: "Careers", href: "/about#careers" },
-      { label: "Brand kit", href: "/about#brand" },
-      { label: "Contact", href: "mailto:hello@rpo.xyz", external: true },
+      { label: "Blog", href: "/blog" },
+      { label: "Careers", href: "/careers" },
+      { label: "Grants", href: "/grants" },
+      { label: "Press", href: "/press" },
+      { label: "Brand kit", href: "/brand" },
     ],
   },
 ];
@@ -47,14 +62,35 @@ const SOCIALS = [
   { label: "GitHub", href: "https://github.com/lanqi0518-ux/balls", Icon: Github },
   { label: "Discord", href: "https://discord.gg/rpo", Icon: Discord },
   { label: "Docs", href: "/docs", Icon: Book },
+  { label: "Contact", href: "mailto:hello@rpo.xyz", Icon: Mail },
 ];
 
 export function Footer() {
   return (
     <footer className="border-t border-line bg-paper-100">
       <Container>
-        <div className="grid lg:grid-cols-12 gap-10 py-20 lg:py-28">
-          <div className="lg:col-span-4">
+        {/* Newsletter */}
+        <div className="border-b border-line py-12 lg:py-16 grid lg:grid-cols-2 gap-8 items-center">
+          <div>
+            <div className="eyebrow mb-3">Stay in the loop</div>
+            <h3 className="font-display text-3xl lg:text-4xl text-ink-900">
+              One email per protocol update. Never spam.
+            </h3>
+          </div>
+          <div>
+            <NewsletterForm />
+            <div className="mt-3 text-xs text-ink-500">
+              By subscribing you agree to our{" "}
+              <Link href="/legal/privacy" className="underline hover:text-ink-900">
+                Privacy Policy
+              </Link>
+              .
+            </div>
+          </div>
+        </div>
+
+        <div className="grid lg:grid-cols-12 gap-10 py-16 lg:py-20">
+          <div className="lg:col-span-3">
             <div className="flex items-center gap-2">
               <LogoMark className="h-8 w-8" />
               <span className="font-semibold text-ink-900 text-lg">RPO</span>
@@ -65,7 +101,7 @@ export function Footer() {
               transparent on-chain vaults.
             </p>
 
-            <div className="mt-8 flex items-center gap-2">
+            <div className="mt-8 flex items-center gap-2 flex-wrap">
               {SOCIALS.map(({ label, href, Icon }) => (
                 <a
                   key={label}
@@ -81,7 +117,7 @@ export function Footer() {
             </div>
           </div>
 
-          <div className="lg:col-span-8 grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div className="lg:col-span-9 grid grid-cols-2 md:grid-cols-5 gap-8">
             {COLS.map((c) => (
               <div key={c.title}>
                 <div className="text-[11px] uppercase tracking-[0.22em] text-ink-500 mb-5 font-medium">
@@ -135,15 +171,14 @@ export function Footer() {
             issued by Robinhood Assets (Jersey) Limited and are not offered or
             sold to U.S. persons, Canadians, U.K., Swiss, or U.A.E. residents.
           </div>
-          <div className="flex items-center gap-5 text-xs text-ink-500">
-            <Link href="/legal" className="hover:text-ink-900">
-              Legal
-            </Link>
-            <Link href="/legal#privacy" className="hover:text-ink-900">
-              Privacy
-            </Link>
-            <Link href="/legal#terms" className="hover:text-ink-900">
-              Terms
+          <div className="flex items-center gap-5 text-xs text-ink-500 flex-wrap">
+            <Link href="/legal" className="hover:text-ink-900">Legal</Link>
+            <Link href="/legal/privacy" className="hover:text-ink-900">Privacy</Link>
+            <Link href="/legal/terms" className="hover:text-ink-900">Terms</Link>
+            <Link href="/legal/risk" className="hover:text-ink-900">Risk</Link>
+            <Link href="/status" className="hover:text-ink-900 inline-flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-forest-500" />
+              All systems operational
             </Link>
           </div>
         </div>

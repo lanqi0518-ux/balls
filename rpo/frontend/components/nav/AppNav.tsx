@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/ui/Logo";
 import { ConnectButton } from "@/components/wallet/ConnectButton";
+import { CommandPalette } from "@/components/app/CommandPalette";
+import { NotificationCenter } from "@/components/app/NotificationCenter";
 import {
   Calendar,
   Wallet,
@@ -106,12 +108,8 @@ export function AppTopBar() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Link
-            href="/how-it-works"
-            className="hidden sm:inline-flex text-sm text-ink-500 hover:text-ink-900 transition-colors"
-          >
-            Product
-          </Link>
+          <CommandPalette />
+          <NotificationCenter />
           <div className="hidden sm:block h-4 w-px bg-line" />
           <ConnectButton size="sm" variant="primary" />
         </div>
