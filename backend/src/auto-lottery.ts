@@ -167,9 +167,20 @@ export class AutoLottery {
     this.provider = new ethers.JsonRpcProvider(config.rpcUrl);
 
     if (config.taxReceiverPrivateKey) {
-      this.taxReceiverWallet = new ethers.Wallet(config.taxReceiverPrivateKey, this.provider);
+      const wallet = new ethers.Wallet(config.taxReceiverPrivateKey, this.provider);
+      if (wallet.address.toLowerCase() !== this.taxReceiverAddress.toLowerCase()) {
+        // Fail loudly instead of signing prize/fee transfers from the wrong
+        // account. Without this, transfers would silently come from the
+        // signer address (which is probably empty) instead of the tax wallet.
+        throw new Error(
+          `TAX_RECEIVER_PRIVATE_KEY derives ${wallet.address} but ` +
+          `TAX_RECEIVER_WALLET is ${this.taxReceiverAddress}. ` +
+          `Refusing to start — fix the key/address pair or clear both.`
+        );
+      }
+      this.taxReceiverWallet = wallet;
       this.autoTransferEnabled = true;
-      console.log('✅ Auto transfer enabled');
+      console.log('✅ Auto transfer enabled — key matches TAX_RECEIVER_WALLET');
       console.log(`📤 Tax wallet (holds 3%+1%): ${this.taxReceiverAddress}`);
       console.log(`🏆 Winners take: ${Number(this.prizePoolBps) / 100}% of the tax wallet each draw`);
       if (this.hasSeparateDevWallet()) {
