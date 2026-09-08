@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Inter, Fraunces, JetBrains_Mono } from "next/font/google";
 import { Providers } from "./providers";
+import { JsonLd } from "@/components/seo/JsonLd";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -65,6 +66,15 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${fraunces.variable} ${mono.variable}`}
     >
+      <head>
+        <link
+          rel="alternate"
+          type="application/rss+xml"
+          title="RPO Blog"
+          href="/blog/rss.xml"
+        />
+        <JsonLd />
+      </head>
       <body className="min-h-screen bg-white text-ink-900 antialiased">
         <Providers>{children}</Providers>
       </body>

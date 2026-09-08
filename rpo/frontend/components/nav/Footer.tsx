@@ -3,12 +3,15 @@ import { Container } from "@/components/ui/Container";
 import { LogoMark } from "@/components/ui/Logo";
 import { NewsletterForm } from "@/components/forms/NewsletterForm";
 import { Twitter, Github, Discord, Book, Mail } from "@/components/ui/Icons";
+import { RELEASE } from "@/lib/version";
+import { RPO_ADDRESSES } from "@/lib/addresses";
 
 const COLS = [
   {
     title: "Protocol",
     links: [
       { label: "IPO Calendar", href: "/app" },
+      { label: "Explorer", href: "/explorer" },
       { label: "Positions", href: "/app/positions" },
       { label: "Stake $RPO", href: "/app/stake" },
       { label: "Leaderboard", href: "/app/leaderboard" },
@@ -22,6 +25,7 @@ const COLS = [
       { label: "Whitepaper", href: "/whitepaper" },
       { label: "Tokenomics", href: "/tokenomics" },
       { label: "Governance", href: "/governance" },
+      { label: "Ecosystem", href: "/ecosystem" },
       { label: "FAQ", href: "/faq" },
     ],
   },
@@ -32,6 +36,7 @@ const COLS = [
       { label: "REST API", href: "/docs/api" },
       { label: "TypeScript SDK", href: "/docs/sdk" },
       { label: "Contracts", href: "/docs/contracts" },
+      { label: "Changelog", href: "/changelog" },
       { label: "GitHub", href: "https://github.com/lanqi0518-ux/balls", external: true },
     ],
   },
@@ -180,6 +185,16 @@ export function Footer() {
               <span className="h-1.5 w-1.5 rounded-full bg-forest-500" />
               All systems operational
             </Link>
+            <a
+              href={`https://github.com/lanqi0518-ux/balls/commit/${RELEASE.commit}`}
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-ink-900 font-mono inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-white px-2.5 py-1"
+              title={`Released ${RELEASE.releasedAt} on ${RELEASE.channel} · chain ${RPO_ADDRESSES.chainId}`}
+            >
+              <span className="h-1 w-1 rounded-full bg-peach-500" />
+              {RELEASE.version} · {RELEASE.commit}
+            </a>
           </div>
         </div>
       </Container>

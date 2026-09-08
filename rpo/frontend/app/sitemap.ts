@@ -12,6 +12,9 @@ const ROUTES = [
   "/about",
   "/faq",
   "/status",
+  "/ecosystem",
+  "/changelog",
+  "/explorer",
   // Docs
   "/docs",
   "/docs/api",
