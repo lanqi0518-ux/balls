@@ -131,3 +131,21 @@ export const Sparkles = svg(
     <path d="M6 6l2 2M16 16l2 2M6 18l2-2M16 8l2-2" />
   </>
 );
+export const Bell = svg(
+  <>
+    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8" />
+    <path d="M10 21a2 2 0 0 0 4 0" />
+  </>
+);
+export const Mail = svg(
+  <>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M3 7l9 6 9-6" />
+  </>
+);
+export const Search = svg(
+  <>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.5-3.5" />
+  </>
+);
