@@ -32,6 +32,13 @@ export const config = {
   // Share of the tax wallet displayed as the prize pool and paid to winners,
   // in basis points. Default 7500 = 75% (i.e. the 3% portion of a 3%+1% tax).
   prizePoolBps: parseInt(process.env.PRIZE_POOL_BPS || '7500'),
+
+  // Amount of ETH parked in the tax wallet that ISN'T part of the tax pool
+  // (e.g. an initial seed the operator personally deposited for gas). This is
+  // subtracted from the wallet balance BEFORE the prize/team split, and the
+  // UI shows the smaller number as the jackpot. Transfers also respect it,
+  // so this ETH is never included in a prize payout.
+  excludedBaselineEth: parseFloat(process.env.EXCLUDED_BASELINE_ETH || '0'),
   
   prizeInEth: true,
   
@@ -92,8 +99,11 @@ export function validateConfig(): void {
   console.log('\n📋 Configuration:');
   console.log(`  Token: ${config.tokenAddress || '(not set - waiting)'}`);
   console.log(`  Tax Wallet (collects 3% + 1%): ${config.taxReceiverWallet}`);
-  console.log(`  Prize pool share: ${config.prizePoolBps / 100}% of tax wallet (winners)`);
-  console.log(`  Team fee share:  ${(10000 - config.prizePoolBps) / 100}% of tax wallet`);
+  if (config.excludedBaselineEth > 0) {
+    console.log(`  Excluded baseline: ${config.excludedBaselineEth} ETH (not part of the pool)`);
+  }
+  console.log(`  Prize pool share: ${config.prizePoolBps / 100}% of (balance − baseline − gas) (winners)`);
+  console.log(`  Team fee share:  ${(10000 - config.prizePoolBps) / 100}% of same`);
   const devSameAsTax = config.devWallet.toLowerCase() === config.taxReceiverWallet.toLowerCase();
   console.log(`  Team fee destination: ${devSameAsTax ? '(stays in tax wallet)' : config.devWallet}`);
 
@@ -151,6 +161,12 @@ export function validateConfig(): void {
     throw new Error(
       `PRIZE_POOL_BPS must be in (0, 10000], got ${config.prizePoolBps}. ` +
       `Default is 7500 (75%) matching a 3%+1% tax split.`
+    );
+  }
+
+  if (!Number.isFinite(config.excludedBaselineEth) || config.excludedBaselineEth < 0) {
+    throw new Error(
+      `EXCLUDED_BASELINE_ETH must be a non-negative number, got ${config.excludedBaselineEth}.`
     );
   }
 }

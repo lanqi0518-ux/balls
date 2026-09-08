@@ -140,6 +140,10 @@ export class AutoLottery {
   private readonly snapshotLeadMs = config.snapshotLeadTime;
   // Share of the tax wallet paid to winners (75% by default for a 3+1 tax).
   private readonly prizePoolBps = BigInt(config.prizePoolBps);
+  // ETH parked in the tax wallet that isn't part of the pool (seed funds).
+  private readonly excludedBaselineWei = ethers.parseEther(
+    config.excludedBaselineEth.toString()
+  );
 
   // Demo mode: fabricate holders, prize-pool growth and draws so the site
   // can be shown off without a deployed token contract.
@@ -304,7 +308,9 @@ export class AutoLottery {
   }
 
   private getSpendable(balance: bigint): bigint {
-    return balance > this.MIN_GAS_BALANCE ? balance - this.MIN_GAS_BALANCE : 0n;
+    // Leave gas AND the operator's excluded baseline in the wallet.
+    const floor = this.MIN_GAS_BALANCE + this.excludedBaselineWei;
+    return balance > floor ? balance - floor : 0n;
   }
 
   /**
@@ -326,7 +332,11 @@ export class AutoLottery {
     if (this.demoMode) {
       this.growDemoPool();
       this.ethBalance = this.demoPoolWei;
-      const spendable = this.getSpendable(this.ethBalance);
+      // Only apply the gas floor — the excluded operator baseline is a real-
+      // wallet concept and would nonsensically shrink the fake demo jackpot.
+      const spendable = this.ethBalance > this.MIN_GAS_BALANCE
+        ? this.ethBalance - this.MIN_GAS_BALANCE
+        : 0n;
       const { prize, team } = this.splitTax(spendable);
       this.currentPrizePool = prize;
       this.publisherFee = team;
@@ -420,8 +430,8 @@ export class AutoLottery {
    * Check if we have enough ETH for transfers (need some reserve for gas)
    */
   private hasEnoughForTransfers(): boolean {
-    // Need at least 0.05 ETH reserve for gas after transfers
-    return this.ethBalance > this.MIN_GAS_BALANCE;
+    // Need gas reserve + operator baseline to remain after transfers
+    return this.ethBalance > this.MIN_GAS_BALANCE + this.excludedBaselineWei;
   }
 
   private tick() {
@@ -587,16 +597,19 @@ export class AutoLottery {
     
     console.log(`\n📦 Processing ${validTransfers.length} ETH transfers...`);
     
-    // Check total amount needed (including gas reserve)
+    // Check total amount needed (gas reserve + operator baseline must stay put)
     const totalNeeded = validTransfers.reduce((sum, t) => sum + t.amount, 0n);
-    const gasReserve = this.MIN_GAS_BALANCE;
-    const totalWithGas = totalNeeded + gasReserve;
-    
+    const reserveFloor = this.MIN_GAS_BALANCE + this.excludedBaselineWei;
+    const totalWithGas = totalNeeded + reserveFloor;
+
     const totalEth = ethers.formatEther(totalNeeded);
     const totalUsd = (parseFloat(totalEth) * this.ethPriceUsd).toFixed(2);
     console.log(`  💰 Total needed: ${totalEth} ETH ($${totalUsd})`);
     console.log(`  💳 Available: ${ethers.formatEther(this.ethBalance)} ETH`);
-    
+    if (this.excludedBaselineWei > 0n) {
+      console.log(`  🔒 Excluded baseline: ${ethers.formatEther(this.excludedBaselineWei)} ETH (stays put)`);
+    }
+
     if (totalWithGas > this.ethBalance) {
       console.log(`  ❌ Insufficient ETH balance!`);
       return validTransfers.map(t => ({
@@ -941,6 +954,7 @@ export class AutoLottery {
       autoTransferEnabled: this.autoTransferEnabled,
       demoMode: this.demoMode,
       tokenConfigured: this.demoMode ? true : !!this.tokenContract,
+      excludedBaselineEth: ethers.formatEther(this.excludedBaselineWei),
       prizeInEth: true,
       totalDevPaid: ethers.formatEther(this.totalDevPaid),
       totalPrizePaid: ethers.formatEther(this.totalPrizePaid),
