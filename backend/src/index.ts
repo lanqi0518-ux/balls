@@ -64,10 +64,21 @@ async function main() {
   if (canonicalHost) {
     console.log(`🌐 Canonical host: https://${canonicalHost} (other hosts will 301 here)`);
     app.use((req, res, next) => {
+      // Never redirect the health probe — Fly hits it with the machine's
+      // private IPv6 as Host, which doesn't match any known-good exemption.
+      if (req.path === '/health') return next();
+
       const rawHost = (req.headers.host || '').toLowerCase();
       const host = rawHost.split(':')[0]; // drop :port
+      const isIpLiteral =
+        host.length === 0 ||
+        /^\d+\.\d+\.\d+\.\d+$/.test(host) ||           // IPv4
+        host.startsWith('[') ||                          // bracketed IPv6
+        host.includes(':') ||                            // raw IPv6
+        /^[0-9a-f]{4,}$/i.test(host.replace(/[.:]/g, '')); // hex-only
+
       if (
-        !host ||
+        isIpLiteral ||
         host === canonicalHost ||
         host === 'localhost' ||
         host.startsWith('127.') ||
