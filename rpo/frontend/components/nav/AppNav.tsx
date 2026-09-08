@@ -1,0 +1,175 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { Logo } from "@/components/ui/Logo";
+import {
+  Calendar,
+  Wallet,
+  Coin,
+  Trophy,
+  Book,
+  ArrowUpRight,
+} from "@/components/ui/Icons";
+import { cn } from "@/lib/cn";
+
+const NAV = [
+  { label: "IPO Calendar", href: "/app", Icon: Calendar },
+  { label: "Positions", href: "/app/positions", Icon: Wallet },
+  { label: "Stake $RPO", href: "/app/stake", Icon: Coin },
+  { label: "Leaderboard", href: "/app/leaderboard", Icon: Trophy },
+];
+
+const BOTTOM = [
+  { label: "Docs", href: "/docs", Icon: Book, external: false },
+  { label: "GitHub", href: "https://github.com/lanqi0518-ux/balls", Icon: ArrowUpRight, external: true },
+];
+
+export function AppSidebar() {
+  const pathname = usePathname();
+  return (
+    <aside className="hidden lg:flex flex-col w-60 border-r border-line bg-ink-900 h-screen sticky top-0">
+      <div className="h-16 flex items-center px-6 border-b border-line">
+        <Logo />
+      </div>
+
+      <nav className="flex-1 p-3 space-y-1">
+        {NAV.map(({ label, href, Icon }) => {
+          const active =
+            href === "/app" ? pathname === "/app" : pathname.startsWith(href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                active
+                  ? "bg-mint-500/10 text-mint-400"
+                  : "text-fg-muted hover:text-fg hover:bg-ink-800"
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="p-3 border-t border-line space-y-1">
+        {BOTTOM.map(({ label, href, Icon, external }) =>
+          external ? (
+            <a
+              key={label}
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-fg-muted hover:text-fg hover:bg-ink-800 transition-colors"
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </a>
+          ) : (
+            <Link
+              key={label}
+              href={href}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-fg-muted hover:text-fg hover:bg-ink-800 transition-colors"
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </Link>
+          )
+        )}
+      </div>
+    </aside>
+  );
+}
+
+export function AppTopBar() {
+  const { address, isConnected } = useAccount();
+  const { connect, connectors } = useConnect();
+  const { disconnect } = useDisconnect();
+  const pathname = usePathname();
+
+  return (
+    <div className="sticky top-0 z-30 h-16 border-b border-line bg-ink-900/85 backdrop-blur-xl">
+      <div className="h-full flex items-center justify-between px-5 lg:px-8">
+        <div className="flex items-center gap-3">
+          <Link href="/" className="lg:hidden">
+            <Logo />
+          </Link>
+          <div className="hidden lg:block text-sm text-fg-muted font-mono">
+            {breadcrumb(pathname)}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Link
+            href="/how-it-works"
+            className="hidden sm:inline-flex text-sm text-fg-muted hover:text-fg transition-colors"
+          >
+            Product
+          </Link>
+          <div className="hidden sm:block h-4 w-px bg-line" />
+          {isConnected ? (
+            <button
+              onClick={() => disconnect()}
+              className="btn-secondary text-sm py-1.5"
+              title={address}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-mint-500" />
+              {address?.slice(0, 6)}…{address?.slice(-4)}
+            </button>
+          ) : (
+            <button
+              onClick={() =>
+                connectors[0] && connect({ connector: connectors[0] })
+              }
+              className="btn-primary text-sm py-1.5"
+            >
+              Connect wallet
+            </button>
+          )}
+        </div>
+      </div>
+
+      <MobileTabs pathname={pathname} />
+    </div>
+  );
+}
+
+function MobileTabs({ pathname }: { pathname: string }) {
+  return (
+    <div className="lg:hidden border-t border-line flex overflow-x-auto no-scrollbar">
+      {NAV.map(({ label, href, Icon }) => {
+        const active =
+          href === "/app" ? pathname === "/app" : pathname.startsWith(href);
+        return (
+          <Link
+            key={href}
+            href={href}
+            className={cn(
+              "flex items-center gap-2 px-4 py-3 text-xs whitespace-nowrap border-b-2 transition-colors",
+              active
+                ? "border-mint-500 text-mint-400"
+                : "border-transparent text-fg-muted"
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+function breadcrumb(pathname: string): string {
+  if (pathname === "/app") return "app / calendar";
+  if (pathname.startsWith("/app/ipo/")) {
+    const t = pathname.split("/").pop() ?? "";
+    return `app / ipo / ${t.toUpperCase()}`;
+  }
+  const parts = pathname.split("/").filter(Boolean);
+  return parts.join(" / ");
+}

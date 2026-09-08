@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Badge } from "@/components/ui/Badge";
+import { ArrowUpRight } from "@/components/ui/Icons";
 
 type IPOCardProps = {
   ticker: string;
@@ -9,6 +11,7 @@ type IPOCardProps = {
   expectedPrice?: number;
   countdownSec: number;
   boost: number;
+  status?: "Subscribing" | "Announced" | "Fulfilled" | "Refunded";
 };
 
 function formatCountdown(seconds: number): string {
@@ -17,6 +20,10 @@ function formatCountdown(seconds: number): string {
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   return `${d}d ${h}h ${m}m`;
+}
+
+function fmtM(x: number): string {
+  return `$${(x / 1_000_000).toFixed(2)}M`;
 }
 
 export function IPOCard({
@@ -28,54 +35,92 @@ export function IPOCard({
   expectedPrice,
   countdownSec,
   boost,
+  status = "Subscribing",
 }: IPOCardProps) {
   const pct = Math.min(100, Math.round((subscribedUSD / targetUSD) * 100));
+
   return (
-    <div className="card p-6 flex flex-col gap-4">
+    <Link
+      href={`/app/ipo/${ticker.toLowerCase()}`}
+      className="card-hover p-6 flex flex-col gap-5 group relative"
+    >
       <div className="flex items-center gap-4">
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={logoUrl} alt={ticker} className="w-12 h-12 rounded-full" />
+          <img
+            src={logoUrl}
+            alt={ticker}
+            className="w-12 h-12 rounded-full border border-line-strong"
+          />
         ) : (
-          <div className="w-12 h-12 rounded-full bg-chain-border flex items-center justify-center font-bold">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-ink-600 to-ink-800 border border-line-strong flex items-center justify-center font-semibold text-fg">
             {ticker.slice(0, 2)}
           </div>
         )}
-        <div className="flex-1">
-          <div className="text-xl font-bold">{ticker}</div>
-          <div className="text-sm text-gray-400">{name}</div>
+        <div className="flex-1 min-w-0">
+          <div className="text-lg font-semibold text-fg">{ticker}</div>
+          <div className="text-xs text-fg-muted truncate">{name}</div>
         </div>
-        <div className="text-right">
-          <div className="text-xs text-gray-400">Launch in</div>
-          <div className="font-mono text-brand">{formatCountdown(countdownSec)}</div>
-        </div>
+        <Badge variant={status === "Subscribing" ? "mint" : "default"} dot={status === "Subscribing"}>
+          {status}
+        </Badge>
       </div>
 
       <div>
-        <div className="flex justify-between text-xs text-gray-400">
+        <div className="flex items-center justify-between text-xs text-fg-muted mb-2">
           <span>Subscribed</span>
-          <span>
-            ${(subscribedUSD / 1_000_000).toFixed(2)}M / ${(targetUSD / 1_000_000).toFixed(2)}M
+          <span className="font-mono text-fg">
+            {fmtM(subscribedUSD)} / {fmtM(targetUSD)}
           </span>
         </div>
-        <div className="w-full h-2 bg-chain-border rounded-full mt-1 overflow-hidden">
-          <div className="h-full bg-brand" style={{ width: `${pct}%` }} />
+        <div className="h-1 bg-ink-700 rounded-full overflow-hidden">
+          <div className="h-full bg-mint-gradient" style={{ width: `${pct}%` }} />
         </div>
       </div>
 
-      <div className="flex justify-between text-sm">
-        <span className="text-gray-400">
-          Expected price: {expectedPrice ? `$${expectedPrice.toFixed(2)}` : "TBD"}
-        </span>
-        <span className="text-brand">Your boost: {boost.toFixed(1)}x</span>
+      <div className="grid grid-cols-3 border-t border-line pt-4 gap-3">
+        <MiniStat
+          k="Expected"
+          v={expectedPrice ? `$${expectedPrice.toFixed(2)}` : "TBD"}
+        />
+        <MiniStat k="Launch in" v={formatCountdown(countdownSec)} tone="mint" />
+        <MiniStat k="Your boost" v={`${boost.toFixed(1)}×`} tone="mint" />
       </div>
 
-      <Link
-        href={`/ipo/${ticker}`}
-        className="btn-primary text-center block"
+      <div className="flex items-center justify-between mt-2">
+        <span className="text-xs text-fg-dim">
+          {pct}% filled · vault #{ticker}
+        </span>
+        <span className="text-sm text-mint-400 inline-flex items-center gap-1 group-hover:gap-2 transition-all">
+          Subscribe <ArrowUpRight className="h-3.5 w-3.5" />
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+function MiniStat({
+  k,
+  v,
+  tone,
+}: {
+  k: string;
+  v: string;
+  tone?: "mint";
+}) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-[0.14em] text-fg-dim">
+        {k}
+      </div>
+      <div
+        className={
+          "text-sm font-mono tabular-nums mt-1 " +
+          (tone === "mint" ? "text-mint-400" : "text-fg")
+        }
       >
-        Subscribe
-      </Link>
+        {v}
+      </div>
     </div>
   );
 }

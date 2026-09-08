@@ -4,3 +4,9 @@ Thumbs.db
 node_modules/
 dist
 .env
+
+# Next.js build artifacts
+rpo/frontend/.next/
+rpo/frontend/next-env.d.ts
+rpo/frontend/tsconfig.tsbuildinfo
+rpo/frontend/node_modules/

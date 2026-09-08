@@ -6,18 +6,153 @@
   color-scheme: dark;
 }
 
+html,
 body {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: #08090b;
 }
 
-.card {
-  @apply bg-chain-panel border border-chain-border rounded-2xl;
+body {
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
 }
 
-.btn-primary {
-  @apply bg-brand hover:bg-brand-dark text-black font-semibold rounded-xl px-4 py-2 transition;
+/* Selection */
+::selection {
+  background: rgba(0, 227, 143, 0.25);
+  color: #f4f5f6;
 }
 
-.btn-outline {
-  @apply border border-chain-border hover:border-brand text-white font-semibold rounded-xl px-4 py-2 transition;
+@layer components {
+  .container-tight {
+    @apply mx-auto max-w-6xl px-5 lg:px-8;
+  }
+  .container-wide {
+    @apply mx-auto max-w-7xl px-5 lg:px-8;
+  }
+  .container-copy {
+    @apply mx-auto max-w-3xl px-5 lg:px-8;
+  }
+
+  .section {
+    @apply py-24 lg:py-32;
+  }
+  .section-tight {
+    @apply py-16 lg:py-24;
+  }
+
+  .card {
+    @apply relative bg-ink-800 border border-line rounded-2xl;
+  }
+  .card-hover {
+    @apply card transition-all duration-200 hover:border-line-strong hover:bg-ink-700;
+  }
+  .card-elevated {
+    @apply relative bg-ink-800 border border-line rounded-2xl shadow-card;
+  }
+  .card-floating {
+    @apply relative bg-ink-800 border border-line rounded-2xl shadow-floating;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed select-none;
+  }
+  .btn-primary {
+    @apply btn bg-mint-500 hover:bg-mint-400 text-ink-950 font-semibold rounded-full px-5 py-2.5;
+  }
+  .btn-secondary {
+    @apply btn bg-ink-700 hover:bg-ink-600 text-fg border border-line rounded-full px-5 py-2.5;
+  }
+  .btn-ghost {
+    @apply btn text-fg-muted hover:text-fg hover:bg-ink-800 rounded-full px-4 py-2;
+  }
+  .btn-outline {
+    @apply btn border border-line-strong hover:border-mint-500 hover:text-mint-500 text-fg rounded-full px-5 py-2.5;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs text-fg-muted;
+  }
+  .badge-mint {
+    @apply badge bg-mint-500/10 border-mint-500/30 text-mint-400;
+  }
+  .badge-cream {
+    @apply badge bg-cream/5 border-cream/20 text-cream;
+  }
+
+  .link {
+    @apply text-fg-muted hover:text-fg transition-colors;
+  }
+
+  .kbd {
+    @apply inline-flex items-center rounded border border-line-strong bg-ink-700 px-1.5 py-0.5 text-[10px] font-mono text-fg-muted;
+  }
+
+  .divider {
+    @apply h-px w-full bg-line;
+  }
+
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-fg-muted font-medium;
+  }
+
+  .prose-editorial {
+    @apply text-fg-muted leading-relaxed [&>p]:mb-4 [&>h2]:font-display [&>h2]:text-3xl [&>h2]:text-fg [&>h2]:mt-12 [&>h2]:mb-4 [&>h3]:text-xl [&>h3]:text-fg [&>h3]:mt-8 [&>h3]:mb-3 [&>ul]:list-disc [&>ul]:pl-6 [&>ul]:mb-4 [&>li]:mb-1 [&_a]:text-mint-400 [&_a:hover]:underline [&_code]:font-mono [&_code]:text-mint-400 [&_code]:bg-ink-800 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-[0.9em];
+  }
+}
+
+/* Subtle grid backdrop */
+.grid-bg {
+  background-image: linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0.035) 1px,
+      transparent 1px
+    ),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(
+    ellipse 65% 45% at 50% 35%,
+    black 40%,
+    transparent 100%
+  );
+}
+
+/* Scrollbar (subtle) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #08090b;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* Numbers rendering */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Utility to hide scrollbar (used in horizontal tab strips) */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
