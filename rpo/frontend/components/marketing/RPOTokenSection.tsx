@@ -56,7 +56,7 @@ export function RPOTokenSection() {
             className="absolute -top-16 -right-20 opacity-70 pointer-events-none animate-float-slow"
           />
 
-          <div className="relative card-floating p-10 space-y-6 backdrop-blur-sm">
+          <div className="relative card-floating p-10 space-y-6">
             <div className="flex items-center justify-between">
               <div className="eyebrow">Allocation boost</div>
               <Badge variant="forest">3× cap</Badge>

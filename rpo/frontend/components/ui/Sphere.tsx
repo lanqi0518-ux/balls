@@ -67,7 +67,7 @@ export function Sphere({
           <stop offset="1" stopColor={gradients.deep} stopOpacity="0.35" />
         </radialGradient>
         <filter id={`${id}-shadow`} x="-50%" y="-20%" width="200%" height="140%">
-          <feGaussianBlur stdDeviation="14" />
+          <feGaussianBlur stdDeviation="8" />
         </filter>
       </defs>
       {/* ground shadow */}

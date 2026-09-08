@@ -127,10 +127,10 @@ module.exports = {
       animation: {
         "fade-in": "fadeIn 0.5s ease-out both",
         "fade-in-up": "fadeInUp 0.6s ease-out both",
-        float: "float 6s ease-in-out infinite",
-        "float-slow": "float 10s ease-in-out infinite",
-        marquee: "marquee 40s linear infinite",
-        "spin-slow": "spin 40s linear infinite",
+        float: "float 14s ease-in-out infinite",
+        "float-slow": "float 22s ease-in-out infinite",
+        marquee: "marquee 60s linear infinite",
+        "spin-slow": "spin 60s linear infinite",
       },
       keyframes: {
         fadeIn: { "0%": { opacity: 0 }, "100%": { opacity: 1 } },

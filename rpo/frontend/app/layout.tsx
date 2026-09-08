@@ -1,7 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Inter, Fraunces, JetBrains_Mono } from "next/font/google";
-import { Providers } from "./providers";
 import { JsonLd } from "@/components/seo/JsonLd";
 
 const inter = Inter({
@@ -76,7 +75,7 @@ export default function RootLayout({
         <JsonLd />
       </head>
       <body className="min-h-screen bg-white text-ink-900 antialiased">
-        <Providers>{children}</Providers>
+        {children}
       </body>
     </html>
   );

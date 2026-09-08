@@ -30,6 +30,33 @@ body {
   color: #ffffff;
 }
 
+/* Continuous animations — hint the browser to promote them to their own
+   compositor layer so the CPU/GPU doesn't re-rasterize every frame. */
+.animate-float,
+.animate-float-slow,
+.animate-marquee,
+.animate-spin-slow {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Reduced-motion: honor user preference AND kill continuous CSS animations */
+/*  on any device where the user hasn't opted in. Keeps decorative motion    */
+/*  when explicitly enabled, but never burns compositor cycles by default    */
+/*  on visitors who don't need it.                                           */
+/* -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @layer components {
   .container-tight {
     @apply mx-auto max-w-6xl px-5 lg:px-8;
@@ -43,9 +70,16 @@ body {
 
   .section {
     @apply py-24 lg:py-36;
+    /* Skip paint/layout when the section is far off-screen.
+       Massive win for long marketing pages — the browser doesn't
+       render sections it can't see. */
+    content-visibility: auto;
+    contain-intrinsic-size: 800px;
   }
   .section-tight {
     @apply py-16 lg:py-24;
+    content-visibility: auto;
+    contain-intrinsic-size: 500px;
   }
 
   /* Cards on white — subtle inset border + soft outer shadow */

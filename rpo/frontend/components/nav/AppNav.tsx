@@ -96,7 +96,7 @@ export function AppTopBar() {
   const pathname = usePathname();
 
   return (
-    <div className="sticky top-0 z-30 h-16 border-b border-line bg-white/85 backdrop-blur-xl">
+    <div className="sticky top-0 z-30 h-16 border-b border-line bg-white">
       <div className="h-full flex items-center justify-between px-5 lg:px-8">
         <div className="flex items-center gap-3">
           <Link href="/" className="lg:hidden">

@@ -10,7 +10,6 @@ export function Hero() {
       {/* Warm mesh gradient — the "wow" layer */}
       <div className="absolute inset-0 bg-mesh-warm opacity-90 pointer-events-none" />
       <div className="absolute inset-0 grid-bg pointer-events-none" />
-      <div className="absolute inset-0 paper-grain opacity-40 pointer-events-none" />
 
       {/* Floating 3D orbs */}
       <Sphere

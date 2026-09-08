@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { Logo } from "@/components/ui/Logo";
 import { LinkButton } from "@/components/ui/Button";
 import { ArrowRight, ChevronDown, Menu, X } from "@/components/ui/Icons";
-import { ConnectButton } from "@/components/wallet/ConnectButton";
 import { cn } from "@/lib/cn";
 
 type MenuItem = {
@@ -97,9 +96,9 @@ export function MarketingNav() {
     <div className="sticky top-0 z-50">
       <div
         className={cn(
-          "transition-all duration-300",
+          "transition-colors duration-200",
           scrolled
-            ? "bg-white/80 backdrop-blur-xl border-b border-line"
+            ? "bg-white/95 border-b border-line"
             : "bg-transparent border-b border-transparent"
         )}
       >
@@ -197,7 +196,13 @@ export function MarketingNav() {
           </div>
 
           <div className="hidden lg:flex items-center gap-2">
-            <ConnectButton size="sm" variant="secondary" label="Connect" />
+            <LinkButton
+              href="/docs"
+              variant="ghost"
+              size="sm"
+            >
+              Docs
+            </LinkButton>
             <LinkButton
               href="/app"
               variant="primary"
@@ -219,7 +224,7 @@ export function MarketingNav() {
       </div>
 
       {open && (
-        <div className="lg:hidden bg-white/95 backdrop-blur-xl border-b border-line max-h-[calc(100vh-4rem)] overflow-y-auto">
+        <div className="lg:hidden bg-white border-b border-line max-h-[calc(100vh-4rem)] overflow-y-auto">
           <div className="container-wide py-6 space-y-6">
             {MENUS.map((m) => (
               <div key={m.label}>
