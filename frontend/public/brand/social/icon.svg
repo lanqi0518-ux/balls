@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Balls">
+  <defs>
+    <!-- Deep navy card background matching site brand -->
+    <radialGradient id="bg" cx="0.35" cy="0.28" r="0.9">
+      <stop offset="0%"   stop-color="#122340"/>
+      <stop offset="60%"  stop-color="#0A1628"/>
+      <stop offset="100%" stop-color="#050B15"/>
+    </radialGradient>
+
+    <!-- 3D red ball body -->
+    <radialGradient id="body" cx="0.35" cy="0.28" r="0.78">
+      <stop offset="0%"   stop-color="#ff9098"/>
+      <stop offset="40%"  stop-color="#ef3247"/>
+      <stop offset="80%"  stop-color="#b8102a"/>
+      <stop offset="100%" stop-color="#7c0a1c"/>
+    </radialGradient>
+
+    <!-- Glossy specular highlight -->
+    <radialGradient id="shine" cx="0.35" cy="0.30" r="0.22">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="55%"  stop-color="#ffffff" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Ambient red halo -->
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="55%"  stop-color="#e31937" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#e31937" stop-opacity="0.55"/>
+    </radialGradient>
+
+    <!-- Inner rim shading for depth -->
+    <radialGradient id="rim" cx="0.5" cy="0.55" r="0.5">
+      <stop offset="80%"  stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.4"/>
+    </radialGradient>
+
+    <!-- Drop shadow -->
+    <filter id="drop" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="18"/>
+      <feOffset dy="20"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.7"/></feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background canvas -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- Ambient halo (bleeds slightly past ball) -->
+  <circle cx="512" cy="512" r="440" fill="url(#halo)"/>
+
+  <!-- The ball itself, filling ~78% of the canvas so a Twitter circle crop still fits it comfortably -->
+  <g filter="url(#drop)">
+    <circle cx="512" cy="512" r="400" fill="url(#body)"/>
+    <circle cx="512" cy="512" r="400" fill="url(#rim)"/>
+  </g>
+
+  <!-- Glossy top-left highlight -->
+  <ellipse cx="392" cy="388" rx="130" ry="85" fill="url(#shine)"/>
+
+  <!-- White "B" glyph (drawn as paths so it renders identically everywhere) -->
+  <path fill="#ffffff" fill-rule="evenodd" transform="translate(512 512) scale(9) translate(-64 -64)" d="
+    M 42 34
+    H 68
+    C 80 34 88 41 88 50
+    C 88 58 83 62 78 63
+    C 84 64 90 69 90 78
+    C 90 87 82 94 68 94
+    H 42
+    Z
+    M 54 46
+    V 58
+    H 66
+    C 70 58 74 56 74 52
+    C 74 48 70 46 66 46
+    Z
+    M 54 68
+    V 82
+    H 66
+    C 71 82 76 80 76 75
+    C 76 70 71 68 66 68
+    Z
+  "/>
+</svg>

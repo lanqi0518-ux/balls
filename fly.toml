@@ -1,0 +1,52 @@
+# Fly.io app config — single-container deployment of the Balls frontend and
+# backend. Region defaults to `ord` (US central); add more with:
+#   fly scale count 2 --region ord,nrt
+# The scheduler is single-writer (in-memory state, once-per-70s draw) so keep
+# to ONE machine unless you also introduce a Redis-backed lock.
+
+app = "balls-lanqi"
+primary_region = "ord"
+kill_signal = "SIGINT"
+kill_timeout = "15s"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8080"
+  # Everything else — RPC_URL, TOKEN_ADDRESS, TAX_RECEIVER_PRIVATE_KEY,
+  # ADMIN_TOKEN, ALLOWED_ORIGINS — must come from `fly secrets set` so they
+  # never end up in the image or repo.
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false          # SSE cannot survive suspension
+  auto_start_machines = true
+  min_machines_running = 1            # In-memory scheduler must stay warm
+  processes = ["app"]
+
+  # Long-lived SSE connections. Fly's default 60s idle timeout would drop
+  # subscribers between draws.
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 2000
+    soft_limit = 1500
+
+# HTTP-level health check hitting the /health endpoint the backend already
+# exposes. Grace period covers cold RPC lookups on boot.
+[[http_service.checks]]
+  grace_period = "30s"
+  interval = "15s"
+  method = "GET"
+  timeout = "5s"
+  path = "/health"
+
+# One shared-cpu-2x / 2 GB machine is enough for ~5k concurrent SSE clients.
+# For more, scale memory first (`fly scale memory 4096`) then add regions.
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2gb"
+  cpu_kind = "shared"
+  cpus = 2

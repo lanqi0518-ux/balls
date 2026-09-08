@@ -1,0 +1,41 @@
+# VCS / editor
+.git
+.gitignore
+.gitattributes
+.vscode
+.idea
+*.log
+
+# CI / docs / meta
+.github
+docs
+README.md
+CHANGELOG.md
+LICENSE
+
+# Node dependency trees — reinstalled inside the image
+**/node_modules
+
+# Build artifacts — regenerated inside the image
+**/dist
+**/build
+
+# frontend/public is intentionally NOT excluded — Vite copies it into
+# dist/ during `npm run build`, so it must be present in the Docker
+# build context. Excluding it (even with a `!logo*` re-include) drops
+# the whole tree, and favicon.svg / logo.svg ship as 404s.
+
+# Contract toolchain — not needed at runtime
+contracts
+foundry.toml
+
+# Local secrets / env — pass them via `fly secrets set` instead
+.env
+.env.*
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+
+# Test outputs
+coverage
+.nyc_output

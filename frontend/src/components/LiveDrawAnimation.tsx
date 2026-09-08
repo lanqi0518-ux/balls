@@ -19,6 +19,10 @@ interface Props {
   onClose: () => void
 }
 
+// Draws run about once a minute, so the overlay has to get out of the way on
+// its own. It used to stay up until the user clicked Close, covering the page.
+const AUTO_CLOSE_MS = 12000
+
 export function LiveDrawAnimation({ isVisible, result, onClose }: Props) {
   const [phase, setPhase] = useState<'spinning' | 'reveal' | 'winners'>('spinning')
   const [displayNumber, setDisplayNumber] = useState(1)
@@ -29,130 +33,159 @@ export function LiveDrawAnimation({ isVisible, result, onClose }: Props) {
       return
     }
 
-    // Spinning animation
+    const timeouts: ReturnType<typeof setTimeout>[] = []
+
     let count = 0
     const spinInterval = setInterval(() => {
       setDisplayNumber(Math.floor(Math.random() * 50) + 1)
       count++
-      if (count > 15) {
+      if (count > 18) {
         clearInterval(spinInterval)
         setPhase('reveal')
         setDisplayNumber(result.winningNumber)
-        
-        // Show winners after 1.5s
-        setTimeout(() => {
-          setPhase('winners')
-        }, 1500)
+
+        timeouts.push(
+          setTimeout(() => {
+            setPhase('winners')
+          }, 1600),
+        )
       }
-    }, 100)
+    }, 90)
+
+    timeouts.push(setTimeout(onClose, AUTO_CLOSE_MS))
 
     return () => {
       clearInterval(spinInterval)
+      timeouts.forEach(clearTimeout)
     }
-  }, [isVisible, result.winningNumber])
+  }, [isVisible, result.winningNumber, onClose])
 
   if (!isVisible) return null
 
+  const hasWinners = result.winnersCount > 0
+  const spinning = phase === 'spinning'
+
   return (
-    <div className="draw-animation-overlay" onClick={onClose}>
-      <div 
-        className="text-center max-w-lg mx-4 md:mx-auto p-5 md:p-8"
-        onClick={(e) => e.stopPropagation()}
-        style={{ background: 'var(--bg-card)', borderRadius: '20px' }}
-      >
-        <p className="text-[var(--text-muted)] text-xs md:text-sm uppercase tracking-wider mb-1 md:mb-2">
-          Draw #{result.drawId}
-        </p>
-        
-        <p className="text-white text-base md:text-lg mb-4 md:mb-6">Winning Number</p>
-        
-        {/* Big Ball */}
-        <div className={`draw-ball mx-auto ${phase === 'spinning' ? 'animate-pulse' : ''}`}>
-          {displayNumber}
-        </div>
-        
-        {/* Winners Info */}
-        {phase !== 'spinning' && (
-          <div className="mt-5 md:mt-8">
-            {result.winnersCount > 0 ? (
-              <div className="flex justify-center gap-6 md:gap-8 mb-4 md:mb-6">
-                <div className="text-center">
-                  <div className="text-2xl md:text-3xl font-bold" style={{ color: 'var(--green-primary)' }}>
-                    {result.winnersCount}
-                  </div>
-                  <div className="text-xs md:text-sm text-[var(--text-muted)]">Winners</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl md:text-3xl font-bold" style={{ color: 'var(--green-primary)' }}>
-                    {Number(result.prizePool).toFixed(4)} ETH
-                  </div>
-                  <div className="text-xs md:text-sm text-[var(--text-muted)]">Prize Pool</div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center mb-4 md:mb-6">
-                <div className="text-3xl md:text-4xl mb-2">🎰</div>
-                <div className="text-xl md:text-2xl font-bold" style={{ color: 'var(--yellow)' }}>
-                  JACKPOT ROLLOVER!
-                </div>
-                <div className="text-xs md:text-sm text-[var(--text-muted)] mt-2">
-                  No winners - Prize accumulates to next draw
-                </div>
-                <div className="text-lg md:text-xl font-bold mt-3 md:mt-4" style={{ color: 'var(--green-primary)' }}>
-                  {Number(result.prizePool).toFixed(4)} ETH + Next Round
-                </div>
-              </div>
-            )}
-            
-            {/* Winner Details */}
-            {phase === 'winners' && result.winners && result.winners.length > 0 && (
-              <div 
-                className="mt-4 md:mt-6 p-3 md:p-4 rounded-xl text-left max-h-48 md:max-h-60 overflow-y-auto"
-                style={{ background: 'var(--bg-dark)' }}
-              >
-                <p className="text-[10px] md:text-xs text-[var(--text-muted)] uppercase tracking-wider mb-2 md:mb-3">
-                  Distribution by Holding Ratio
-                </p>
-                
-                <div className="space-y-2 md:space-y-3">
-                  {result.winners.map((winner, idx) => (
-                    <div 
-                      key={idx}
-                      className="flex items-center justify-between p-2 md:p-3 rounded-lg"
-                      style={{ background: 'var(--bg-card)' }}
-                    >
-                      <div>
-                        <div className="font-mono text-xs md:text-sm text-white">
-                          {winner.address.slice(0, 6)}...{winner.address.slice(-4)}
-                        </div>
-                        <div className="text-[10px] md:text-xs text-[var(--text-muted)]">
-                          {Number(winner.balance).toLocaleString(undefined, { maximumFractionDigits: 0 })} BALLS
-                        </div>
-                      </div>
-                      
-                      <div className="text-right">
-                        <div className="text-sm md:text-base font-bold" style={{ color: 'var(--green-primary)' }}>
-                          +{Number(winner.prize).toFixed(4)} ETH
-                        </div>
-                        <div className="text-[10px] md:text-xs" style={{ color: 'var(--purple)' }}>
-                          {winner.sharePercent.toFixed(1)}%
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-          </div>
-        )}
-        
-        <button 
+    <div
+      className="draw-animation-overlay"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Draw ${result.drawId} result`}
+    >
+      <div className="draw-modal" onClick={e => e.stopPropagation()}>
+        <button
+          type="button"
+          className="draw-modal-close"
           onClick={onClose}
-          className="mt-8 btn btn-primary"
+          aria-label="Close"
         >
-          Close
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
         </button>
+
+        <div className="text-center">
+          <div className="jackpot-label" style={{ color: 'var(--text-muted)' }}>
+            Draw #{result.drawId}
+          </div>
+          <div className="text-white text-base md:text-lg font-semibold mb-6 mt-1">
+            Winning Number
+          </div>
+
+          <div className="flex justify-center">
+            <div
+              className={`ball ball-xl ${spinning ? '' : 'ball-winning'}`}
+              style={spinning ? undefined : { animation: 'ball-drop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both' }}
+            >
+              {displayNumber}
+            </div>
+          </div>
+
+          {!spinning && (
+            <div className="mt-8">
+              {hasWinners ? (
+                <div className="grid grid-cols-2 gap-6 max-w-sm mx-auto">
+                  <div className="text-center">
+                    <div className="stat-value text-green">
+                      {result.winnersCount}
+                    </div>
+                    <div className="stat-label">Winners</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="stat-value text-gold">
+                      {Number(result.prizePool).toFixed(4)}
+                    </div>
+                    <div className="stat-label">ETH Prize</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <div className="text-4xl mb-2">🎰</div>
+                  <div className="display text-2xl md:text-3xl text-gold">
+                    JACKPOT ROLLS OVER
+                  </div>
+                  <p className="text-xs md:text-sm text-[var(--text-muted)] mt-2">
+                    No holders matched. Prize accumulates to the next draw.
+                  </p>
+                  <div className="mt-4 text-lg md:text-xl display text-green">
+                    +{Number(result.prizePool).toFixed(4)} ETH
+                  </div>
+                </div>
+              )}
+
+              {phase === 'winners' && result.winners && result.winners.length > 0 && (
+                <div
+                  className="mt-6 rounded-xl p-3 text-left max-h-52 overflow-y-auto border border-[var(--border)]"
+                  style={{ background: 'rgba(0, 0, 0, 0.35)' }}
+                >
+                  <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] font-semibold mb-3 px-1">
+                    Distribution by holding ratio
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    {result.winners.map((winner, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-2 md:p-3 rounded-lg"
+                        style={{ background: 'var(--bg-card)' }}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="mono text-xs md:text-sm truncate">
+                            {winner.address.slice(0, 6)}…{winner.address.slice(-4)}
+                          </div>
+                          <div className="text-[10px] text-[var(--text-muted)] mono">
+                            {Number(winner.balance).toLocaleString(undefined, {
+                              maximumFractionDigits: 0,
+                            })}{' '}
+                            BALLS
+                          </div>
+                        </div>
+
+                        <div className="text-right ml-3 flex-shrink-0">
+                          <div className="text-sm md:text-base font-bold text-gold display">
+                            +{Number(winner.prize).toFixed(4)}
+                          </div>
+                          <div className="text-[10px] text-[var(--purple)] font-semibold">
+                            {winner.sharePercent.toFixed(1)}% share
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Auto-close indicator */}
+          <div className="draw-progress mt-6" aria-hidden>
+            <div
+              className="draw-progress-fill"
+              style={{ animationDuration: `${AUTO_CLOSE_MS}ms` }}
+            />
+          </div>
+        </div>
       </div>
     </div>
   )

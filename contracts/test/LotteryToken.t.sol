@@ -50,6 +50,21 @@ contract LotteryTokenTest is Test {
         assertEq(number1, token.getNumber(user1));
     }
     
+    /// @dev _update 只在 lotteryContract 已设置时收税，而且是静默跳过的。
+    ///      如果允许先放开交易，这段时间里的买卖全部免税，奖池一分钱拿不到。
+    function testTradingCannotOpenBeforeLotteryIsSet() public {
+        vm.startPrank(owner);
+        LotteryToken fresh = new LotteryToken("T", "T", teamWallet);
+
+        vm.expectRevert("Set lottery contract first");
+        fresh.enableTrading();
+
+        fresh.setLotteryContract(address(lottery));
+        fresh.enableTrading();
+        assertTrue(fresh.tradingEnabled());
+        vm.stopPrank();
+    }
+
     function testTaxOnTransfer() public {
         vm.startPrank(owner);
         
@@ -97,6 +112,59 @@ contract LotteryTokenTest is Test {
         assertTrue(token.isHolder(user2));
     }
     
+    /// @dev 卖光代币会把地址从它的号码分组里移除。这个删除曾经是线性扫描整个
+    ///      分组，而号码只有 50 个，所以持币者一多，普通的一次卖出就会因为
+    ///      gas 超限而失败，代币会变得无法转账。
+    function testSellCostDoesNotGrowWithNumberGroupSize() public {
+        uint256 stateId = vm.snapshotState();
+        uint256 gasInSmallGroup = _measureSellGas(5);
+
+        vm.revertToState(stateId);
+        uint256 gasInLargeGroup = _measureSellGas(60);
+
+        // 线性扫描下，多出的 55 个成员每个都要多读一次 storage（冷读 2100 gas），
+        // 差值会有十万量级；按位置直接删除时两者几乎相同。
+        assertApproxEqAbs(
+            gasInLargeGroup,
+            gasInSmallGroup,
+            5_000,
+            "removal cost scales with group size"
+        );
+    }
+
+    /// @dev 让 user1 所在的号码分组有 fillerCount 个其它成员，然后测量他卖光的 gas。
+    ///      user1 最后才加入，因此位于数组末尾，也就是线性扫描的最坏位置。
+    function _measureSellGas(uint256 fillerCount) internal returns (uint256) {
+        uint8 targetNumber = token.getNumber(user1);
+
+        uint256 added;
+        for (uint160 i = 1000; added < fillerCount && i < 20000; i++) {
+            address filler = address(i);
+            if (token.getNumber(filler) == targetNumber && !token.isHolder(filler)) {
+                vm.prank(owner);
+                token.transfer(filler, 1_000 * 10**18);
+                added++;
+            }
+        }
+        assertEq(added, fillerCount, "failed to fill the number group");
+
+        vm.prank(owner);
+        token.transfer(user1, 1_000 * 10**18);
+        assertEq(token.getHoldersCountByNumber(targetNumber), fillerCount + 1);
+
+        uint256 balance = token.balanceOf(user1);
+
+        vm.prank(user1);
+        uint256 gasBefore = gasleft();
+        token.transfer(user2, balance);
+        uint256 gasUsed = gasBefore - gasleft();
+
+        assertFalse(token.isHolder(user1));
+        assertEq(token.getHoldersCountByNumber(targetNumber), fillerCount);
+
+        return gasUsed;
+    }
+
     function testNumberMapping() public {
         vm.startPrank(owner);
         
@@ -151,6 +219,27 @@ contract PowerballLotteryTest is Test {
         // 产生一些交易税
         vm.prank(user1);
         token.transfer(user2, 10_000 * 10**18);
+    }
+
+    /// @dev 给 1-50 每个号码都安排一个持币者，这样开奖必定命中，
+    ///      测试才不会依赖随机号码碰巧落在少数几个持币者身上。
+    function _seedHolderForEveryNumber() internal {
+        bool[51] memory covered;
+        uint256 found;
+
+        for (uint160 i = 1000; found < 50 && i < 10000; i++) {
+            address holder = address(i);
+            uint8 number = token.getNumber(holder);
+
+            if (!covered[number]) {
+                covered[number] = true;
+                found++;
+                vm.prank(owner);
+                token.transfer(holder, 1_000 * 10**18);
+            }
+        }
+
+        assertEq(found, 50, "failed to cover all 50 numbers");
     }
     
     function testCanDrawAfterInterval() public {
@@ -239,5 +328,104 @@ contract PowerballLotteryTest is Test {
         assertEq(totalDraws, 0);
         assertTrue(currentPool > 0);
         assertTrue(holders > 0);
+    }
+
+    /// @dev 奖池曾经直接取合约余额，而余额里含有已承诺但未领取的奖金，
+    ///      于是每一轮都把同一笔钱重新发一遍，承诺总额最终超过实际持有量。
+    function testUnclaimedPrizesAreNotRedistributed() public {
+        _seedHolderForEveryNumber();
+
+        for (uint256 round = 0; round < 5; round++) {
+            vm.warp(block.timestamp + 61);
+            vm.roll(block.number + 1);
+            lottery.draw();
+
+            // 合约必须始终留得出所有已承诺的奖金
+            assertGe(
+                token.balanceOf(address(lottery)),
+                lottery.totalPendingPrizes(),
+                "contract cannot cover the prizes it promised"
+            );
+
+            // 可分配奖池不含已承诺部分
+            assertEq(
+                lottery.getCurrentPrizePool(),
+                token.balanceOf(address(lottery)) - lottery.totalPendingPrizes()
+            );
+        }
+
+        assertTrue(lottery.totalPendingPrizes() > 0, "expected at least one winner in 5 rounds");
+    }
+
+    /// @dev 每一位中奖者都必须真的能把奖金领走
+    function testEveryWinnerCanClaim() public {
+        address[] memory candidates = new address[](3);
+        candidates[0] = owner;
+        candidates[1] = user1;
+        candidates[2] = user2;
+
+        for (uint256 round = 0; round < 5; round++) {
+            vm.warp(block.timestamp + 61);
+            vm.roll(block.number + 1);
+            lottery.draw();
+        }
+
+        for (uint256 i = 0; i < candidates.length; i++) {
+            uint256 pending = lottery.getPendingPrize(candidates[i]);
+            if (pending == 0) continue;
+
+            uint256 before = token.balanceOf(candidates[i]);
+            vm.prank(candidates[i]);
+            lottery.claimPrize();
+
+            assertEq(token.balanceOf(candidates[i]) - before, pending);
+            assertEq(lottery.getPendingPrize(candidates[i]), 0);
+        }
+
+        assertEq(lottery.totalPendingPrizes(), 0);
+    }
+
+    function testEmergencyWithdrawCannotStrandPrizes() public {
+        _seedHolderForEveryNumber();
+
+        vm.warp(block.timestamp + 61);
+        vm.roll(block.number + 1);
+        lottery.draw();
+
+        uint256 pending = lottery.totalPendingPrizes();
+        assertTrue(pending > 0, "expected a winner");
+
+        uint256 balance = token.balanceOf(address(lottery));
+
+        vm.prank(owner);
+        vm.expectRevert("Would strand unclaimed prizes");
+        lottery.emergencyWithdraw(address(token), balance);
+
+        // 只提取未被承诺的部分是允许的
+        vm.prank(owner);
+        lottery.emergencyWithdraw(address(token), balance - pending);
+
+        assertEq(token.balanceOf(address(lottery)), pending);
+    }
+
+    /// @dev 开奖者能拿到 1% 奖励，所以中奖号码不能依赖调用者可选的输入
+    function testWinningNumberDoesNotDependOnCaller() public {
+        uint256 snapshotId = vm.snapshotState();
+
+        vm.warp(block.timestamp + 61);
+        vm.roll(block.number + 1);
+        vm.prank(address(0xA11CE));
+        lottery.draw();
+        uint8 numberFromAlice = lottery.getDrawInfo(1).winningNumber;
+
+        vm.revertToState(snapshotId);
+
+        vm.warp(block.timestamp + 61);
+        vm.roll(block.number + 1);
+        vm.prank(address(0xB0B));
+        lottery.draw();
+        uint8 numberFromBob = lottery.getDrawInfo(1).winningNumber;
+
+        assertEq(numberFromAlice, numberFromBob);
     }
 }

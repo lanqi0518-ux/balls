@@ -1,31 +1,82 @@
-<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Balls">
   <defs>
-    <radialGradient id="ballGradient" cx="30%" cy="30%" r="70%">
-      <stop offset="0%" style="stop-color:#00FF00"/>
-      <stop offset="50%" style="stop-color:#00C805"/>
-      <stop offset="100%" style="stop-color:#008000"/>
+    <!-- 3D red-ball body: matches .ball-winning in index.css -->
+    <radialGradient id="body" cx="0.35" cy="0.28" r="0.78">
+      <stop offset="0%"   stop-color="#ff9098"/>
+      <stop offset="40%"  stop-color="#ef3247"/>
+      <stop offset="80%"  stop-color="#b8102a"/>
+      <stop offset="100%" stop-color="#7c0a1c"/>
     </radialGradient>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+
+    <!-- Glossy top-left highlight -->
+    <radialGradient id="shine" cx="0.35" cy="0.30" r="0.22">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="55%"  stop-color="#ffffff" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Soft outer red halo so the ball reads on dark backgrounds -->
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="72%"  stop-color="#e31937" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#e31937" stop-opacity="0.45"/>
+    </radialGradient>
+
+    <!-- Inner rim shading for extra depth -->
+    <radialGradient id="rim" cx="0.5" cy="0.55" r="0.5">
+      <stop offset="80%"  stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.35"/>
+    </radialGradient>
+
+    <!-- Drop shadow the ball is standing on -->
+    <filter id="drop" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dy="4"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.55"/></feComponentTransfer>
       <feMerge>
-        <feMergeNode in="coloredBlur"/>
+        <feMergeNode/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
-    <filter id="shadow">
-      <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#00C805" flood-opacity="0.6"/>
-    </filter>
   </defs>
-  
-  <!-- Outer glow -->
-  <circle cx="50" cy="50" r="45" fill="none" stroke="#00C805" stroke-width="1" opacity="0.3" filter="url(#glow)"/>
-  
-  <!-- Main ball -->
-  <circle cx="50" cy="50" r="42" fill="url(#ballGradient)" filter="url(#shadow)"/>
-  
-  <!-- Highlight -->
-  <ellipse cx="35" cy="35" rx="15" ry="10" fill="white" opacity="0.3"/>
-  
-  <!-- Letter B -->
-  <text x="50" y="65" font-family="Arial Black, sans-serif" font-size="45" font-weight="900" fill="white" text-anchor="middle" filter="url(#glow)">B</text>
+
+  <!-- Ambient glow around the ball -->
+  <circle cx="64" cy="64" r="62" fill="url(#halo)"/>
+
+  <!-- Ball body + shading, wrapped so the drop shadow applies to the whole ball -->
+  <g filter="url(#drop)">
+    <circle cx="64" cy="64" r="54" fill="url(#body)"/>
+    <circle cx="64" cy="64" r="54" fill="url(#rim)"/>
+  </g>
+
+  <!-- Specular highlight sits on top of the ball but behind the letter -->
+  <ellipse cx="47" cy="42" rx="17" ry="11" fill="url(#shine)"/>
+
+  <!--
+    Bold "B" as an SVG path so the mark renders identically everywhere
+    (favicon tabs, iOS home-screen icons, Linux browsers without
+    Microsoft fonts, etc.), independent of installed system fonts.
+    Even-odd fill rule punches the two loops so the ball shows through.
+  -->
+  <path fill="#ffffff" fill-rule="evenodd" d="
+    M 42 34
+    H 68
+    C 80 34 88 41 88 50
+    C 88 58 83 62 78 63
+    C 84 64 90 69 90 78
+    C 90 87 82 94 68 94
+    H 42
+    Z
+    M 54 46
+    V 58
+    H 66
+    C 70 58 74 56 74 52
+    C 74 48 70 46 66 46
+    Z
+    M 54 68
+    V 82
+    H 66
+    C 71 82 76 80 76 75
+    C 76 70 71 68 66 68
+    Z
+  "/>
 </svg>

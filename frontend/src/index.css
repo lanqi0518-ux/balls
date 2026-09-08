@@ -2,30 +2,52 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ================================
-   BALLS - Robinhood 风格
-   ================================ */
+/* ==========================================================================
+   BALLS — On-chain Powerball
+   Palette borrowed from Powerball's site (deep navy, red pop, gold jackpot)
+   while keeping Balls' green as the brand accent.
+   ========================================================================== */
 
 :root {
-  /* Robinhood 绿色 */
+  /* Backgrounds — deep navy for lottery authority */
+  --bg-base: #060F1F;
+  --bg-dark: #0A1628;
+  --bg-navy: #0F1E36;
+  --bg-card: #17253F;
+  --bg-elevated: #1E2E4A;
+  --bg-hover: #263B5C;
+
+  /* Brand green (Balls) */
   --green-primary: #00C805;
   --green-dark: #00A804;
-  --green-light: #D4FFDB;
-  
-  /* 背景色 */
-  --bg-dark: #1E2124;
-  --bg-card: #2A2D31;
-  --bg-hover: #3A3D41;
-  
-  /* 文字 */
+  --green-light: #7DFF80;
+  --green-glow: rgba(0, 200, 5, 0.45);
+
+  /* Powerball red — for excitement, alerts, the ball highlight */
+  --red-primary: #E31937;
+  --red-dark: #B01430;
+  --red-glow: rgba(227, 25, 55, 0.5);
+
+  /* Jackpot gold — money */
+  --gold: #FFD54A;
+  --gold-bright: #FFE87A;
+  --gold-dark: #E0A82E;
+  --gold-glow: rgba(255, 213, 74, 0.55);
+
+  /* Typography */
   --text-primary: #FFFFFF;
-  --text-secondary: #9CA3AF;
-  --text-muted: #6B7280;
-  
-  /* 其他颜色 */
-  --red: #FF5000;
+  --text-secondary: #B5C1D6;
+  --text-muted: #6E7C95;
+
+  /* Utility */
   --yellow: #FFCC00;
   --purple: #9945FF;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.12);
+
+  --font-display: 'Anton', 'Impact', 'Bebas Neue', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 * {
@@ -34,17 +56,30 @@
   box-sizing: border-box;
 }
 
+html,
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: var(--bg-dark);
+  overflow-x: hidden;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-base);
   color: var(--text-primary);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+
+  /* Subtle spotlight so the deep navy has some depth */
+  background-image:
+    radial-gradient(circle at 20% 0%, rgba(0, 200, 5, 0.08), transparent 40%),
+    radial-gradient(circle at 80% 20%, rgba(227, 25, 55, 0.06), transparent 45%),
+    radial-gradient(circle at 50% 100%, rgba(255, 213, 74, 0.05), transparent 55%);
+  background-attachment: fixed;
 }
 
-/* ================================
-   布局
-   ================================ */
+/* ==========================================================================
+   Layout
+   ========================================================================== */
 
 .container {
   max-width: 1200px;
@@ -52,66 +87,113 @@ body {
   padding: 0 24px;
 }
 
-/* ================================
-   卡片 - Robinhood 风格
-   ================================ */
-
-.card {
-  background: var(--bg-card);
-  border-radius: 12px;
-  padding: 24px;
-  transition: background-color 0.2s ease;
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
-.card:hover {
-  background: var(--bg-hover);
+.section-header::before {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 20px;
+  background: var(--red-primary);
+  border-radius: 2px;
+  box-shadow: 0 0 12px var(--red-glow);
+}
+
+.section-header h3 {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   Cards
+   ========================================================================== */
+
+.card {
+  background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-navy) 100%);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.card-hover:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+}
+
+.card-elevated {
+  background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-card) 100%);
+  border-color: var(--border-strong);
 }
 
 .card-highlight {
-  background: linear-gradient(135deg, rgba(0, 200, 5, 0.1), rgba(0, 200, 5, 0.05));
-  border: 1px solid rgba(0, 200, 5, 0.2);
+  background: linear-gradient(135deg, rgba(0, 200, 5, 0.14), rgba(0, 200, 5, 0.03));
+  border-color: rgba(0, 200, 5, 0.28);
 }
 
-/* ================================
-   按钮
-   ================================ */
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
 
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
+  gap: 8px;
+  padding: 12px 22px;
+  border-radius: 10px;
+  font-weight: 700;
   font-size: 14px;
   cursor: pointer;
   transition: all 0.2s ease;
   border: none;
+  text-decoration: none;
+  letter-spacing: 0.02em;
 }
 
 .btn-primary {
-  background: var(--green-primary);
+  background: linear-gradient(180deg, var(--green-primary) 0%, var(--green-dark) 100%);
   color: #000;
+  box-shadow: 0 4px 16px rgba(0, 200, 5, 0.35);
 }
 
-.btn-primary:hover {
-  background: var(--green-dark);
+.btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 200, 5, 0.5);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .btn-secondary {
-  background: transparent;
-  color: var(--green-primary);
-  border: 1px solid var(--green-primary);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
 }
 
 .btn-secondary:hover {
-  background: rgba(0, 200, 5, 0.1);
+  background: rgba(255, 255, 255, 0.12);
 }
 
-/* ================================
-   彩球
-   ================================ */
+.btn-red {
+  background: linear-gradient(180deg, var(--red-primary) 0%, var(--red-dark) 100%);
+  color: #fff;
+  box-shadow: 0 4px 16px var(--red-glow);
+}
+
+/* ==========================================================================
+   Lottery balls — 3D white ball with red winning variant
+   ========================================================================== */
 
 .ball {
   width: 56px;
@@ -120,74 +202,221 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 20px;
-  color: #000;
-  background: linear-gradient(180deg, #FFFFFF 0%, #E5E7EB 100%);
-  box-shadow: 
-    0 4px 12px rgba(0, 0, 0, 0.3),
-    inset 0 2px 4px rgba(255, 255, 255, 0.5);
-  transition: all 0.3s ease;
-}
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+  font-weight: 400;
+  font-size: 26px;
+  color: #0A1628;
 
-.ball-winning {
-  background: linear-gradient(180deg, var(--green-primary) 0%, var(--green-dark) 100%);
-  color: #000;
-  box-shadow: 
-    0 0 24px rgba(0, 200, 5, 0.45),
-    0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.ball-small {
-  width: 40px;
-  height: 40px;
-  font-size: 16px;
-}
-
-/* ================================
-   奖池
-   ================================ */
-
-.prize-pool {
-  text-align: center;
-  padding: 48px 24px;
-  background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-dark) 100%);
-  border-radius: 16px;
+  /* Glossy white sphere — radial gradient with an offset highlight */
+  background:
+    radial-gradient(circle at 32% 28%, #ffffff 0%, #f4f6fa 35%, #d5dae4 65%, #a9b2c2 100%);
+  box-shadow:
+    inset 0 -6px 12px rgba(0, 0, 0, 0.18),
+    inset 0 4px 6px rgba(255, 255, 255, 0.8),
+    0 6px 18px rgba(0, 0, 0, 0.45);
   position: relative;
-  overflow: hidden;
+  flex-shrink: 0;
 }
 
-.prize-pool::before {
+.ball::after {
+  /* Soft specular highlight */
   content: '';
   position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 200px;
+  top: 10%;
+  left: 18%;
+  width: 30%;
+  height: 22%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9), transparent 70%);
+  pointer-events: none;
+}
+
+/* Red powerball-style ball for the winning number */
+.ball-winning {
+  color: #fff;
+  background:
+    radial-gradient(circle at 32% 28%, #ff8590 0%, #ef3247 40%, #b8102a 80%, #7c0a1c 100%);
+  box-shadow:
+    inset 0 -6px 12px rgba(0, 0, 0, 0.35),
+    inset 0 4px 6px rgba(255, 255, 255, 0.35),
+    0 0 30px var(--red-glow),
+    0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+/* Gold jackpot ball */
+.ball-jackpot {
+  color: #3a2a05;
+  background:
+    radial-gradient(circle at 32% 28%, #fff8cc 0%, #ffd54a 40%, #d59a1a 80%, #8a6210 100%);
+  box-shadow:
+    inset 0 -6px 12px rgba(0, 0, 0, 0.25),
+    inset 0 4px 6px rgba(255, 255, 255, 0.5),
+    0 0 30px var(--gold-glow),
+    0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.ball-lg {
+  width: 88px;
+  height: 88px;
+  font-size: 40px;
+}
+
+.ball-xl {
+  width: 140px;
+  height: 140px;
+  font-size: 68px;
+}
+
+.ball-sm {
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+}
+
+/* Ball drop-in animation */
+@keyframes ball-drop {
+  0% {
+    transform: translateY(-40px) scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(6px) scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ball-enter {
+  animation: ball-drop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ==========================================================================
+   Jackpot hero — the whole point of the page
+   ========================================================================== */
+
+.jackpot-hero {
+  position: relative;
+  border-radius: 24px;
+  padding: 44px 32px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at top, rgba(255, 213, 74, 0.15) 0%, transparent 60%),
+    linear-gradient(180deg, #14243F 0%, #0A1628 100%);
+  border: 1px solid rgba(255, 213, 74, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.jackpot-hero::before,
+.jackpot-hero::after {
+  /* Corner accents inspired by Powerball's gold trim */
+  content: '';
+  position: absolute;
+  width: 60%;
   height: 3px;
-  background: var(--green-primary);
-  border-radius: 0 0 3px 3px;
+  background: linear-gradient(90deg, transparent, var(--gold) 50%, transparent);
+  opacity: 0.7;
 }
 
-.prize-amount {
-  font-size: 72px;
-  font-weight: 800;
-  color: var(--green-primary);
-  line-height: 1;
-  letter-spacing: -2px;
+.jackpot-hero::before {
+  top: 0;
+  left: 20%;
 }
 
-.prize-label {
-  font-size: 14px;
-  color: var(--text-muted);
+.jackpot-hero::after {
+  bottom: 0;
+  right: 20%;
+}
+
+.jackpot-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  color: var(--gold);
   text-transform: uppercase;
-  letter-spacing: 2px;
-  margin-bottom: 8px;
+  text-align: center;
+  margin-bottom: 12px;
 }
 
-/* ================================
-   倒计时
-   ================================ */
+.jackpot-amount {
+  font-family: var(--font-display);
+  font-size: clamp(56px, 12vw, 128px);
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  text-align: center;
+  color: var(--gold-bright);
+  text-shadow:
+    0 0 40px rgba(255, 213, 74, 0.55),
+    0 4px 20px rgba(0, 0, 0, 0.5);
+  animation: jackpot-pulse 3.6s ease-in-out infinite;
+}
+
+@keyframes jackpot-pulse {
+  0%, 100% {
+    text-shadow: 0 0 40px rgba(255, 213, 74, 0.5), 0 4px 20px rgba(0, 0, 0, 0.5);
+  }
+  50% {
+    text-shadow: 0 0 60px rgba(255, 213, 74, 0.85), 0 4px 20px rgba(0, 0, 0, 0.5);
+  }
+}
+
+.jackpot-subamount {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 18px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.jackpot-eth-price {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.jackpot-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.jackpot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.03em;
+}
+
+.jackpot-chip a {
+  color: var(--green-primary);
+  font-family: var(--font-mono);
+  text-decoration: none;
+}
+
+.jackpot-chip a:hover {
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   Countdown — flip-clock style tiles
+   ========================================================================== */
 
 .countdown {
   display: flex;
@@ -197,96 +426,68 @@ body {
 }
 
 .countdown-digit {
-  width: 64px;
-  height: 80px;
-  background: var(--bg-card);
-  border-radius: 12px;
+  width: 60px;
+  height: 78px;
+  background: linear-gradient(180deg, #22335A 0%, #0F1E36 100%);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 36px;
-  font-weight: 700;
-  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 44px;
+  color: #fff;
   position: relative;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
 }
 
 .countdown-digit::after {
+  /* Center seam like a physical split-flap tile */
   content: '';
   position: absolute;
   top: 50%;
-  left: 0;
-  right: 0;
+  left: 8%;
+  right: 8%;
   height: 1px;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.55);
 }
 
 .countdown-separator {
-  font-size: 36px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 40px;
   color: var(--text-muted);
 }
 
 .countdown-urgent .countdown-digit {
-  background: rgba(255, 80, 0, 0.2);
-  color: var(--red);
+  background: linear-gradient(180deg, #4a1421 0%, #2a0a13 100%);
+  color: var(--gold-bright);
+  border-color: rgba(227, 25, 55, 0.4);
+  box-shadow: 0 0 20px rgba(227, 25, 55, 0.35);
 }
 
-/* ================================
-   统计数字
-   ================================ */
+/* ==========================================================================
+   Statistics grid
+   ========================================================================== */
 
 .stat-value {
-  font-size: 32px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 40px;
+  line-height: 1;
   color: var(--text-primary);
 }
 
 .stat-label {
-  font-size: 13px;
+  font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.stat-change {
-  font-size: 13px;
+  letter-spacing: 0.15em;
+  margin-top: 6px;
   font-weight: 600;
 }
 
-.stat-change.positive {
-  color: var(--green-primary);
-}
-
-.stat-change.negative {
-  color: var(--red);
-}
-
-/* ================================
-   开奖历史
-   ================================ */
-
-.draw-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px;
-  border-radius: 8px;
-  transition: background 0.2s ease;
-  cursor: pointer;
-}
-
-.draw-item:hover {
-  background: var(--bg-hover);
-}
-
-.draw-item-new {
-  background: rgba(0, 200, 5, 0.1);
-  border: 1px solid rgba(0, 200, 5, 0.2);
-}
-
-/* ================================
-   号码网格
-   ================================ */
+/* ==========================================================================
+   Number distribution grid
+   ========================================================================== */
 
 .number-grid {
   display: grid;
@@ -299,51 +500,137 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-card);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--text-secondary);
-  transition: all 0.2s ease;
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--text-muted);
+  transition: all 0.15s ease;
   position: relative;
 }
 
 .number-cell.has-holders {
-  background: rgba(0, 200, 5, 0.1);
-  color: var(--green-primary);
-  border: 1px solid rgba(0, 200, 5, 0.3);
+  background: linear-gradient(180deg, rgba(0, 200, 5, 0.16), rgba(0, 200, 5, 0.04));
+  color: var(--green-light);
+  border-color: rgba(0, 200, 5, 0.35);
+}
+
+.number-cell.is-winning {
+  background: linear-gradient(180deg, rgba(227, 25, 55, 0.28), rgba(227, 25, 55, 0.08));
+  color: #fff;
+  border-color: rgba(227, 25, 55, 0.6);
+  box-shadow: 0 0 20px rgba(227, 25, 55, 0.3);
 }
 
 .number-cell .holder-count {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 18px;
-  height: 18px;
+  top: -6px;
+  right: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
   background: var(--green-primary);
-  border-radius: 50%;
+  border-radius: 999px;
+  font-family: var(--font-body);
   font-size: 10px;
   font-weight: 700;
   color: #000;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
 }
 
-/* ================================
-   实时指示器
-   ================================ */
+/* ==========================================================================
+   Recent winning numbers strip
+   ========================================================================== */
+
+.winning-strip {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  padding: 4px 0 12px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.winning-strip::-webkit-scrollbar {
+  height: 6px;
+}
+
+.winning-item {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 96px;
+}
+
+.winning-item-id {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-weight: 700;
+}
+
+.winning-item-prize {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--green-primary);
+  font-weight: 600;
+}
+
+.winning-item-time {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Draw history rows
+   ========================================================================== */
+
+.draw-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  transition: background 0.15s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.draw-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--border);
+}
+
+.draw-item-new {
+  background: linear-gradient(90deg, rgba(0, 200, 5, 0.08), transparent 60%);
+  border-color: rgba(0, 200, 5, 0.2);
+}
+
+/* ==========================================================================
+   Live indicator (pulsing dot)
+   ========================================================================== */
 
 .live-indicator {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  background: rgba(0, 200, 5, 0.1);
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
+  background: rgba(0, 200, 5, 0.12);
+  border: 1px solid rgba(0, 200, 5, 0.28);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
   color: var(--green-primary);
+  letter-spacing: 0.08em;
 }
 
 .live-dot {
@@ -351,42 +638,51 @@ body {
   height: 8px;
   background: var(--green-primary);
   border-radius: 50%;
-  animation: live-pulse 2.4s ease-in-out infinite;
+  box-shadow: 0 0 8px var(--green-glow);
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+.live-dot.offline {
+  background: var(--text-muted);
+  box-shadow: none;
+  animation: none;
 }
 
 @keyframes live-pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
+  50% { opacity: 0.35; }
 }
 
-/* ================================
-   输入框
-   ================================ */
+/* ==========================================================================
+   Forms
+   ========================================================================== */
 
 .input {
   width: 100%;
   padding: 12px 16px;
   background: var(--bg-dark);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
   color: var(--text-primary);
   font-size: 14px;
-  transition: all 0.2s ease;
+  font-family: var(--font-mono);
+  transition: all 0.15s ease;
 }
 
 .input:focus {
   outline: none;
   border-color: var(--green-primary);
-  box-shadow: 0 0 0 3px rgba(0, 200, 5, 0.1);
+  box-shadow: 0 0 0 3px rgba(0, 200, 5, 0.12);
 }
 
 .input::placeholder {
   color: var(--text-muted);
+  font-family: var(--font-body);
 }
 
-/* ================================
-   通知 Toast
-   ================================ */
+/* ==========================================================================
+   Toasts
+   ========================================================================== */
 
 .toast-container {
   position: fixed;
@@ -396,70 +692,157 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  pointer-events: none;
 }
 
 .toast {
-  background: var(--bg-card);
+  pointer-events: auto;
+  background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-card) 100%);
   border-radius: 12px;
-  padding: 16px 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  padding: 14px 18px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--border-strong);
   border-left: 3px solid var(--green-primary);
   animation: toast-in 0.3s ease;
+  min-width: 220px;
+  max-width: 320px;
+  font-weight: 600;
+  font-size: 13px;
 }
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translateX(100px); }
-  to { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: translateX(60px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
-/* ================================
-   开奖动画
-   ================================ */
+/* ==========================================================================
+   Draw animation overlay
+   ========================================================================== */
 
 .draw-animation-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.9);
+  background: radial-gradient(ellipse at center, rgba(10, 22, 40, 0.85) 0%, rgba(0, 0, 0, 0.96) 100%);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 200;
-  animation: fade-in 0.3s ease;
+  animation: overlay-in 0.3s ease;
+  padding: 16px;
 }
 
-@keyframes fade-in {
+@keyframes overlay-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-.draw-ball {
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
-  background: linear-gradient(180deg, var(--green-primary) 0%, var(--green-dark) 100%);
+.draw-modal {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  padding: 32px 28px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-card) 100%);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.6);
+  animation: modal-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.draw-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 72px;
-  font-weight: 800;
-  color: #000;
-  box-shadow: 
-    0 0 100px rgba(0, 200, 5, 0.5),
-    0 20px 60px rgba(0, 0, 0, 0.5);
-  animation: ball-spin 0.5s ease-out;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-@keyframes ball-spin {
-  from { transform: scale(0) rotate(-180deg); }
-  to { transform: scale(1) rotate(0); }
+.draw-modal-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
 }
 
-/* ================================
-   滚动条
-   ================================ */
+/* Auto-close progress bar */
+.draw-progress {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 16px;
+}
+
+.draw-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green-primary), var(--gold));
+  transform-origin: left;
+  animation: progress-drain linear forwards;
+}
+
+@keyframes progress-drain {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+/* ==========================================================================
+   Marquee ticker
+   ========================================================================== */
+
+.ticker {
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 0;
+}
+
+.ticker-track {
+  display: flex;
+  gap: 48px;
+  white-space: nowrap;
+  animation: ticker-scroll 40s linear infinite;
+}
+
+.ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.ticker-item strong {
+  color: var(--gold);
+  font-family: var(--font-body);
+  font-weight: 700;
+}
+
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* ==========================================================================
+   Scrollbars
+   ========================================================================== */
 
 ::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -475,197 +858,154 @@ body {
   background: var(--text-muted);
 }
 
-/* ================================
-   响应式 - 平板
-   ================================ */
+/* ==========================================================================
+   Utilities
+   ========================================================================== */
 
-@media (max-width: 1024px) {
-  .container {
-    padding: 0 16px;
-  }
-  
-  .prize-amount {
-    font-size: 56px;
-  }
+.mono {
+  font-family: var(--font-mono);
 }
 
-/* ================================
-   响应式 - 手机
-   ================================ */
+.display {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+
+.text-gold { color: var(--gold); }
+.text-red { color: var(--red-primary); }
+.text-green { color: var(--green-primary); }
+
+.divider-dashed {
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  .container { padding: 0 16px; }
+}
 
 @media (max-width: 768px) {
-  .container {
-    padding: 0 12px;
-  }
-  
-  /* 奖池金额 */
-  .prize-amount {
-    font-size: 42px;
-    letter-spacing: -1px;
-  }
-  
-  .prize-pool {
-    padding: 32px 16px;
-  }
-  
-  /* 倒计时 */
-  .countdown {
-    gap: 4px;
-  }
-  
+  .container { padding: 0 14px; }
+
+  .jackpot-hero { padding: 32px 20px; }
+  .jackpot-label { letter-spacing: 0.24em; }
+  .jackpot-subamount { font-size: 15px; }
+
+  .countdown { gap: 4px; }
   .countdown-digit {
     width: 44px;
-    height: 56px;
-    font-size: 22px;
+    height: 60px;
+    font-size: 30px;
     border-radius: 8px;
   }
-  
-  .countdown-separator {
-    font-size: 24px;
-  }
-  
-  /* 彩球 */
+  .countdown-separator { font-size: 28px; }
+
   .ball {
     width: 48px;
     height: 48px;
-    font-size: 18px;
+    font-size: 22px;
   }
-  
-  .ball-small {
+  .ball-lg {
+    width: 68px;
+    height: 68px;
+    font-size: 30px;
+  }
+  .ball-xl {
+    width: 108px;
+    height: 108px;
+    font-size: 52px;
+  }
+  .ball-sm {
     width: 36px;
     height: 36px;
-    font-size: 14px;
+    font-size: 16px;
   }
-  
-  /* 卡片 */
-  .card {
-    padding: 16px;
-    border-radius: 10px;
-  }
-  
-  /* 号码网格 */
+
+  .card { padding: 18px; border-radius: 14px; }
+  .section-header h3 { font-size: 11px; }
+
   .number-grid {
     grid-template-columns: repeat(5, 1fr);
     gap: 6px;
   }
-  
-  .number-cell {
-    font-size: 12px;
-  }
-  
+  .number-cell { font-size: 15px; }
   .number-cell .holder-count {
-    width: 14px;
-    height: 14px;
-    font-size: 8px;
-    top: -2px;
-    right: -2px;
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    font-size: 9px;
+    top: -4px;
+    right: -4px;
   }
-  
-  /* 统计数字 */
-  .stat-value {
-    font-size: 24px;
-  }
-  
-  .stat-label {
-    font-size: 11px;
-  }
-  
-  /* 开奖历史 */
+
+  .stat-value { font-size: 28px; }
+  .stat-label { font-size: 10px; }
+
   .draw-item {
-    padding: 12px;
-    flex-wrap: wrap;
+    grid-template-columns: auto 1fr auto;
     gap: 12px;
+    padding: 12px;
   }
-  
-  /* 开奖动画 */
-  .draw-ball {
-    width: 120px;
-    height: 120px;
-    font-size: 52px;
-  }
-  
-  /* 通知 */
+
   .toast-container {
     top: 12px;
     right: 12px;
     left: 12px;
   }
-  
-  .toast {
-    padding: 12px 16px;
-    font-size: 14px;
-  }
-  
-  /* 输入框 */
-  .input {
-    padding: 10px 14px;
-    font-size: 16px; /* Prevent zoom on iOS */
-  }
-  
-  /* 按钮 */
-  .btn {
-    padding: 10px 20px;
-    font-size: 14px;
-  }
-}
+  .toast { min-width: 0; max-width: none; }
 
-/* ================================
-   响应式 - 小手机
-   ================================ */
+  .input { padding: 10px 14px; font-size: 16px; }
+  .btn { padding: 10px 18px; font-size: 13px; }
+
+  .winning-item { min-width: 80px; }
+}
 
 @media (max-width: 480px) {
-  .prize-amount {
-    font-size: 36px;
-  }
-  
+  .jackpot-hero { padding: 28px 16px; }
+  .jackpot-amount { line-height: 0.9; }
+
   .countdown-digit {
     width: 38px;
-    height: 48px;
-    font-size: 18px;
+    height: 52px;
+    font-size: 24px;
   }
-  
-  .countdown-separator {
-    font-size: 20px;
-  }
-  
-  .draw-ball {
-    width: 100px;
-    height: 100px;
-    font-size: 44px;
-  }
-  
-  .number-grid {
-    grid-template-columns: repeat(5, 1fr);
-    gap: 4px;
-  }
-  
-  .number-cell {
-    font-size: 11px;
-    border-radius: 6px;
+  .countdown-separator { font-size: 22px; }
+
+  .ball-xl {
+    width: 96px;
+    height: 96px;
+    font-size: 46px;
   }
 }
 
-/* ================================
-   移动端专属样式
-   ================================ */
-
-/* 防止水平滚动 */
-html, body {
-  overflow-x: hidden;
+/* iOS safe area */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .container {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 
-/* 触摸友好的点击区域 */
+/* Prefer users' motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .jackpot-amount { animation: none; }
+  .ticker-track { animation: none; }
+}
+
+/* Touch-friendly hit targets on mobile */
 @media (max-width: 768px) {
   .draw-item,
   .btn,
   .number-cell {
     min-height: 44px;
-  }
-}
-
-/* iOS 安全区域 */
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-  .container {
-    padding-bottom: env(safe-area-inset-bottom);
   }
 }

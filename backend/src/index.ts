@@ -1,8 +1,21 @@
 import express from 'express';
 import cors from 'cors';
+import { isAddress } from 'ethers';
+import path from 'node:path';
+import fs from 'node:fs';
 import { config, validateConfig } from './config.js';
+import { requireAdmin } from './auth.js';
 import { HolderTracker } from './holder-tracker.js';
 import { AutoLottery } from './auto-lottery.js';
+
+// Path to the built frontend bundle. In the shipped Docker image the frontend
+// is compiled and copied to <cwd>/public. When developing locally against the
+// frontend dev server this directory may not exist yet — that's fine, we skip
+// mounting it and rely on Vite's dev server. Resolving off process.cwd() keeps
+// this working under both CommonJS and ESM builds.
+const FRONTEND_DIR = process.env.FRONTEND_DIR
+  ? path.resolve(process.env.FRONTEND_DIR)
+  : path.resolve(process.cwd(), 'public');
 
 async function main() {
   console.log('🎱 Balls Lottery - Automated Backend');
@@ -34,6 +47,12 @@ async function main() {
     broadcast('draw', result);
     broadcast('status', autoLottery.getStatus());
   };
+  // Whenever the wallet balance polling detects a change (new tax landed,
+  // draw drained the pool, operator top-up), push a fresh status frame so
+  // subscribed browsers update in near-real time.
+  autoLottery.onStatusChange = () => {
+    broadcast('status', autoLottery.getStatus());
+  };
   autoLottery.onSnapshot = (snapshot) => {
     broadcast('snapshot', snapshot);
     broadcast('status', autoLottery.getStatus());
@@ -41,18 +60,72 @@ async function main() {
   
   // Create Express app
   const app = express();
-  app.use(cors());
+
+  // Canonical-host redirect: when CANONICAL_HOST is set (e.g. "example.com"),
+  // 301 every request whose Host header differs from it to that host, so that
+  // www.example.com, bare IP hits, or the .fly.dev backdoor all funnel users
+  // to one URL. Fly's internal *.fly.dev hostname and local dev traffic stay
+  // exempt so healthchecks and localhost testing keep working.
+  const canonicalHost = (process.env.CANONICAL_HOST || '').toLowerCase().trim();
+  if (canonicalHost) {
+    console.log(`🌐 Canonical host: https://${canonicalHost} (other hosts will 301 here)`);
+    app.use((req, res, next) => {
+      // Never redirect the health probe — Fly hits it with the machine's
+      // private IPv6 as Host, which doesn't match any known-good exemption.
+      if (req.path === '/health') return next();
+
+      const rawHost = (req.headers.host || '').toLowerCase();
+      const host = rawHost.split(':')[0]; // drop :port
+      const isIpLiteral =
+        host.length === 0 ||
+        /^\d+\.\d+\.\d+\.\d+$/.test(host) ||           // IPv4
+        host.startsWith('[') ||                          // bracketed IPv6
+        host.includes(':') ||                            // raw IPv6
+        /^[0-9a-f]{4,}$/i.test(host.replace(/[.:]/g, '')); // hex-only
+
+      if (
+        isIpLiteral ||
+        host === canonicalHost ||
+        host === 'localhost' ||
+        host.startsWith('127.') ||
+        host.endsWith('.fly.dev') ||
+        host.endsWith('.internal')
+      ) {
+        return next();
+      }
+      return res.redirect(301, `https://${canonicalHost}${req.originalUrl}`);
+    });
+  }
+
+  app.use(cors(
+    config.allowedOrigins.length > 0 ? { origin: config.allowedOrigins } : {}
+  ));
   app.use(express.json());
-  
-  // ============ API Routes ============
-  
-  // Root
-  app.get('/', (_req, res) => {
-    res.json({ 
+
+  // Attach short-lived edge-cache hints to read-only GETs so a CDN sitting in
+  // front of us can absorb bursty traffic. SSE and mutating routes are left
+  // alone so they always hit the origin.
+  const CACHEABLE_GETS = new Set([
+    '/api/status',
+    '/api/draws',
+    '/api/distribution',
+    '/api/holders',
+    '/api/tracker/stats',
+  ]);
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && CACHEABLE_GETS.has(req.path)) {
+      res.setHeader('Cache-Control', 'public, max-age=5, s-maxage=5');
+    }
+    next();
+  });
+
+  // API landing page — kept behind /api so the SPA can own the root path.
+  app.get('/api', (_req, res) => {
+    res.json({
       name: 'Balls Lottery API',
       status: 'running',
       clients: sseClients.size,
-      endpoints: ['/health', '/api/status', '/api/draws', '/api/events']
+      endpoints: ['/health', '/api/status', '/api/draws', '/api/events'],
     });
   });
 
@@ -68,6 +141,9 @@ async function main() {
       eligible: status.stats.eligibleHolders,
       draws: status.totalDraws,
       hasEnoughForTransfers: status.hasEnoughForTransfers,
+      // False when some block ranges could not be read, meaning the holder
+      // list is missing anyone who only traded in those blocks
+      scanComplete: status.stats.scanComplete,
     });
   });
   
@@ -146,6 +222,11 @@ async function main() {
   // Get user info
   app.get('/api/user/:address', (req, res) => {
     const { address } = req.params;
+
+    if (!isAddress(address)) {
+      return res.status(400).json({ success: false, error: 'Invalid address' });
+    }
+
     res.json({
       success: true,
       data: autoLottery.getUserInfo(address),
@@ -178,6 +259,12 @@ async function main() {
   // Lookup number by address
   app.get('/api/number/:address', (req, res) => {
     const { address } = req.params;
+
+    // getNumber() hashes the address and throws on malformed input
+    if (!isAddress(address)) {
+      return res.status(400).json({ success: false, error: 'Invalid address' });
+    }
+
     const number = holderTracker.getNumber(address);
     res.json({
       success: true,
@@ -194,7 +281,7 @@ async function main() {
   });
   
   // Force rescan all holders
-  app.post('/api/tracker/rescan', async (_req, res) => {
+  app.post('/api/tracker/rescan', requireAdmin, async (_req, res) => {
     try {
       console.log('📡 Manual rescan requested via API');
       await holderTracker.rescan();
@@ -212,7 +299,7 @@ async function main() {
   });
   
   // Verify transfer configuration (admin only)
-  app.get('/api/admin/verify-config', async (_req, res) => {
+  app.get('/api/admin/verify-config', requireAdmin, async (_req, res) => {
     const status = autoLottery.getStatus();
     
     const verification = {
@@ -266,14 +353,57 @@ async function main() {
     });
   });
 
-  // Add address to exclusion list
-  app.post('/api/tracker/exclude', (req, res) => {
-    const { address } = req.body;
-    
-    if (!address || typeof address !== 'string') {
+  // Hot-swap to a freshly deployed token address WITHOUT a process restart.
+  // Called the moment the operator launches on Robinhood Chain — flips demo
+  // mode off, points the tracker at the new contract and kicks off history
+  // scan. Returns as soon as the swap is applied; scan continues in the bg.
+  app.post('/api/admin/launch', requireAdmin, async (req, res) => {
+    const { tokenAddress } = req.body || {};
+    if (!tokenAddress || typeof tokenAddress !== 'string' || !isAddress(tokenAddress)) {
       return res.status(400).json({
         success: false,
-        error: 'Address is required',
+        error: 'A valid tokenAddress is required',
+      });
+    }
+
+    try {
+      const started = Date.now();
+      await autoLottery.switchToLiveToken(tokenAddress);
+      const status = autoLottery.getStatus();
+
+      // Push the new status out to every open SSE connection so the frontend
+      // stops rendering demo numbers immediately (no F5 needed).
+      broadcast('status', status);
+
+      res.json({
+        success: true,
+        message: '🚀 Lottery is now LIVE on the provided token',
+        tokenAddress,
+        swapMs: Date.now() - started,
+        status: {
+          demoMode: status.demoMode,
+          tokenConfigured: status.tokenConfigured,
+          autoTransferEnabled: status.autoTransferEnabled,
+          holders: status.stats.totalHolders,
+          eligibleHolders: status.stats.eligibleHolders,
+          prizePool: status.prizePool,
+          ethBalance: status.ethBalance,
+        },
+      });
+    } catch (error: any) {
+      console.error('❌ /api/admin/launch failed:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Add address to exclusion list
+  app.post('/api/tracker/exclude', requireAdmin, (req, res) => {
+    const { address } = req.body;
+    
+    if (!address || typeof address !== 'string' || !isAddress(address)) {
+      return res.status(400).json({
+        success: false,
+        error: 'A valid address is required',
       });
     }
     
@@ -316,12 +446,58 @@ async function main() {
   });
   
   // Broadcast status every 10 seconds (draw/snapshot push immediately)
-  setInterval(() => {
+  const statusBroadcast = setInterval(() => {
     if (sseClients.size > 0) {
       broadcast('status', autoLottery.getStatus());
     }
   }, 10000);
-  
+
+  // Comment-only heartbeat. Proxies such as nginx and Cloudflare drop idle
+  // connections, and a draw can be a full interval away with nothing sent.
+  const heartbeat = setInterval(() => {
+    sseClients.forEach(client => {
+      try {
+        client.write(': ping\n\n');
+      } catch {
+        sseClients.delete(client);
+      }
+    });
+  }, 15000);
+
+  // Serve the built frontend from the same process, so a single container
+  // ships both. Registered LAST so every /api/* and /health route above wins.
+  //   - hashed asset filenames get a year of immutable caching
+  //   - index.html is served fresh so a new deploy is picked up on next load
+  //   - anything else that isn't a file (SPA routes) falls back to index.html
+  if (fs.existsSync(FRONTEND_DIR)) {
+    console.log(`📦 Serving frontend from ${FRONTEND_DIR}`);
+
+    app.use(
+      express.static(FRONTEND_DIR, {
+        index: false,
+        etag: true,
+        maxAge: 0,
+        setHeaders: (res, filePath) => {
+          if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          } else {
+            res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+          }
+        },
+      }),
+    );
+
+    const indexPath = path.join(FRONTEND_DIR, 'index.html');
+    app.get('*', (req, res, next) => {
+      if (req.method !== 'GET') return next();
+      if (req.path.startsWith('/api') || req.path.startsWith('/health')) return next();
+      res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+      res.sendFile(indexPath);
+    });
+  } else {
+    console.log(`ℹ️  No frontend build at ${FRONTEND_DIR} — API-only mode`);
+  }
+
   // Start server
   const port = config.port || 10000;
   app.listen(port, () => {
@@ -341,8 +517,12 @@ async function main() {
   // Graceful shutdown
   const shutdown = () => {
     console.log('\nShutting down...');
+    clearInterval(statusBroadcast);
+    clearInterval(heartbeat);
     autoLottery.stop();
     holderTracker.stop();
+    sseClients.forEach(client => client.end());
+    sseClients.clear();
     process.exit(0);
   };
   

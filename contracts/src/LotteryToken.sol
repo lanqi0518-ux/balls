@@ -36,6 +36,11 @@ contract LotteryToken is ERC20, Ownable, ReentrancyGuard {
     // 号码到持币者的映射 (1-50)
     mapping(uint8 => address[]) public numberToHolders;
     mapping(address => uint8) public holderNumber; // 缓存每个地址的号码
+    // 地址在 numberToHolders[number] 中的位置+1 (0表示不存在)。
+    // 没有它就只能线性扫描整个号码分组来删除，而删除发生在每一笔把余额
+    // 清零的转账里：号码只有50个，持币者一多，单次卖出就会超出gas上限，
+    // 代币会变得无法转账。
+    mapping(address => uint256) public numberArrayIndex;
     
     // 免税地址（如LP池、合约地址等）
     mapping(address => bool) public isExcludedFromTax;
@@ -120,6 +125,9 @@ contract LotteryToken is ERC20, Ownable, ReentrancyGuard {
      */
     function enableTrading() external onlyOwner {
         require(!tradingEnabled, "Trading already enabled");
+        // _update 只在 lotteryContract 已设置时才收税，而且是静默跳过。
+        // 若在设置之前就放开交易，这期间的所有买卖都不收税，奖池拿不到钱。
+        require(lotteryContract != address(0), "Set lottery contract first");
         tradingEnabled = true;
         emit TradingEnabled();
     }
@@ -159,6 +167,7 @@ contract LotteryToken is ERC20, Ownable, ReentrancyGuard {
             uint8 number = getNumber(holder);
             holderNumber[holder] = number;
             numberToHolders[number].push(holder);
+            numberArrayIndex[holder] = numberToHolders[number].length;
             
             emit HolderAdded(holder, number, block.timestamp);
         }
@@ -197,17 +206,24 @@ contract LotteryToken is ERC20, Ownable, ReentrancyGuard {
     }
     
     /**
-     * @dev 从号码映射中移除地址
+     * @dev 从号码映射中移除地址（O(1)，用尾元素填补空位）
      */
     function _removeFromNumberMapping(address holder, uint8 number) internal {
+        uint256 position = numberArrayIndex[holder];
+        if (position == 0) return;
+
         address[] storage holdersForNumber = numberToHolders[number];
-        for (uint256 i = 0; i < holdersForNumber.length; i++) {
-            if (holdersForNumber[i] == holder) {
-                holdersForNumber[i] = holdersForNumber[holdersForNumber.length - 1];
-                holdersForNumber.pop();
-                break;
-            }
+        uint256 index = position - 1;
+        uint256 lastIndex = holdersForNumber.length - 1;
+
+        if (index != lastIndex) {
+            address lastHolder = holdersForNumber[lastIndex];
+            holdersForNumber[index] = lastHolder;
+            numberArrayIndex[lastHolder] = index + 1;
         }
+
+        holdersForNumber.pop();
+        numberArrayIndex[holder] = 0;
     }
 
     // ============ 转账重写 ============
