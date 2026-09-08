@@ -147,7 +147,8 @@ export class AutoLottery {
 
   // Demo mode: fabricate holders, prize-pool growth and draws so the site
   // can be shown off without a deployed token contract.
-  private readonly demoMode = config.demoMode;
+  // Mutable — flipped off the instant the real token address is hot-swapped in.
+  private demoMode = config.demoMode;
   private demoHolders: Array<{ address: string; number: number; balance: bigint }> = [];
   // Seed with ~0.5 ETH so the first jackpot the site loads isn't zero
   private demoPoolWei = ethers.parseEther('0.5');
@@ -943,6 +944,39 @@ export class AutoLottery {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Live switch from demo mode to a real, freshly-deployed token. No process
+   * restart required — the next tick uses the real snapshot.
+   *
+   * Returns immediately; the tracker keeps scanning in the background.
+   */
+  async switchToLiveToken(newAddress: string): Promise<void> {
+    const addr = newAddress.trim();
+    console.log(`\n🚀 Switching auto-lottery to LIVE token → ${addr}`);
+
+    this.demoMode = false;
+    this.demoHolders = [];
+    this.demoPoolWei = 0n;
+
+    (config as { tokenAddress: string }).tokenAddress = addr;
+    this.tokenContract = new ethers.Contract(
+      addr,
+      ERC20_ABI,
+      this.taxReceiverWallet || this.provider
+    );
+
+    await this.holderTracker.setTokenAddress(addr);
+
+    // Force a fresh balance read so the SSE broadcast has the real ETH figure.
+    try {
+      await this.updateBalances();
+      this.statusCache = null;
+    } catch (e: any) {
+      console.warn('⚠️ Post-swap balance refresh failed:', e.message);
+    }
+    console.log('✅ Live mode active — next draw uses real holders.\n');
   }
 
   getStatus() {

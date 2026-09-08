@@ -353,6 +353,49 @@ async function main() {
     });
   });
 
+  // Hot-swap to a freshly deployed token address WITHOUT a process restart.
+  // Called the moment the operator launches on Robinhood Chain — flips demo
+  // mode off, points the tracker at the new contract and kicks off history
+  // scan. Returns as soon as the swap is applied; scan continues in the bg.
+  app.post('/api/admin/launch', requireAdmin, async (req, res) => {
+    const { tokenAddress } = req.body || {};
+    if (!tokenAddress || typeof tokenAddress !== 'string' || !isAddress(tokenAddress)) {
+      return res.status(400).json({
+        success: false,
+        error: 'A valid tokenAddress is required',
+      });
+    }
+
+    try {
+      const started = Date.now();
+      await autoLottery.switchToLiveToken(tokenAddress);
+      const status = autoLottery.getStatus();
+
+      // Push the new status out to every open SSE connection so the frontend
+      // stops rendering demo numbers immediately (no F5 needed).
+      broadcast('status', status);
+
+      res.json({
+        success: true,
+        message: '🚀 Lottery is now LIVE on the provided token',
+        tokenAddress,
+        swapMs: Date.now() - started,
+        status: {
+          demoMode: status.demoMode,
+          tokenConfigured: status.tokenConfigured,
+          autoTransferEnabled: status.autoTransferEnabled,
+          holders: status.stats.totalHolders,
+          eligibleHolders: status.stats.eligibleHolders,
+          prizePool: status.prizePool,
+          ethBalance: status.ethBalance,
+        },
+      });
+    } catch (error: any) {
+      console.error('❌ /api/admin/launch failed:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Add address to exclusion list
   app.post('/api/tracker/exclude', requireAdmin, (req, res) => {
     const { address } = req.body;

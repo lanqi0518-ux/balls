@@ -640,6 +640,64 @@ export class HolderTracker {
   }
 
   /**
+   * Live token-address swap. Point the tracker at a freshly-deployed token
+   * and start scanning immediately, without a process restart. Safe to call
+   * whether or not TOKEN_ADDRESS was set at boot.
+   *
+   * Returns as soon as scanning has been kicked off so the caller (an HTTP
+   * request) doesn't have to wait for the whole history walk to finish.
+   */
+  async setTokenAddress(newAddress: string): Promise<void> {
+    const addr = newAddress.trim();
+    console.log(`\n🔁 Hot-swap token address → ${addr}`);
+
+    // Tear down the previous listener/timers if any were attached.
+    if (this.tokenContract) {
+      try { this.tokenContract.removeAllListeners('Transfer'); } catch {}
+    }
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+      this.refreshInterval = null;
+    }
+    if (this.connectionCheckInterval) {
+      clearInterval(this.connectionCheckInterval);
+      this.connectionCheckInterval = null;
+    }
+
+    // Reset every piece of holder state.
+    this.holders.clear();
+    for (let i = 1; i <= 50; i++) this.numberToHolders.get(i)?.clear();
+    this.missedBlockRanges = [];
+    this.lastScannedBlock = 0;
+    this.scanProgress = 0;
+
+    // Rebuild the provider/contract binding.
+    if (!this.provider) {
+      this.provider = new ethers.JsonRpcProvider(config.rpcUrl);
+    }
+    const erc20Abi = [
+      'event Transfer(address indexed from, address indexed to, uint256 value)',
+      'function balanceOf(address) view returns (uint256)',
+    ];
+    this.tokenContract = new ethers.Contract(addr, erc20Abi, this.provider);
+    (config as { tokenAddress: string }).tokenAddress = addr;
+
+    // Fire scan + listener in the background. A freshly launched token has
+    // no history, so the historical scan finishes in one or two chunks.
+    this.isRunning = true;
+    (async () => {
+      try {
+        await this.scanAllTransfers();
+        this.startEventListener();
+        this.startPeriodicRefresh();
+        console.log(`✅ Tracker live on ${addr} — ${this.holders.size} holders`);
+      } catch (e: any) {
+        console.error('❌ Hot-swap scan failed:', e.message);
+      }
+    })();
+  }
+
+  /**
    * Get all holders
    */
   getAllHolders(): Array<{address: string; balance: bigint; number: number; firstSeen: number}> {
