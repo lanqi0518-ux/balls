@@ -10,19 +10,28 @@ export const config = {
   tokenAddress: process.env.TOKEN_ADDRESS || '',
   lotteryAddress: process.env.LOTTERY_ADDRESS || '',
   
-  // Prize pool wallet — receives the 3% lottery tax.
-  // 100% of this wallet (minus 0.05 ETH gas) goes to winners.
-  taxReceiverWallet: process.env.TAX_RECEIVER_WALLET || '0xfaF2deaF29C4A0bb086195c675eA37d4820E0598',
+  // Tax collection wallet — the token contract sends BOTH the 3% lottery
+  // tax and the 1% team tax to this address, so the balance represents the
+  // full 4% share of trading volume. The backend splits it in software:
+  //   * `prizePoolBps` (default 7500 = 75%) is the prize pool paid to winners
+  //   * The remaining 25% is the team fee (stays in the wallet unless a
+  //     separate `devWallet` is configured with a signer)
+  taxReceiverWallet: process.env.TAX_RECEIVER_WALLET || '0x4E91fc43e0a9BFBaf98D063eEf393Fe74211E624',
   taxReceiverPrivateKey: process.env.TAX_RECEIVER_PRIVATE_KEY || '',
-  
-  // Publisher automatically receives 1%. At draw time this is forwarded
-  // to teamWallet together with prize payouts.
-  // If empty or the same as the prize wallet, only the 3% prize pool is paid.
+
+  // Legacy: a separate on-chain wallet just for the 1% share. Only used when
+  // set AND different from taxReceiverWallet — otherwise the single-wallet
+  // model above (75/25 split of one balance) is used.
   publisherWallet: process.env.PUBLISHER_WALLET || '',
   publisherPrivateKey: process.env.PUBLISHER_PRIVATE_KEY || '',
-  
-  // Team wallet that receives the forwarded publisher 1%
-  devWallet: process.env.TEAM_WALLET || '0x9bae8aDF73F0dd6d27acB12E41eb9B800f93785F',
+
+  // Optional: address the 25% team fee is forwarded to on each draw. Leave
+  // unset (or equal to taxReceiverWallet) to keep the fee in the tax wallet.
+  devWallet: process.env.TEAM_WALLET || '0x4E91fc43e0a9BFBaf98D063eEf393Fe74211E624',
+
+  // Share of the tax wallet displayed as the prize pool and paid to winners,
+  // in basis points. Default 7500 = 75% (i.e. the 3% portion of a 3%+1% tax).
+  prizePoolBps: parseInt(process.env.PRIZE_POOL_BPS || '7500'),
   
   prizeInEth: true,
   
@@ -82,10 +91,11 @@ export function getEligibilityWindowMs(): number {
 export function validateConfig(): void {
   console.log('\n📋 Configuration:');
   console.log(`  Token: ${config.tokenAddress || '(not set - waiting)'}`);
-  console.log(`  Prize Pool Wallet (3%): ${config.taxReceiverWallet}`);
-  console.log(`  Publisher Wallet (1%): ${config.publisherWallet || '(same as prize pool — 1% forward skipped)'}`);
-  console.log(`  Team Wallet (receives 1%): ${config.devWallet}`);
-  console.log('  Payout: 3% ALL to winners | 1% forwarded to team at draw');
+  console.log(`  Tax Wallet (collects 3% + 1%): ${config.taxReceiverWallet}`);
+  console.log(`  Prize pool share: ${config.prizePoolBps / 100}% of tax wallet (winners)`);
+  console.log(`  Team fee share:  ${(10000 - config.prizePoolBps) / 100}% of tax wallet`);
+  const devSameAsTax = config.devWallet.toLowerCase() === config.taxReceiverWallet.toLowerCase();
+  console.log(`  Team fee destination: ${devSameAsTax ? '(stays in tax wallet)' : config.devWallet}`);
 
   console.log('\n⏱️ Schedule:');
   console.log(`  Draw interval: ${config.drawInterval / 1000}s`);
@@ -134,6 +144,13 @@ export function validateConfig(): void {
       `\n⚠️ MIN_HOLDING_DURATION (${config.minHoldingDuration}s) exceeds the gap between ` +
       `snapshots (${windowMs / 1000}s), so a new buyer waits up to ${waitRounds} draws ` +
       `before becoming eligible.`
+    );
+  }
+
+  if (config.prizePoolBps <= 0 || config.prizePoolBps > 10000) {
+    throw new Error(
+      `PRIZE_POOL_BPS must be in (0, 10000], got ${config.prizePoolBps}. ` +
+      `Default is 7500 (75%) matching a 3%+1% tax split.`
     );
   }
 }

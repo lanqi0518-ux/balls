@@ -138,6 +138,8 @@ export class AutoLottery {
   private readonly MIN_GAS_BALANCE = ethers.parseEther('0.05'); // Minimum 0.05 ETH reserved for gas
   private readonly drawIntervalMs = config.drawInterval;
   private readonly snapshotLeadMs = config.snapshotLeadTime;
+  // Share of the tax wallet paid to winners (75% by default for a 3+1 tax).
+  private readonly prizePoolBps = BigInt(config.prizePoolBps);
 
   // Demo mode: fabricate holders, prize-pool growth and draws so the site
   // can be shown off without a deployed token contract.
@@ -164,26 +166,27 @@ export class AutoLottery {
       this.taxReceiverWallet = new ethers.Wallet(config.taxReceiverPrivateKey, this.provider);
       this.autoTransferEnabled = true;
       console.log('✅ Auto transfer enabled');
-      console.log(`📤 Prize pool wallet (3% ALL to winners): ${this.taxReceiverAddress}`);
-      console.log(`📤 Team wallet (receives auto 1%): ${this.devWalletAddress}`);
+      console.log(`📤 Tax wallet (holds 3%+1%): ${this.taxReceiverAddress}`);
+      console.log(`🏆 Winners take: ${Number(this.prizePoolBps) / 100}% of the tax wallet each draw`);
+      if (this.hasSeparateDevWallet()) {
+        console.log(`📤 Team fee forwarded to: ${this.devWalletAddress}`);
+      } else {
+        console.log('📥 Team fee stays in the tax wallet (no separate DEV wallet set)');
+      }
     } else {
       console.log('⚠️ No private key - auto transfer DISABLED');
     }
 
+    // Legacy separate-publisher-wallet path — only kept for backwards compat.
+    // Ignored when the publisher wallet is empty or equal to the tax wallet
+    // (the current single-wallet model handles the 1% share via the split).
     if (config.publisherPrivateKey) {
       this.publisherSigner = new ethers.Wallet(config.publisherPrivateKey, this.provider);
-    } else if (
-      this.taxReceiverWallet &&
-      this.publisherAddress.toLowerCase() === this.taxReceiverAddress.toLowerCase()
-    ) {
-      this.publisherSigner = this.taxReceiverWallet;
     }
 
     if (this.hasSeparatePublisherWallet()) {
-      console.log(`📤 Publisher 1% wallet: ${this.publisherAddress}`);
+      console.log(`📤 Legacy publisher 1% wallet: ${this.publisherAddress}`);
       console.log(`🔑 Publisher signer: ${this.publisherSigner ? 'READY' : 'MISSING KEY — 1% forward disabled'}`);
-    } else {
-      console.log('ℹ️ Set PUBLISHER_WALLET if the auto 1% lands in a different wallet from the 3% prize pool');
     }
 
     if (this.demoMode) {
@@ -287,11 +290,31 @@ export class AutoLottery {
   }
 
   private hasSeparatePublisherWallet(): boolean {
-    return this.publisherAddress.toLowerCase() !== this.taxReceiverAddress.toLowerCase();
+    return (
+      this.publisherAddress !== '' &&
+      this.publisherAddress.toLowerCase() !== this.taxReceiverAddress.toLowerCase()
+    );
+  }
+
+  private hasSeparateDevWallet(): boolean {
+    return (
+      !!this.devWalletAddress &&
+      this.devWalletAddress.toLowerCase() !== this.taxReceiverAddress.toLowerCase()
+    );
   }
 
   private getSpendable(balance: bigint): bigint {
     return balance > this.MIN_GAS_BALANCE ? balance - this.MIN_GAS_BALANCE : 0n;
+  }
+
+  /**
+   * Split a spendable balance into (prizePool, teamFee) using prizePoolBps.
+   * With the default 7500 bps, a 4 ETH balance splits into 3 ETH for winners
+   * and 1 ETH for the team — matching the 3%+1% on-chain tax split.
+   */
+  private splitTax(spendable: bigint): { prize: bigint; team: bigint } {
+    const prize = (spendable * this.prizePoolBps) / 10000n;
+    return { prize, team: spendable - prize };
   }
 
   /**
@@ -303,9 +326,11 @@ export class AutoLottery {
     if (this.demoMode) {
       this.growDemoPool();
       this.ethBalance = this.demoPoolWei;
-      this.currentPrizePool = this.getSpendable(this.ethBalance);
+      const spendable = this.getSpendable(this.ethBalance);
+      const { prize, team } = this.splitTax(spendable);
+      this.currentPrizePool = prize;
+      this.publisherFee = team;
       this.publisherBalance = 0n;
-      this.publisherFee = 0n;
       this.ethPriceUsd = await fetchEthPrice();
       return;
     }
@@ -313,15 +338,22 @@ export class AutoLottery {
     if (!this.provider) return;
 
     try {
+      // Single-wallet model: this balance contains BOTH the 3% and the 1%,
+      // and the split lives entirely in software. Winners get prizePoolBps of
+      // it; the rest is the team fee.
       this.ethBalance = await this.provider.getBalance(this.taxReceiverAddress);
-      this.currentPrizePool = this.getSpendable(this.ethBalance);
+      const spendable = this.getSpendable(this.ethBalance);
+      const { prize, team } = this.splitTax(spendable);
+      this.currentPrizePool = prize;
+      this.publisherFee = team;
 
       if (this.hasSeparatePublisherWallet()) {
+        // Legacy path: a real separate on-chain publisher wallet. Its balance
+        // adds to the team fee (which then gets forwarded together at draw).
         this.publisherBalance = await this.provider.getBalance(this.publisherAddress);
-        this.publisherFee = this.getSpendable(this.publisherBalance);
+        this.publisherFee = team + this.getSpendable(this.publisherBalance);
       } else {
         this.publisherBalance = 0n;
-        this.publisherFee = 0n;
       }
 
       this.ethPriceUsd = await fetchEthPrice();
@@ -664,20 +696,25 @@ export class AutoLottery {
       console.log(`👥 Winners: ${winnersData.length}` + 
         (winnersData.length === this.MAX_WINNERS_PER_DRAW ? ' (limited)' : ''));
       
-      // Prize wallet 3% ALL goes to winners (minus 0.05 ETH gas).
-      // Publisher auto 1% is forwarded to the team wallet in this same draw.
+      // Single-wallet model: the tax wallet holds 3% + 1% of trading volume.
+      // Winners share the 3% (75%) portion; the 1% (25%) is either forwarded
+      // to a separate team wallet in this same batch, or left in place.
       await this.updateBalances();
       const prizePool = this.currentPrizePool;
       const publisherFee = this.publisherFee;
-      
+
       const ethBalanceStr = ethers.formatEther(this.ethBalance);
       const prizePoolStr = ethers.formatEther(prizePool);
       const publisherFeeStr = ethers.formatEther(publisherFee);
       const prizeUsd = (parseFloat(prizePoolStr) * this.ethPriceUsd).toFixed(2);
-      
-      console.log(`💵 Prize wallet (3%): ${ethBalanceStr} ETH`);
-      console.log(`🏆 Prize Pool (ALL to winners): ${prizePoolStr} ETH ($${prizeUsd})`);
-      console.log(`📤 Publisher 1% to forward: ${publisherFeeStr} ETH → ${this.devWalletAddress}`);
+
+      console.log(`💵 Tax wallet balance: ${ethBalanceStr} ETH`);
+      console.log(`🏆 Prize Pool to winners: ${prizePoolStr} ETH ($${prizeUsd})`);
+      if (this.hasSeparateDevWallet()) {
+        console.log(`📤 Team fee to forward: ${publisherFeeStr} ETH → ${this.devWalletAddress}`);
+      } else {
+        console.log(`📥 Team fee stays in tax wallet: ${publisherFeeStr} ETH`);
+      }
       console.log(`📈 ETH Price: $${this.ethPriceUsd}`)
       
       // Prepare transfers
@@ -728,22 +765,32 @@ export class AutoLottery {
           const results: TransferResult[] = [];
           console.log(`\n💸 Processing draw payouts...`);
 
-          if (publisherFee > 0n && this.publisherSigner) {
-            console.log('\n📤 Forwarding publisher auto 1% to team wallet (same batch as prizes)...');
-            const feeResult = await this.executeTransfer(
-              this.devWalletAddress,
-              publisherFee,
-              3,
-              this.publisherSigner
-            );
-            results.push(feeResult);
-            if (feeResult.success) {
-              this.totalDevPaid += publisherFee;
-              devFeeForwarded = publisherFee;
+          // Team fee forward. Two scenarios:
+          //   * Single-wallet model (default): the 25% share lives in the tax
+          //     wallet. Forward it out of taxReceiverWallet to devWallet.
+          //   * Legacy separate-publisher-wallet: 25% may live in a different
+          //     on-chain address that has its own signer.
+          if (publisherFee > 0n && this.hasSeparateDevWallet()) {
+            const feeSigner = this.publisherSigner ?? this.taxReceiverWallet;
+            if (feeSigner) {
+              console.log('\n📤 Forwarding team fee to team wallet (same batch as prizes)...');
+              const feeResult = await this.executeTransfer(
+                this.devWalletAddress,
+                publisherFee,
+                3,
+                feeSigner
+              );
+              results.push(feeResult);
+              if (feeResult.success) {
+                this.totalDevPaid += publisherFee;
+                devFeeForwarded = publisherFee;
+              }
+              await this.delay(500);
+            } else {
+              console.log('⚠️ Team fee not forwarded — no signer for the tax wallet');
             }
-            await this.delay(500);
-          } else if (this.hasSeparatePublisherWallet() && publisherFee > 0n && !this.publisherSigner) {
-            console.log('⚠️ Publisher 1% not forwarded — missing PUBLISHER_PRIVATE_KEY');
+          } else if (publisherFee > 0n) {
+            console.log('📥 Team fee stays in tax wallet (DEV_WALLET == tax wallet)');
           }
 
           if (transfers.length > 0) {
