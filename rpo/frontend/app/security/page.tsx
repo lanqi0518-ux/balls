@@ -3,6 +3,7 @@ import { MarketingShell, PageHero } from "@/components/marketing/MarketingShell"
 import { Prose } from "@/components/ui/Prose";
 import { H2 } from "@/components/ui/H";
 import { Badge } from "@/components/ui/Badge";
+import { CodeBlock } from "@/components/ui/CodeBlock";
 import { Shield, Lock, Check, ArrowUpRight } from "@/components/ui/Icons";
 
 export const metadata = {
@@ -133,6 +134,45 @@ export default function SecurityPage() {
       <section className="section-tight border-t border-line">
         <div className="container-wide max-w-4xl">
           <Prose>
+            <H2 id="invariants">Formal invariants</H2>
+            <p>
+              12 invariants are enforced by Foundry&apos;s randomized
+              harness on every commit — 25,600 sequences per invariant per
+              CI run. Any failure blocks release. Certora rules cover the
+              first 8; the remaining 4 are property-based only.
+            </p>
+            <CodeBlock
+              lang="solidity"
+              filename="test/invariants/VaultInvariants.t.sol"
+              code={`function invariant_principalMatchesTotal() public {
+    uint256 sum;
+    for (uint256 i; i < handler.ghostSubscribersLength(); ++i) {
+        address u = handler.ghostSubscribers(i);
+        sum += vault.principalOf(u);
+    }
+    assertEq(sum, vault.totalSubscribed(), "INV-01");
+}
+
+function invariant_weightMatchesTotal() public {
+    uint256 sum;
+    for (uint256 i; i < handler.ghostSubscribersLength(); ++i) {
+        sum += vault.weightOf(handler.ghostSubscribers(i));
+    }
+    assertEq(sum, vault.totalWeight(), "INV-02");
+}
+
+function invariant_boostBounded() public view {
+    assertLe(booster.boostOf(handler.currentActor()), 30_000, "INV-06");
+}`}
+            />
+            <p>
+              The full list — <code>INV-01</code> through{" "}
+              <code>INV-12</code> — is enumerated in the{" "}
+              <a href="/docs/contracts#invariants">contract reference</a>.
+              Certora formal-spec proofs published in the{" "}
+              <a href="/audits">audits</a> archive.
+            </p>
+
             <H2 id="threat">Threat model</H2>
             <p>
               RPO is exposed to five classes of adversary. For each we

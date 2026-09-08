@@ -2,6 +2,9 @@ import { MarketingShell } from "@/components/marketing/MarketingShell";
 import { DocLayout, TocItem } from "@/components/docs/DocLayout";
 import { Prose } from "@/components/ui/Prose";
 import { H2, H3 } from "@/components/ui/H";
+import { ArchitectureDiagram } from "@/components/marketing/ArchitectureDiagram";
+import { WHITEPAPER } from "@/lib/version";
+import { ArrowUpRight } from "@/components/ui/Icons";
 
 export const metadata = {
   title: "Whitepaper",
@@ -50,6 +53,39 @@ export default function WhitepaperPage() {
         version="v1.0"
       >
         <Prose>
+          {/* Downloads strip — visible at top, above the abstract */}
+          <div className="not-prose mb-10 rounded-2xl border border-line bg-paper-100 p-5 grid sm:grid-cols-[1fr_auto] gap-4 items-center">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs font-mono min-w-0">
+              <div className="text-ink-500">Version</div>
+              <div className="text-ink-900">
+                {WHITEPAPER.version} · {WHITEPAPER.releasedAt}
+              </div>
+              <div className="text-ink-500">SHA-256</div>
+              <div className="text-ink-900 truncate">{WHITEPAPER.sha256}</div>
+              <div className="text-ink-500">IPFS</div>
+              <div className="text-ink-900 truncate">
+                <a
+                  href={`https://ipfs.io/ipfs/${WHITEPAPER.ipfsCid}`}
+                  className="hover:underline"
+                >
+                  {WHITEPAPER.ipfsCid}
+                </a>
+              </div>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <a href={WHITEPAPER.pdfUrl} className="btn-primary text-sm">
+                Download PDF
+                <ArrowUpRight className="h-3.5 w-3.5" />
+              </a>
+              <a
+                href={`https://ipfs.io/ipfs/${WHITEPAPER.ipfsCid}`}
+                className="btn-secondary text-sm"
+              >
+                Read on IPFS
+              </a>
+            </div>
+          </div>
+
           <H2 id="abstract">Abstract</H2>
           <p>
             <strong>RPO</strong> is a fully on-chain protocol that lets any
@@ -200,6 +236,8 @@ export default function WhitepaperPage() {
             controlled by the DAO), and they interoperate through pure
             function calls with no admin-controlled parameters.
           </p>
+
+          <ArchitectureDiagram className="my-8" />
 
           <H3 id="vault">3.1 SubscriptionVault</H3>
           <p>

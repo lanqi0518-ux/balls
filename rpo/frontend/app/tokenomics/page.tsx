@@ -3,6 +3,9 @@ import { Prose } from "@/components/ui/Prose";
 import { H2 } from "@/components/ui/H";
 import { Badge } from "@/components/ui/Badge";
 import { Sphere } from "@/components/ui/Sphere";
+import { BoostCurve } from "@/components/interactive/BoostCurve";
+import { LeverageSimulator } from "@/components/interactive/LeverageSimulator";
+import { RPO_ADDRESSES, shortAddr } from "@/lib/addresses";
 
 export const metadata = {
   title: "Tokenomics",
@@ -120,6 +123,13 @@ export default function TokenomicsPage() {
       </section>
 
       <section className="section-tight border-t border-line">
+        <div className="container-wide grid lg:grid-cols-2 gap-6">
+          <BoostCurve />
+          <LeverageSimulator />
+        </div>
+      </section>
+
+      <section className="section-tight border-t border-line">
         <div className="container-wide max-w-4xl">
           <Prose>
             <H2 id="curve">The boost curve, formally</H2>
@@ -193,12 +203,12 @@ export default function TokenomicsPage() {
           </div>
           <div className="md:col-span-2 space-y-4">
             {[
-              { k: "Chain", v: "Robinhood Chain · id 4663" },
-              { k: "Token address", v: "0x5A8f…B902", mono: true },
-              { k: "Booster address", v: "0x8f43…AA71", mono: true },
-              { k: "Pons pool", v: "0xC01D…FE8B (SPY-pair, LP burned)", mono: true },
-              { k: "Timelock", v: "0x1FC0…3388", mono: true },
-              { k: "Multisig (2/3)", v: "0x9812…44A0", mono: true },
+              { k: "Chain", v: `${RPO_ADDRESSES.chainName} · id ${RPO_ADDRESSES.chainId}` },
+              { k: "$RPO token", v: shortAddr(RPO_ADDRESSES.tokens.RPO), mono: true },
+              { k: "AllocationBooster", v: shortAddr(RPO_ADDRESSES.contracts.AllocationBooster), mono: true },
+              { k: "Pons RPO/SPY pool", v: `${shortAddr(RPO_ADDRESSES.pons.RpoSpyPool)} · LP burned`, mono: true },
+              { k: "Timelock", v: shortAddr(RPO_ADDRESSES.contracts.Timelock), mono: true },
+              { k: "Governor", v: shortAddr(RPO_ADDRESSES.contracts.Governor), mono: true },
             ].map((r) => (
               <div
                 key={r.k}
