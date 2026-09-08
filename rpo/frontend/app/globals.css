@@ -204,3 +204,17 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* CodeBlock syntax highlighting.
+   Tokens produced by /components/ui/CodeBlock.tsx. Rendered on the
+   dark #0A0A0A backdrop; colors chosen to match the RPO palette. */
+.hl-kw   { color: #FF8A5C; }             /* peach-400 · keywords */
+.hl-type { color: #7EC59A; }             /* forest-300 · types  */
+.hl-id   { color: #E5E5EA; }             /* base identifiers    */
+.hl-str  { color: #FFC6A9; }             /* peach-200 · strings */
+.hl-num  { color: #FFA37A; }             /* peach-300 · numbers */
+.hl-com  { color: #6D7078; font-style: italic; } /* dimmed comment */
+.hl-op   { color: #B0B4BB; }
+.hl-var  { color: #7EC59A; }
+.hl-val  { color: #FFC6A9; }
+.not-prose pre code { background: transparent !important; padding: 0 !important; border: 0 !important; color: inherit !important; }
