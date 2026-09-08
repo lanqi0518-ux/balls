@@ -47,7 +47,7 @@ export default function SubscribePage({
                   d{ticker} · Reg-S Stock Token · underlying: 1 {ticker} share
                 </div>
               </div>
-              <Badge variant="mint" dot className="ml-auto">
+              <Badge variant="forest" dot className="ml-auto">
                 Subscribing
               </Badge>
             </div>
@@ -64,9 +64,9 @@ export default function SubscribePage({
                 <span>Progress</span>
                 <span className="font-mono">46%</span>
               </div>
-              <div className="h-1.5 rounded-full bg-ink-700 overflow-hidden">
+              <div className="h-1.5 rounded-full bg-paper-200 overflow-hidden">
                 <div
-                  className="h-full bg-mint-gradient"
+                  className="h-full bg-gradient-to-r from-forest-500 to-peach-500"
                   style={{ width: "46%" }}
                 />
               </div>
@@ -85,7 +85,7 @@ export default function SubscribePage({
                 "Not available to U.S., Canadian, U.K., Swiss, or U.A.E. residents per RHJ's Reg-S terms.",
               ].map((l) => (
                 <li key={l} className="flex items-start gap-2">
-                  <Check className="h-4 w-4 text-mint-400 mt-0.5 flex-shrink-0" />
+                  <Check className="h-4 w-4 text-forest-500 mt-0.5 flex-shrink-0" />
                   <span>{l}</span>
                 </li>
               ))}
@@ -105,7 +105,7 @@ export default function SubscribePage({
               <label className="text-xs uppercase tracking-[0.14em] text-fg-dim mb-2 block">
                 Amount to subscribe
               </label>
-              <div className="rounded-xl bg-ink-900 border border-line p-4 flex items-center gap-3">
+              <div className="rounded-xl bg-paper-100 border border-line p-4 flex items-center gap-3">
                 <input
                   className="bg-transparent text-2xl font-mono text-fg outline-none flex-1 tabular-nums"
                   value={amount}
@@ -116,7 +116,7 @@ export default function SubscribePage({
                   inputMode="decimal"
                 />
                 <select
-                  className="bg-ink-800 border border-line rounded-lg px-3 py-1.5 text-sm text-fg"
+                  className="bg-paper-100 border border-line rounded-lg px-3 py-1.5 text-sm text-fg"
                   value={payToken}
                   onChange={(e) => setPayToken(e.target.value)}
                 >
@@ -185,7 +185,7 @@ function Stat({
       <div
         className={
           "text-xl font-mono tabular-nums mt-1 " +
-          (tone === "mint" ? "text-mint-400" : "text-fg")
+          (tone === "mint" ? "text-forest-500" : "text-fg")
         }
       >
         {v}
@@ -209,7 +209,7 @@ function Row({
       <span
         className={
           tone === "mint"
-            ? "text-mint-400 font-mono tabular-nums"
+            ? "text-forest-500 font-mono tabular-nums"
             : "text-fg font-mono tabular-nums"
         }
       >
@@ -230,7 +230,7 @@ function Guarantee({
 }) {
   return (
     <div className="card p-4">
-      <Icon className="h-4 w-4 text-mint-400 mb-3" />
+      <Icon className="h-4 w-4 text-forest-500 mb-3" />
       <div className="text-sm font-semibold text-fg">{title}</div>
       <div className="text-xs text-fg-muted mt-1 leading-relaxed">{body}</div>
     </div>

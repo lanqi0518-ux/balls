@@ -28,7 +28,7 @@ export default function StakePage() {
         </h1>
         <p className="mt-4 text-fg-muted max-w-2xl">
           Locking $RPO multiplies your weight on every SubscriptionVault, up
-          to 3×. The curve is <span className="font-mono text-mint-400">boost = 1 + 2·√share</span>{" "}
+          to 3×. The curve is <span className="font-mono text-forest-500">boost = 1 + 2·√share</span>{" "}
           — early stakers keep the advantage without letting whales monopolize
           allocations.
         </p>
@@ -46,7 +46,7 @@ export default function StakePage() {
               </div>
             </div>
 
-            <div className="rounded-xl bg-ink-900 border border-line p-4 flex items-center gap-3">
+            <div className="rounded-xl bg-paper-100 border border-line p-4 flex items-center gap-3">
               <input
                 className="bg-transparent text-3xl font-mono text-fg outline-none flex-1 tabular-nums"
                 value={amount}
@@ -65,7 +65,7 @@ export default function StakePage() {
                   <button
                     key={preset}
                     onClick={() => setAmount(raw)}
-                    className="rounded-lg border border-line hover:border-mint-500/50 hover:text-mint-400 text-sm text-fg-muted py-2 transition-colors"
+                    className="rounded-lg border border-line hover:border-forest-300 hover:text-forest-500 text-sm text-fg-muted py-2 transition-colors"
                   >
                     {preset}
                   </button>
@@ -89,9 +89,9 @@ export default function StakePage() {
                 <span>1×</span>
                 <span>3× cap</span>
               </div>
-              <div className="h-1.5 rounded-full bg-ink-700 overflow-hidden">
+              <div className="h-1.5 rounded-full bg-paper-200 overflow-hidden">
                 <div
-                  className="h-full bg-mint-gradient transition-all duration-300"
+                  className="h-full bg-gradient-to-r from-forest-500 to-peach-500 transition-all duration-300"
                   style={{ width: `${((boost - 1) / 2) * 100}%` }}
                 />
               </div>
@@ -135,7 +135,7 @@ export default function StakePage() {
 
           <div className="card p-6">
             <div className="flex items-center gap-2 mb-4">
-              <Badge variant="mint">$RPO</Badge>
+              <Badge variant="forest">$RPO</Badge>
               <Badge>Pons LP</Badge>
               <Badge>SPY-pair</Badge>
             </div>
@@ -145,7 +145,7 @@ export default function StakePage() {
                 href="https://pons.dev"
                 target="_blank"
                 rel="noreferrer"
-                className="text-mint-400 hover:underline"
+                className="text-forest-500 hover:underline"
               >
                 Pons
               </a>{" "}
@@ -174,7 +174,7 @@ function Row({
       <span
         className={
           tone === "mint"
-            ? "text-mint-400 font-mono tabular-nums"
+            ? "text-forest-500 font-mono tabular-nums"
             : "text-fg font-mono tabular-nums"
         }
       >

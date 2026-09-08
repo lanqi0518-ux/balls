@@ -1,6 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google";
+import { Inter, Fraunces, JetBrains_Mono } from "next/font/google";
 import { Providers } from "./providers";
 
 const inter = Inter({
@@ -9,11 +9,11 @@ const inter = Inter({
   display: "swap",
 });
 
-const serif = Instrument_Serif({
+const fraunces = Fraunces({
   subsets: ["latin"],
-  weight: "400",
   variable: "--font-display",
   display: "swap",
+  axes: ["opsz", "SOFT", "WONK"],
 });
 
 const mono = JetBrains_Mono({
@@ -63,9 +63,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${serif.variable} ${mono.variable}`}
+      className={`${inter.variable} ${fraunces.variable} ${mono.variable}`}
     >
-      <body className="min-h-screen bg-ink-900 text-fg antialiased">
+      <body className="min-h-screen bg-white text-ink-900 antialiased">
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -51,21 +51,21 @@ const SOCIALS = [
 
 export function Footer() {
   return (
-    <footer className="border-t border-line bg-ink-900">
+    <footer className="border-t border-line bg-paper-100">
       <Container>
-        <div className="grid lg:grid-cols-12 gap-10 py-16 lg:py-20">
+        <div className="grid lg:grid-cols-12 gap-10 py-20 lg:py-28">
           <div className="lg:col-span-4">
             <div className="flex items-center gap-2">
-              <LogoMark className="h-7 w-7" />
-              <span className="font-semibold text-fg text-lg">RPO</span>
+              <LogoMark className="h-8 w-8" />
+              <span className="font-semibold text-ink-900 text-lg">RPO</span>
             </div>
-            <p className="mt-5 text-sm text-fg-muted max-w-sm leading-relaxed">
+            <p className="mt-6 text-sm text-ink-500 max-w-sm leading-relaxed">
               The permissionless IPO subscription protocol. Built on
               Robinhood Chain, priced through Rialto propAMM, secured by
               transparent on-chain vaults.
             </p>
 
-            <div className="mt-6 flex items-center gap-2">
+            <div className="mt-8 flex items-center gap-2">
               {SOCIALS.map(({ label, href, Icon }) => (
                 <a
                   key={label}
@@ -73,7 +73,7 @@ export function Footer() {
                   target={href.startsWith("http") ? "_blank" : undefined}
                   rel="noreferrer"
                   aria-label={label}
-                  className="h-9 w-9 flex items-center justify-center rounded-full border border-line text-fg-muted hover:text-fg hover:border-line-strong transition-colors"
+                  className="h-10 w-10 flex items-center justify-center rounded-full border border-line bg-white text-ink-500 hover:text-ink-900 hover:border-line-strong transition-colors"
                 >
                   <Icon className="h-4 w-4" />
                 </a>
@@ -84,7 +84,7 @@ export function Footer() {
           <div className="lg:col-span-8 grid grid-cols-2 md:grid-cols-4 gap-8">
             {COLS.map((c) => (
               <div key={c.title}>
-                <div className="text-xs uppercase tracking-[0.14em] text-fg-dim mb-4">
+                <div className="text-[11px] uppercase tracking-[0.22em] text-ink-500 mb-5 font-medium">
                   {c.title}
                 </div>
                 <ul className="space-y-3">
@@ -95,14 +95,14 @@ export function Footer() {
                           href={l.href}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-sm text-fg-muted hover:text-fg transition-colors"
+                          className="text-sm text-ink-500 hover:text-ink-900 transition-colors"
                         >
                           {l.label}
                         </a>
                       ) : (
                         <Link
                           href={l.href}
-                          className="text-sm text-fg-muted hover:text-fg transition-colors"
+                          className="text-sm text-ink-500 hover:text-ink-900 transition-colors"
                         >
                           {l.label}
                         </Link>
@@ -115,23 +115,34 @@ export function Footer() {
           </div>
         </div>
 
+        {/* Giant wordmark */}
+        <div className="border-t border-line pt-16 pb-8">
+          <div
+            className="font-display italic text-ink-900 leading-none tracking-tight"
+            style={{
+              fontSize: "clamp(6rem, 22vw, 22rem)",
+              lineHeight: "0.85",
+            }}
+          >
+            RPO
+          </div>
+        </div>
+
         <div className="border-t border-line py-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="text-xs text-fg-dim leading-relaxed max-w-3xl">
+          <div className="text-xs text-ink-500 leading-relaxed max-w-3xl">
             © {new Date().getFullYear()} RPO Labs. Nothing on this site is
             investment advice. Robinhood Stock Tokens are Reg-S debt securities
             issued by Robinhood Assets (Jersey) Limited and are not offered or
             sold to U.S. persons, Canadians, U.K., Swiss, or U.A.E. residents.
-            RPO is a self-custodial protocol; you interact with smart contracts
-            at your own risk.
           </div>
-          <div className="flex items-center gap-5 text-xs text-fg-dim">
-            <Link href="/legal" className="hover:text-fg">
+          <div className="flex items-center gap-5 text-xs text-ink-500">
+            <Link href="/legal" className="hover:text-ink-900">
               Legal
             </Link>
-            <Link href="/legal#privacy" className="hover:text-fg">
+            <Link href="/legal#privacy" className="hover:text-ink-900">
               Privacy
             </Link>
-            <Link href="/legal#terms" className="hover:text-fg">
+            <Link href="/legal#terms" className="hover:text-ink-900">
               Terms
             </Link>
           </div>

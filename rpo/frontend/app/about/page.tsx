@@ -73,7 +73,7 @@ export default function AboutPage() {
         title={
           <>
             RPO is a small team building the missing{" "}
-            <span className="italic text-mint-500">primary-market</span>{" "}
+            <span className="italic text-forest-500">primary-market</span>{" "}
             primitive for on-chain equities.
           </>
         }
@@ -95,7 +95,7 @@ export default function AboutPage() {
         </div>
       </Section>
 
-      <Section id="roadmap" className="border-t border-line bg-ink-800/30">
+      <Section id="roadmap" className="border-t border-line bg-paper-100">
         <SectionHeader
           eyebrow="Roadmap"
           title="Public, versioned, non-fictional."
@@ -109,7 +109,7 @@ export default function AboutPage() {
                   {r.quarter}
                 </div>
                 <Badge
-                  variant={r.tone === "mint" ? "mint" : "default"}
+                  variant={r.tone === "mint" ? "forest" : "default"}
                   dot={r.tone === "mint"}
                 >
                   {r.label}
@@ -118,7 +118,7 @@ export default function AboutPage() {
               <ul className="space-y-3 text-sm text-fg-muted">
                 {r.items.map((item) => (
                   <li key={item} className="flex gap-2">
-                    <span className="text-mint-400 mt-1">›</span>
+                    <span className="text-forest-500 mt-1">›</span>
                     <span>{item}</span>
                   </li>
                 ))}
@@ -156,7 +156,7 @@ export default function AboutPage() {
               <a
                 key={j.role}
                 href="mailto:jobs@rpo.xyz"
-                className="flex items-center justify-between p-6 hover:bg-ink-800/60 transition-colors"
+                className="flex items-center justify-between p-6 hover:bg-paper-100 transition-colors"
               >
                 <div>
                   <div className="text-lg font-medium text-fg">{j.role}</div>
@@ -175,7 +175,7 @@ export default function AboutPage() {
           <div className="card p-8 aspect-square flex items-center justify-center">
             <div className="text-5xl font-display text-fg">RPO</div>
           </div>
-          <div className="card p-8 aspect-square flex items-center justify-center bg-mint-500 text-ink-950">
+          <div className="card p-8 aspect-square flex items-center justify-center bg-forest-500 text-ink-950">
             <div className="text-5xl font-display">RPO</div>
           </div>
           <div className="card p-8 aspect-square flex items-center justify-center bg-cream text-ink-950">
@@ -184,7 +184,7 @@ export default function AboutPage() {
         </div>
         <p className="mt-6 text-sm text-fg-muted">
           Download the full kit (SVG logos, wordmarks, color tokens){" "}
-          <Link href="/brand.zip" className="text-mint-400 hover:underline">
+          <Link href="/brand.zip" className="text-forest-500 hover:underline">
             here
           </Link>
           .

@@ -83,7 +83,7 @@ export default function AppHomePage() {
 
       <section className="mb-14">
         <div className="flex items-center gap-2 mb-5">
-          <Badge variant="mint" dot>
+          <Badge variant="forest" dot>
             Active · {ACTIVE.filter((x) => x.status === "Subscribing").length}
           </Badge>
           <div className="h-4 w-px bg-line" />
@@ -112,10 +112,10 @@ export default function AppHomePage() {
           {RECENT.map((r) => (
             <div
               key={r.ticker}
-              className="p-5 flex items-center justify-between hover:bg-ink-800/60 transition-colors"
+              className="p-5 flex items-center justify-between hover:bg-paper-100 transition-colors"
             >
               <div className="flex items-center gap-4">
-                <div className="h-10 w-10 rounded-full bg-ink-700 border border-line-strong flex items-center justify-center text-sm font-semibold text-fg">
+                <div className="h-10 w-10 rounded-full bg-paper-200 border border-line-strong flex items-center justify-center text-sm font-semibold text-fg">
                   {r.ticker.slice(0, 2)}
                 </div>
                 <div>
@@ -146,8 +146,8 @@ export default function AppHomePage() {
                     className={
                       "font-mono text-sm mt-1 " +
                       (r.change.startsWith("+")
-                        ? "text-mint-400"
-                        : "text-red-400")
+                        ? "text-forest-500"
+                        : "text-rose-600")
                     }
                   >
                     {r.change}

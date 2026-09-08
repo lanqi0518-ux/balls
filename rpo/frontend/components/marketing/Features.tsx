@@ -19,8 +19,8 @@ const FEATURES = [
   },
   {
     Icon: Shield,
-    title: "Non-custodial, ERC-8056 native",
-    body: "Your USDG sits in a per-IPO SubscriptionVault deployed by CREATE2. Post-fulfillment you claim real Stock Tokens with live uiMultiplier corporate actions built in.",
+    title: "Non-custodial",
+    body: "Your USDG sits in a per-IPO SubscriptionVault deployed by CREATE2. Post-fulfillment you claim real ERC-8056 Stock Tokens with live uiMultiplier corporate actions built in.",
   },
   {
     Icon: Layers,
@@ -30,7 +30,7 @@ const FEATURES = [
   {
     Icon: Globe,
     title: "Global by construction",
-    body: "No KYC on the protocol. Every user in every non-restricted jurisdiction gets the same interface, the same allocation math, and the same fill.",
+    body: "No KYC on the protocol. Every user in every non-restricted jurisdiction gets the same interface, the same math, and the same fill.",
   },
 ];
 
@@ -41,20 +41,25 @@ export function Features() {
         eyebrow="What you get"
         title={
           <>
-            The <span className="italic text-mint-500">institutional</span>{" "}
-            IPO experience — permissionless.
+            The <span className="italic">institutional</span> IPO experience —
+            permissionless.
           </>
         }
         description="Six primitives that make on-chain IPO subscription genuinely different from a launchpad, an ICO, or a copy-trade bot."
       />
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-px bg-line rounded-3xl overflow-hidden border border-line">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         {FEATURES.map(({ Icon, title, body }) => (
-          <div key={title} className="bg-ink-900 p-8 hover:bg-ink-800 transition-colors">
-            <div className="h-10 w-10 rounded-lg bg-mint-500/10 text-mint-400 flex items-center justify-center mb-6">
+          <div
+            key={title}
+            className="card-soft p-8 hover:shadow-card transition-shadow duration-300"
+          >
+            <div className="h-11 w-11 rounded-2xl bg-paper-100 border border-line text-ink-900 flex items-center justify-center mb-6">
               <Icon className="h-5 w-5" />
             </div>
-            <h3 className="text-lg font-semibold text-fg mb-2">{title}</h3>
-            <p className="text-sm text-fg-muted leading-relaxed">{body}</p>
+            <h3 className="text-lg font-semibold text-ink-900 mb-2">
+              {title}
+            </h3>
+            <p className="text-sm text-ink-500 leading-relaxed">{body}</p>
           </div>
         ))}
       </div>

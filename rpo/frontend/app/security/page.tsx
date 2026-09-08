@@ -19,7 +19,7 @@ export default function SecurityPage() {
         title={
           <>
             Trust minimized.{" "}
-            <span className="italic text-mint-500">Verifiable</span>. Refund by
+            <span className="italic text-forest-500">Verifiable</span>. Refund by
             default.
           </>
         }
@@ -47,7 +47,7 @@ export default function SecurityPage() {
             },
           ].map(({ Icon, title, body }) => (
             <div key={title} className="card p-8">
-              <div className="h-10 w-10 rounded-lg bg-mint-500/10 text-mint-400 flex items-center justify-center mb-5">
+              <div className="h-10 w-10 rounded-lg bg-forest-50 text-forest-500 flex items-center justify-center mb-5">
                 <Icon className="h-5 w-5" />
               </div>
               <h3 className="text-lg font-semibold text-fg mb-2">{title}</h3>
@@ -57,7 +57,7 @@ export default function SecurityPage() {
         </div>
       </Section>
 
-      <Section id="audits" className="border-t border-line bg-ink-800/30">
+      <Section id="audits" className="border-t border-line bg-paper-100">
         <SectionHeader
           eyebrow="Audits"
           title="Rolling audit with two independent firms."
@@ -102,7 +102,7 @@ export default function SecurityPage() {
                   className="flex items-center justify-between py-2 border-b border-line last:border-0"
                 >
                   <span className="text-fg">{sev}</span>
-                  <span className="font-mono text-mint-400">{payout}</span>
+                  <span className="font-mono text-forest-500">{payout}</span>
                 </li>
               ))}
             </ul>
@@ -169,7 +169,7 @@ export default function SecurityPage() {
                   ⚠ {r.risk}
                 </div>
                 <div className="flex items-start gap-2 text-sm text-fg-muted">
-                  <Check className="h-4 w-4 text-mint-400 mt-0.5 flex-shrink-0" />
+                  <Check className="h-4 w-4 text-forest-500 mt-0.5 flex-shrink-0" />
                   <span>{r.mitigation}</span>
                 </div>
               </div>
@@ -196,7 +196,7 @@ function AuditCard({
     <div className="card p-8">
       <div className="flex items-center justify-between mb-6">
         <div className="font-display text-2xl text-fg">{firm}</div>
-        <Badge variant="mint" dot>
+        <Badge variant="forest" dot>
           {status}
         </Badge>
       </div>

@@ -33,7 +33,7 @@ export function MarketingNav() {
         className={cn(
           "transition-all duration-300",
           scrolled
-            ? "bg-ink-900/70 backdrop-blur-xl border-b border-line"
+            ? "bg-white/80 backdrop-blur-xl border-b border-line"
             : "bg-transparent border-b border-transparent"
         )}
       >
@@ -45,7 +45,7 @@ export function MarketingNav() {
                 <Link
                   key={l.href}
                   href={l.href}
-                  className="px-3 py-2 text-sm text-fg-muted hover:text-fg rounded-full transition-colors"
+                  className="px-3 py-2 text-sm text-ink-500 hover:text-ink-900 rounded-full transition-colors"
                 >
                   {l.label}
                 </Link>
@@ -68,7 +68,7 @@ export function MarketingNav() {
           </div>
 
           <button
-            className="lg:hidden text-fg-muted p-2"
+            className="lg:hidden text-ink-500 p-2"
             onClick={() => setOpen((v) => !v)}
             aria-label="Toggle menu"
           >
@@ -78,13 +78,13 @@ export function MarketingNav() {
       </div>
 
       {open && (
-        <div className="lg:hidden bg-ink-900/95 backdrop-blur-xl border-b border-line">
+        <div className="lg:hidden bg-white/95 backdrop-blur-xl border-b border-line">
           <div className="container-wide py-4 flex flex-col gap-1">
             {LINKS.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
-                className="px-3 py-3 text-fg-muted hover:text-fg rounded-lg"
+                className="px-3 py-3 text-ink-500 hover:text-ink-900 rounded-lg"
                 onClick={() => setOpen(false)}
               >
                 {l.label}

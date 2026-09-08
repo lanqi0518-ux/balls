@@ -70,13 +70,22 @@ function FAQItem({
         className="w-full text-left py-6 flex items-center justify-between gap-6 group"
         aria-expanded={open}
       >
-        <span className="text-lg text-fg font-medium">{q}</span>
-        <ChevronDown
+        <span className="font-display text-2xl text-ink-900 font-medium">
+          {q}
+        </span>
+        <span
           className={cn(
-            "h-4 w-4 text-fg-muted flex-shrink-0 transition-transform",
-            open && "rotate-180 text-mint-400"
+            "h-8 w-8 rounded-full border border-line flex items-center justify-center flex-shrink-0 transition-all",
+            open ? "bg-ink-900 border-ink-900" : "bg-white group-hover:border-ink-900"
           )}
-        />
+        >
+          <ChevronDown
+            className={cn(
+              "h-3.5 w-3.5 transition-transform",
+              open ? "rotate-180 text-white" : "text-ink-900"
+            )}
+          />
+        </span>
       </button>
       <div
         className={cn(
@@ -85,7 +94,7 @@ function FAQItem({
         )}
       >
         <div className="overflow-hidden">
-          <p className="text-fg-muted leading-relaxed max-w-2xl">{a}</p>
+          <p className="text-ink-500 leading-relaxed max-w-2xl">{a}</p>
         </div>
       </div>
     </div>

@@ -7,7 +7,7 @@ export default function NotFound() {
   return (
     <MarketingShell>
       <section className="relative overflow-hidden py-32 lg:py-40">
-        <div className="absolute inset-0 bg-hero-glow pointer-events-none" />
+        <div className="absolute inset-0 bg-mesh-warm pointer-events-none" />
         <div className="absolute inset-0 grid-bg pointer-events-none" />
         <div className="container-tight relative text-center">
           <div className="eyebrow mb-6 justify-center">Error 404</div>

@@ -1,76 +1,87 @@
 import { Section, SectionHeader } from "@/components/ui/Section";
+import { Sphere } from "@/components/ui/Sphere";
 
 const LAYERS = [
   {
     tag: "Your wallet",
-    tone: "cream",
+    tone: "peach",
     items: ["USDG on Robinhood Chain", "any token via LiFi bridge"],
   },
   {
     tag: "RPO protocol",
-    tone: "mint",
+    tone: "ink",
     items: [
-      "IPORegistry (announce + deploy)",
-      "SubscriptionVault (deposit + allocate)",
-      "AllocationBooster ($RPO stake)",
-      "RialtoAdapter (best-price routing)",
-      "LeverageLooper (Morpho re-subscribe)",
+      "IPORegistry",
+      "SubscriptionVault",
+      "AllocationBooster",
+      "RialtoAdapter",
+      "LeverageLooper",
     ],
   },
   {
     tag: "Robinhood Chain infra",
-    tone: "default",
+    tone: "forest",
     items: [
-      "Rialto propAMM (market-maker quotes)",
-      "Uniswap V3 (fallback venue)",
-      "Chainlink total-return oracles",
-      "Morpho Blue (Stock Token lending)",
+      "Rialto propAMM",
+      "Uniswap V3",
+      "Chainlink oracles",
+      "Morpho Blue",
     ],
   },
   {
     tag: "Off-chain",
     tone: "default",
     items: [
-      "Robinhood /rhj/assets & /rhj/prices",
+      "Robinhood /rhj/assets",
       "RHJ (Reg-S issuer)",
-      "Chainlink Automation keeper",
+      "Chainlink Automation",
     ],
   },
 ];
 
 export function StackDiagram() {
   return (
-    <Section id="stack">
+    <Section id="stack" className="relative overflow-hidden">
+      <Sphere
+        variant="peach"
+        size={280}
+        className="absolute top-20 -right-20 opacity-60 pointer-events-none"
+      />
+      <Sphere
+        variant="forest"
+        size={200}
+        className="absolute bottom-20 -left-16 opacity-50 pointer-events-none"
+      />
       <SectionHeader
         eyebrow="The stack"
         title={
           <>
-            Real infrastructure.{" "}
-            <span className="italic text-mint-500">Not synthetic.</span>
+            Real infrastructure. <span className="italic">Not synthetic.</span>
           </>
         }
         description="Every layer below already exists in production on Robinhood Chain. RPO is the missing subscription primitive on top."
       />
-      <div className="rounded-3xl border border-line bg-ink-800/40 p-6 lg:p-10 relative overflow-hidden">
-        <div className="absolute inset-0 bg-cream-glow pointer-events-none" />
-        <div className="relative space-y-4">
+      <div className="relative rounded-3xl border border-line bg-white p-6 lg:p-10 shadow-card">
+        <div className="space-y-3">
           {LAYERS.map((l) => (
             <div
               key={l.tag}
-              className="rounded-2xl border border-line bg-ink-800 p-5 lg:p-6"
+              className="rounded-2xl border border-line bg-paper-50 p-6"
             >
               <div className="flex items-center gap-3 mb-4">
                 <span
                   className={
-                    "h-2 w-2 rounded-full " +
-                    (l.tone === "mint"
-                      ? "bg-mint-500"
-                      : l.tone === "cream"
-                      ? "bg-cream"
-                      : "bg-fg-dim")
+                    "h-2.5 w-2.5 rounded-full " +
+                    (l.tone === "ink"
+                      ? "bg-ink-900"
+                      : l.tone === "peach"
+                      ? "bg-peach-500"
+                      : l.tone === "forest"
+                      ? "bg-forest-500"
+                      : "bg-ink-300")
                   }
                 />
-                <span className="text-xs uppercase tracking-[0.14em] text-fg-muted font-mono">
+                <span className="text-[11px] uppercase tracking-[0.22em] text-ink-500 font-mono">
                   {l.tag}
                 </span>
               </div>
@@ -78,7 +89,7 @@ export function StackDiagram() {
                 {l.items.map((item) => (
                   <span
                     key={item}
-                    className="inline-flex items-center rounded-lg border border-line bg-ink-900 px-3 py-1.5 text-xs text-fg font-mono"
+                    className="inline-flex items-center rounded-lg border border-line bg-white px-3 py-1.5 text-xs text-ink-900 font-mono"
                   >
                     {item}
                   </span>

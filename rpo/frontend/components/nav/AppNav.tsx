@@ -23,13 +23,18 @@ const NAV = [
 
 const BOTTOM = [
   { label: "Docs", href: "/docs", Icon: Book, external: false },
-  { label: "GitHub", href: "https://github.com/lanqi0518-ux/balls", Icon: ArrowUpRight, external: true },
+  {
+    label: "GitHub",
+    href: "https://github.com/lanqi0518-ux/balls",
+    Icon: ArrowUpRight,
+    external: true,
+  },
 ];
 
 export function AppSidebar() {
   const pathname = usePathname();
   return (
-    <aside className="hidden lg:flex flex-col w-60 border-r border-line bg-ink-900 h-screen sticky top-0">
+    <aside className="hidden lg:flex flex-col w-60 border-r border-line bg-paper-100 h-screen sticky top-0">
       <div className="h-16 flex items-center px-6 border-b border-line">
         <Logo />
       </div>
@@ -43,10 +48,10 @@ export function AppSidebar() {
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                "flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-colors",
                 active
-                  ? "bg-mint-500/10 text-mint-400"
-                  : "text-fg-muted hover:text-fg hover:bg-ink-800"
+                  ? "bg-white text-ink-900 shadow-soft border border-line"
+                  : "text-ink-500 hover:text-ink-900 hover:bg-white"
               )}
             >
               <Icon className="h-4 w-4" />
@@ -64,7 +69,7 @@ export function AppSidebar() {
               href={href}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-fg-muted hover:text-fg hover:bg-ink-800 transition-colors"
+              className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-ink-500 hover:text-ink-900 hover:bg-white transition-colors"
             >
               <Icon className="h-4 w-4" />
               {label}
@@ -73,7 +78,7 @@ export function AppSidebar() {
             <Link
               key={label}
               href={href}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-fg-muted hover:text-fg hover:bg-ink-800 transition-colors"
+              className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-ink-500 hover:text-ink-900 hover:bg-white transition-colors"
             >
               <Icon className="h-4 w-4" />
               {label}
@@ -92,13 +97,13 @@ export function AppTopBar() {
   const pathname = usePathname();
 
   return (
-    <div className="sticky top-0 z-30 h-16 border-b border-line bg-ink-900/85 backdrop-blur-xl">
+    <div className="sticky top-0 z-30 h-16 border-b border-line bg-white/85 backdrop-blur-xl">
       <div className="h-full flex items-center justify-between px-5 lg:px-8">
         <div className="flex items-center gap-3">
           <Link href="/" className="lg:hidden">
             <Logo />
           </Link>
-          <div className="hidden lg:block text-sm text-fg-muted font-mono">
+          <div className="hidden lg:block text-sm text-ink-500 font-mono">
             {breadcrumb(pathname)}
           </div>
         </div>
@@ -106,7 +111,7 @@ export function AppTopBar() {
         <div className="flex items-center gap-3">
           <Link
             href="/how-it-works"
-            className="hidden sm:inline-flex text-sm text-fg-muted hover:text-fg transition-colors"
+            className="hidden sm:inline-flex text-sm text-ink-500 hover:text-ink-900 transition-colors"
           >
             Product
           </Link>
@@ -117,7 +122,7 @@ export function AppTopBar() {
               className="btn-secondary text-sm py-1.5"
               title={address}
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-mint-500" />
+              <span className="h-1.5 w-1.5 rounded-full bg-forest-500" />
               {address?.slice(0, 6)}…{address?.slice(-4)}
             </button>
           ) : (
@@ -140,7 +145,7 @@ export function AppTopBar() {
 
 function MobileTabs({ pathname }: { pathname: string }) {
   return (
-    <div className="lg:hidden border-t border-line flex overflow-x-auto no-scrollbar">
+    <div className="lg:hidden border-t border-line flex overflow-x-auto no-scrollbar bg-white">
       {NAV.map(({ label, href, Icon }) => {
         const active =
           href === "/app" ? pathname === "/app" : pathname.startsWith(href);
@@ -151,8 +156,8 @@ function MobileTabs({ pathname }: { pathname: string }) {
             className={cn(
               "flex items-center gap-2 px-4 py-3 text-xs whitespace-nowrap border-b-2 transition-colors",
               active
-                ? "border-mint-500 text-mint-400"
-                : "border-transparent text-fg-muted"
+                ? "border-ink-900 text-ink-900"
+                : "border-transparent text-ink-500"
             )}
           >
             <Icon className="h-4 w-4" />

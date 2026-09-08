@@ -2,17 +2,19 @@ import Link from "next/link";
 import { ButtonHTMLAttributes, forwardRef, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
-type Variant = "primary" | "secondary" | "outline" | "ghost";
+type Variant = "primary" | "forest" | "secondary" | "outline" | "ghost";
 type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
   primary:
-    "bg-mint-500 hover:bg-mint-400 text-ink-950 font-semibold shadow-sm hover:shadow-glow",
+    "bg-ink-900 hover:bg-ink-800 text-white shadow-soft hover:shadow-card",
+  forest:
+    "bg-forest-500 hover:bg-forest-600 text-white shadow-soft hover:shadow-card",
   secondary:
-    "bg-ink-700 hover:bg-ink-600 text-fg border border-line",
+    "bg-paper-100 hover:bg-paper-200 text-ink-900 border border-line",
   outline:
-    "border border-line-strong hover:border-mint-500 hover:text-mint-500 text-fg",
-  ghost: "text-fg-muted hover:text-fg hover:bg-ink-800",
+    "border border-line-strong hover:border-ink-900 text-ink-900 bg-transparent hover:bg-paper-100",
+  ghost: "text-ink-500 hover:text-ink-900 hover:bg-paper-100",
 };
 
 const sizes: Record<Size, string> = {
@@ -31,11 +33,7 @@ type Common = {
   fullWidth?: boolean;
 };
 
-type AsButton = Common &
-  ButtonHTMLAttributes<HTMLButtonElement> & { href?: undefined };
 type AsLink = Common & { href: string; external?: boolean };
-
-export type ButtonProps = AsButton | AsLink;
 
 function baseClass(v: Variant, s: Size, fullWidth?: boolean) {
   return cn(

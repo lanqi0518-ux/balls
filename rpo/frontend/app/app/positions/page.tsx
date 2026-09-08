@@ -56,7 +56,7 @@ export default function PositionsPage() {
 
       {!isConnected ? (
         <div className="card p-12 text-center">
-          <div className="h-14 w-14 rounded-full bg-ink-700 border border-line-strong flex items-center justify-center mx-auto mb-6">
+          <div className="h-14 w-14 rounded-full bg-paper-200 border border-line-strong flex items-center justify-center mx-auto mb-6">
             <Wallet className="h-6 w-6 text-fg-muted" />
           </div>
           <div className="text-fg text-lg font-medium mb-2">
@@ -76,7 +76,7 @@ export default function PositionsPage() {
 
           <section className="mb-12">
             <div className="flex items-center gap-2 mb-5">
-              <Badge variant="mint" dot>
+              <Badge variant="forest" dot>
                 Active · {ACTIVE.length}
               </Badge>
               <div className="text-xs text-fg-muted">
@@ -87,10 +87,10 @@ export default function PositionsPage() {
               {ACTIVE.map((row) => (
                 <div
                   key={row.ticker}
-                  className="p-5 flex items-center justify-between hover:bg-ink-800/60 transition-colors"
+                  className="p-5 flex items-center justify-between hover:bg-paper-100 transition-colors"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-full bg-ink-700 border border-line-strong flex items-center justify-center text-sm font-semibold text-fg">
+                    <div className="h-10 w-10 rounded-full bg-paper-200 border border-line-strong flex items-center justify-center text-sm font-semibold text-fg">
                       {row.ticker.slice(0, 2)}
                     </div>
                     <div>
@@ -113,7 +113,7 @@ export default function PositionsPage() {
                       <div className="text-[10px] uppercase tracking-[0.14em] text-fg-dim">
                         Weight
                       </div>
-                      <div className="font-mono text-sm text-mint-400 mt-1">
+                      <div className="font-mono text-sm text-forest-500 mt-1">
                         {row.weight}
                       </div>
                     </div>
@@ -137,10 +137,10 @@ export default function PositionsPage() {
               {HOLDINGS.map((h) => (
                 <div
                   key={h.ticker}
-                  className="p-5 flex items-center justify-between hover:bg-ink-800/60 transition-colors"
+                  className="p-5 flex items-center justify-between hover:bg-paper-100 transition-colors"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-full bg-ink-700 border border-line-strong flex items-center justify-center text-sm font-semibold text-fg">
+                    <div className="h-10 w-10 rounded-full bg-paper-200 border border-line-strong flex items-center justify-center text-sm font-semibold text-fg">
                       {h.ticker.slice(1, 3)}
                     </div>
                     <div>
@@ -175,8 +175,8 @@ export default function PositionsPage() {
                         className={
                           "font-mono text-sm mt-1 " +
                           (h.changePct >= 0
-                            ? "text-mint-400"
-                            : "text-red-400")
+                            ? "text-forest-500"
+                            : "text-rose-600")
                         }
                       >
                         {h.changePct >= 0 ? "+" : ""}
@@ -215,7 +215,7 @@ export default function PositionsPage() {
                   {HISTORY.map((h, i) => (
                     <tr
                       key={i}
-                      className="border-b border-line last:border-0 hover:bg-ink-800/60 transition-colors"
+                      className="border-b border-line last:border-0 hover:bg-paper-100 transition-colors"
                     >
                       <td className="p-4 text-fg-muted font-mono">
                         {h.date}
@@ -231,7 +231,7 @@ export default function PositionsPage() {
                       <td className="p-4 text-right">
                         <Link
                           href="#"
-                          className="text-mint-400 hover:underline inline-flex items-center gap-1"
+                          className="text-forest-500 hover:underline inline-flex items-center gap-1"
                         >
                           view <ArrowUpRight className="h-3 w-3" />
                         </Link>
@@ -278,7 +278,7 @@ function SummaryCard({
       <div
         className={
           "font-display text-3xl tabular-nums mt-2 " +
-          (tone === "mint" ? "text-mint-400" : "text-fg")
+          (tone === "mint" ? "text-forest-500" : "text-fg")
         }
       >
         {value}

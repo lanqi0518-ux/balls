@@ -15,16 +15,16 @@ const NAMES = [
 
 export function Partners() {
   return (
-    <section className="py-16 border-y border-line bg-ink-900">
+    <section className="py-20 border-y border-line bg-white">
       <Container>
-        <div className="text-center text-xs uppercase tracking-[0.2em] text-fg-dim mb-10">
+        <div className="text-center text-[11px] uppercase tracking-[0.28em] text-ink-500 mb-12">
           Built on the Robinhood Chain stack
         </div>
-        <Marquee speed={45}>
+        <Marquee speed={50}>
           {NAMES.map((n) => (
             <span
               key={n}
-              className="text-fg-muted hover:text-fg transition-colors text-xl lg:text-2xl font-display whitespace-nowrap"
+              className="text-ink-400 hover:text-ink-900 transition-colors text-2xl lg:text-3xl font-display whitespace-nowrap"
             >
               {n}
             </span>

@@ -33,12 +33,14 @@ export function SectionHeader({
   title,
   description,
   align = "left",
+  tone = "light",
   className,
 }: {
   eyebrow?: string;
   title: ReactNode;
   description?: ReactNode;
   align?: "left" | "center";
+  tone?: "light" | "dark";
   className?: string;
 }) {
   return (
@@ -49,10 +51,26 @@ export function SectionHeader({
         className
       )}
     >
-      {eyebrow && <div className="eyebrow mb-4">{eyebrow}</div>}
-      <h2 className="font-display text-display-sm text-fg">{title}</h2>
+      {eyebrow && (
+        <div className={tone === "dark" ? "eyebrow-dark mb-5" : "eyebrow mb-5"}>
+          {eyebrow}
+        </div>
+      )}
+      <h2
+        className={cn(
+          "font-display text-display-sm",
+          tone === "dark" ? "text-white" : "text-ink-900"
+        )}
+      >
+        {title}
+      </h2>
       {description && (
-        <p className="mt-5 text-lg text-fg-muted leading-relaxed">
+        <p
+          className={cn(
+            "mt-6 text-lg leading-relaxed",
+            tone === "dark" ? "text-white/70" : "text-ink-500"
+          )}
+        >
           {description}
         </p>
       )}

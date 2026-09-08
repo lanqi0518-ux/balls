@@ -42,7 +42,7 @@ export function IPOCard({
   return (
     <Link
       href={`/app/ipo/${ticker.toLowerCase()}`}
-      className="card-hover p-6 flex flex-col gap-5 group relative"
+      className="card-hover p-7 flex flex-col gap-5 group"
     >
       <div className="flex items-center gap-4">
         {logoUrl ? (
@@ -50,31 +50,37 @@ export function IPOCard({
           <img
             src={logoUrl}
             alt={ticker}
-            className="w-12 h-12 rounded-full border border-line-strong"
+            className="w-12 h-12 rounded-2xl border border-line"
           />
         ) : (
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-ink-600 to-ink-800 border border-line-strong flex items-center justify-center font-semibold text-fg">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-ink-900 to-ink-700 flex items-center justify-center text-white font-semibold">
             {ticker.slice(0, 2)}
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <div className="text-lg font-semibold text-fg">{ticker}</div>
-          <div className="text-xs text-fg-muted truncate">{name}</div>
+          <div className="text-lg font-semibold text-ink-900">{ticker}</div>
+          <div className="text-xs text-ink-500 truncate">{name}</div>
         </div>
-        <Badge variant={status === "Subscribing" ? "mint" : "default"} dot={status === "Subscribing"}>
+        <Badge
+          variant={status === "Subscribing" ? "forest" : "default"}
+          dot={status === "Subscribing"}
+        >
           {status}
         </Badge>
       </div>
 
       <div>
-        <div className="flex items-center justify-between text-xs text-fg-muted mb-2">
+        <div className="flex items-center justify-between text-xs text-ink-500 mb-2">
           <span>Subscribed</span>
-          <span className="font-mono text-fg">
+          <span className="font-mono text-ink-900 tabular-nums">
             {fmtM(subscribedUSD)} / {fmtM(targetUSD)}
           </span>
         </div>
-        <div className="h-1 bg-ink-700 rounded-full overflow-hidden">
-          <div className="h-full bg-mint-gradient" style={{ width: `${pct}%` }} />
+        <div className="h-1.5 bg-paper-200 rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-forest-500 to-peach-500"
+            style={{ width: `${pct}%` }}
+          />
         </div>
       </div>
 
@@ -83,15 +89,19 @@ export function IPOCard({
           k="Expected"
           v={expectedPrice ? `$${expectedPrice.toFixed(2)}` : "TBD"}
         />
-        <MiniStat k="Launch in" v={formatCountdown(countdownSec)} tone="mint" />
-        <MiniStat k="Your boost" v={`${boost.toFixed(1)}×`} tone="mint" />
+        <MiniStat
+          k="Launch in"
+          v={formatCountdown(countdownSec)}
+          tone="forest"
+        />
+        <MiniStat k="Boost" v={`${boost.toFixed(1)}×`} tone="peach" />
       </div>
 
-      <div className="flex items-center justify-between mt-2">
-        <span className="text-xs text-fg-dim">
+      <div className="flex items-center justify-between mt-1">
+        <span className="text-xs text-ink-500">
           {pct}% filled · vault #{ticker}
         </span>
-        <span className="text-sm text-mint-400 inline-flex items-center gap-1 group-hover:gap-2 transition-all">
+        <span className="text-sm text-ink-900 inline-flex items-center gap-1 group-hover:gap-2 transition-all">
           Subscribe <ArrowUpRight className="h-3.5 w-3.5" />
         </span>
       </div>
@@ -106,17 +116,21 @@ function MiniStat({
 }: {
   k: string;
   v: string;
-  tone?: "mint";
+  tone?: "forest" | "peach";
 }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-[0.14em] text-fg-dim">
+      <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500">
         {k}
       </div>
       <div
         className={
           "text-sm font-mono tabular-nums mt-1 " +
-          (tone === "mint" ? "text-mint-400" : "text-fg")
+          (tone === "forest"
+            ? "text-forest-500 font-semibold"
+            : tone === "peach"
+            ? "text-peach-600 font-semibold"
+            : "text-ink-900")
         }
       >
         {v}

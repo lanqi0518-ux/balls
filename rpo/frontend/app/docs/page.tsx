@@ -49,7 +49,7 @@ export default function DocsPage() {
         title={
           <>
             Everything a developer needs to{" "}
-            <span className="italic text-mint-500">integrate</span> RPO.
+            <span className="italic text-forest-500">integrate</span> RPO.
           </>
         }
         description="Reference ABIs, deployment addresses, TypeScript helpers, and integration recipes. Full markdown source in the repo — this page is the canonical hub."
@@ -63,14 +63,14 @@ export default function DocsPage() {
               href={href}
               className="card-hover p-8 flex flex-col gap-4 group"
             >
-              <div className="h-10 w-10 rounded-lg bg-mint-500/10 text-mint-400 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg bg-forest-50 text-forest-500 flex items-center justify-center">
                 <Icon className="h-5 w-5" />
               </div>
               <h3 className="font-display text-2xl text-fg">{title}</h3>
               <p className="text-sm text-fg-muted leading-relaxed flex-1">
                 {body}
               </p>
-              <div className="text-sm text-mint-400 inline-flex items-center gap-1 group-hover:gap-2 transition-all">
+              <div className="text-sm text-forest-500 inline-flex items-center gap-1 group-hover:gap-2 transition-all">
                 Read <ArrowUpRight className="h-3.5 w-3.5" />
               </div>
             </Link>
@@ -78,9 +78,9 @@ export default function DocsPage() {
         </div>
       </Section>
 
-      <Section id="quickstart" className="border-t border-line bg-ink-800/30">
+      <Section id="quickstart" className="border-t border-line bg-paper-100">
         <SectionHeader eyebrow="Quickstart" title="Deploy locally in 10 minutes." />
-        <div className="card p-6 lg:p-8 bg-ink-900">
+        <div className="card p-6 lg:p-8 bg-paper-100">
           <pre className="text-xs lg:text-sm font-mono text-fg leading-relaxed whitespace-pre overflow-x-auto">
 {`# Clone
 git clone https://github.com/lanqi0518-ux/balls.git rpo
@@ -111,7 +111,7 @@ forge script script/Deploy.s.sol \\
           {CONTRACTS.map((c) => (
             <div
               key={c.name}
-              className="p-6 flex items-center justify-between gap-6 hover:bg-ink-800/60 transition-colors"
+              className="p-6 flex items-center justify-between gap-6 hover:bg-paper-100 transition-colors"
             >
               <div className="min-w-0">
                 <div className="text-fg font-semibold">{c.name}</div>
@@ -135,7 +135,7 @@ forge script script/Deploy.s.sol \\
           description="Read the current IPO calendar directly from the registry."
         />
         <Container variant="copy" className="!px-0">
-          <div className="card p-6 lg:p-8 bg-ink-900">
+          <div className="card p-6 lg:p-8 bg-paper-100">
             <pre className="text-xs lg:text-sm font-mono text-fg leading-relaxed whitespace-pre overflow-x-auto">
 {`import { createPublicClient, http } from "viem";
 import { robinhoodChain } from "@rpo/sdk/chain";

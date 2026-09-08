@@ -64,8 +64,8 @@ export default function HowItWorksPage() {
         title={
           <>
             One contract per IPO. Six calls from{" "}
-            <span className="italic text-mint-500">deposit</span> to{" "}
-            <span className="italic text-mint-500">exit</span>.
+            <span className="italic text-forest-500">deposit</span> to{" "}
+            <span className="italic text-forest-500">exit</span>.
           </>
         }
         description="Everything RPO does happens on public contracts on Robinhood Chain. There is no off-chain matching engine, no proprietary order book, and no admin key that can seize your allocation."
@@ -79,7 +79,7 @@ export default function HowItWorksPage() {
         </div>
       </Section>
 
-      <Section className="border-t border-line bg-ink-800/30">
+      <Section className="border-t border-line bg-paper-100">
         <SectionHeader
           eyebrow="Invariants"
           title="Things that are true by construction."
@@ -95,7 +95,7 @@ export default function HowItWorksPage() {
             "Stock Tokens use ERC-8056 uiMultiplier, so splits and dividends are automatic.",
           ].map((line) => (
             <div key={line} className="card p-5 flex items-start gap-3">
-              <Check className="h-4 w-4 text-mint-400 mt-1 flex-shrink-0" />
+              <Check className="h-4 w-4 text-forest-500 mt-1 flex-shrink-0" />
               <span className="text-sm text-fg">{line}</span>
             </div>
           ))}
@@ -148,13 +148,13 @@ function LifecycleRow({
       }
     >
       <div className="card p-8 lg:p-10 [direction:ltr]">
-        <div className="text-xs uppercase tracking-[0.14em] text-mint-400 font-mono">
+        <div className="text-xs uppercase tracking-[0.14em] text-forest-500 font-mono">
           Step {step.n} · {step.tag}
         </div>
         <h3 className="mt-3 font-display text-3xl text-fg">{step.title}</h3>
         <p className="mt-4 text-fg-muted leading-relaxed">{step.body}</p>
       </div>
-      <div className="card p-6 lg:p-8 bg-ink-900 [direction:ltr] overflow-hidden">
+      <div className="card p-6 lg:p-8 bg-paper-100 [direction:ltr] overflow-hidden">
         <div className="text-[10px] uppercase tracking-[0.14em] text-fg-dim font-mono mb-4">
           Solidity
         </div>

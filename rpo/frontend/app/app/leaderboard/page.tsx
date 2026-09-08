@@ -29,7 +29,7 @@ export default function LeaderboardPage() {
             weighted $RPO airdrop.
           </p>
         </div>
-        <Badge variant="mint" dot>
+        <Badge variant="forest" dot>
           Season active · 8.4M / 50M
         </Badge>
       </header>
@@ -46,7 +46,7 @@ export default function LeaderboardPage() {
         {LEADERS.map((l) => (
           <div
             key={l.rank}
-            className="grid grid-cols-12 items-center px-5 py-4 border-b border-line last:border-0 hover:bg-ink-800/60 transition-colors"
+            className="grid grid-cols-12 items-center px-5 py-4 border-b border-line last:border-0 hover:bg-paper-100 transition-colors"
           >
             <div className="col-span-1">
               {l.rank <= 3 ? (
@@ -54,8 +54,8 @@ export default function LeaderboardPage() {
                   className={
                     "h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold " +
                     (l.rank === 1
-                      ? "bg-mint-500/20 text-mint-400"
-                      : "bg-ink-700 text-fg")
+                      ? "bg-forest-50 text-forest-500"
+                      : "bg-paper-200 text-fg")
                   }
                 >
                   <Trophy className="h-3.5 w-3.5" />
@@ -73,7 +73,7 @@ export default function LeaderboardPage() {
             <div className="col-span-1 text-right font-mono text-sm text-fg-muted">
               {l.ipos}
             </div>
-            <div className="col-span-2 text-right font-mono text-sm text-mint-400 tabular-nums">
+            <div className="col-span-2 text-right font-mono text-sm text-forest-500 tabular-nums">
               +{l.pnl}%
             </div>
             <div className="col-span-2 text-right font-mono text-sm text-fg tabular-nums">
