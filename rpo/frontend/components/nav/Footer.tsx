@@ -23,6 +23,7 @@ const COLS = [
     links: [
       { label: "How it works", href: "/how-it-works" },
       { label: "Whitepaper", href: "/whitepaper" },
+      { label: "Roadmap", href: "/roadmap" },
       { label: "Tokenomics", href: "/tokenomics" },
       { label: "Governance", href: "/governance" },
       { label: "Ecosystem", href: "/ecosystem" },

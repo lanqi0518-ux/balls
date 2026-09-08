@@ -8,6 +8,7 @@ import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { FeaturedIPOs } from "@/components/marketing/FeaturedIPOs";
 import { StackDiagram } from "@/components/marketing/StackDiagram";
 import { RPOTokenSection } from "@/components/marketing/RPOTokenSection";
+import { RoadmapTease } from "@/components/marketing/RoadmapTease";
 import { Partners } from "@/components/marketing/Partners";
 import { Testimonials } from "@/components/marketing/Testimonials";
 import { FAQ } from "@/components/marketing/FAQ";
@@ -27,6 +28,7 @@ export default function HomePage() {
         <FeaturedIPOs />
         <StackDiagram />
         <RPOTokenSection />
+        <RoadmapTease />
         <Testimonials />
         <FAQ />
         <CTA />

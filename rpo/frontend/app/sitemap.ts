@@ -7,6 +7,7 @@ const ROUTES = [
   "",
   "/how-it-works",
   "/whitepaper",
+  "/roadmap",
   "/tokenomics",
   "/governance",
   "/about",

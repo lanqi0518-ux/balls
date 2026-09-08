@@ -494,52 +494,70 @@ export default function WhitepaperPage() {
           </p>
 
           <H2 id="roadmap">10. Roadmap</H2>
+          <p>
+            The protocol&apos;s trajectory is deliberately staged into four
+            phases, each ending in a self-contained legal and technical
+            deliverable. Full public plan at{" "}
+            <a href="/roadmap">/roadmap</a>.
+          </p>
           <table>
             <thead>
               <tr>
                 <th>Phase</th>
-                <th>Milestone</th>
-                <th>Status</th>
+                <th>Codename</th>
+                <th>Legal path</th>
+                <th>Who buys</th>
+                <th>Target</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>0</td>
-                <td>Testnet on Sepolia-Orbit + $RPO fair launch on Pons</td>
-                <td>Shipped</td>
+                <td>00</td>
+                <td>Subscribe</td>
+                <td>None (reads RHJ Reg-S)</td>
+                <td>Global non-US retail</td>
+                <td>Shipped · Mar 2026</td>
               </tr>
               <tr>
-                <td>1</td>
-                <td>Mainnet on Robinhood Chain, 5 IPOs</td>
-                <td>Live</td>
-              </tr>
-              <tr>
-                <td>2</td>
-                <td>LiFi + Privy widget, gasless subscribe</td>
-                <td>Q2 2026</td>
-              </tr>
-              <tr>
-                <td>3</td>
-                <td>LeverageLooper GA + Morpho market seed</td>
-                <td>Q2 2026</td>
-              </tr>
-              <tr>
-                <td>4</td>
-                <td>Governor v1 + first onchain vote</td>
+                <td>01</td>
+                <td>Issue · Reg-S</td>
+                <td>Regulation S + Cayman SPV</td>
+                <td>Global non-US retail</td>
                 <td>Q3 2026</td>
               </tr>
               <tr>
-                <td>5</td>
-                <td>Cross-chain SubscriptionVaults via LayerZero</td>
-                <td>Q3 2026</td>
-              </tr>
-              <tr>
-                <td>6</td>
-                <td>ETF-basket vault (subscribe once, get 10 IPOs)</td>
+                <td>02</td>
+                <td>Issue · Reg-D</td>
+                <td>Reg-D 506(c) + accredited SBT</td>
+                <td>Accredited investors globally</td>
                 <td>Q4 2026</td>
+              </tr>
+              <tr>
+                <td>03</td>
+                <td>Issue · Reg-A+</td>
+                <td>Reg-A Tier 2 + SEC qualification</td>
+                <td>US retail + global</td>
+                <td>Q2 2027</td>
+              </tr>
+              <tr>
+                <td>04</td>
+                <td>Compete</td>
+                <td>S-1 + FINRA ATS + Transfer Agent</td>
+                <td>Every public-market participant</td>
+                <td>2027 – 2028</td>
               </tr>
             </tbody>
           </table>
+          <p>
+            The three new contract modules delivered across phases 01 → 04
+            —{" "}
+            <code>IssuanceFactory</code>,{" "}
+            <code>TransferPolicy</code> (ERC-3643), and{" "}
+            <code>CapTable</code> — are described in detail on the{" "}
+            <a href="/roadmap#modules">roadmap page</a>. All new modules
+            inherit the same non-upgradable, no-admin, permissionless-refund
+            posture as the current five contracts.
+          </p>
 
           <H2 id="references">References</H2>
           <ol>

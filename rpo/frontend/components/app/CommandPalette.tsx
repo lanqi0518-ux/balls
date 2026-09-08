@@ -54,6 +54,7 @@ export function CommandPalette() {
       { id: "nav-lb", label: "Leaderboard", section: "Navigate", Icon: Trophy, action: () => router.push("/app/leaderboard") },
       { id: "nav-docs", label: "Docs", section: "Navigate", Icon: Book, action: () => router.push("/docs") },
       { id: "nav-wp", label: "Whitepaper", section: "Navigate", Icon: Book, action: () => router.push("/whitepaper") },
+      { id: "nav-rm", label: "Roadmap · NASDAQ replacement plan", section: "Navigate", Icon: Chart, action: () => router.push("/roadmap") },
       { id: "nav-tk", label: "Tokenomics", section: "Navigate", Icon: Coin, action: () => router.push("/tokenomics") },
       { id: "nav-gv", label: "Governance", section: "Navigate", Icon: Shield, action: () => router.push("/governance") },
       { id: "nav-sec", label: "Security", section: "Navigate", Icon: Shield, action: () => router.push("/security") },

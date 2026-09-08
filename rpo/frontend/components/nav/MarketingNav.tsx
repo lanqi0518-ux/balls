@@ -41,6 +41,7 @@ const MENUS: Menu[] = [
     label: "Learn",
     items: [
       { label: "Whitepaper", href: "/whitepaper", hint: "12-chapter technical paper" },
+      { label: "Roadmap", href: "/roadmap", hint: "The NASDAQ-replacement plan" },
       { label: "Tokenomics", href: "/tokenomics", hint: "Supply, distribution, flywheel" },
       { label: "Governance", href: "/governance", hint: "Proposals & votes" },
       { label: "Ecosystem", href: "/ecosystem", hint: "Every integration + version" },
