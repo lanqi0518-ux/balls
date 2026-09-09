@@ -7,6 +7,7 @@ import { ArrowUpRight } from "@/components/ui/Icons";
 import {
   computeBoost,
   IPO_SEEDS,
+  PIPELINE,
   useDemoStore,
 } from "@/lib/demoStore";
 import { useCountdown } from "@/lib/useCountdown";
@@ -64,6 +65,94 @@ export default function AppHomePage() {
           {active.map((ipo) => (
             <LiveIPOCard key={ipo.ticker} ipo={ipo} boost={boost} />
           ))}
+        </div>
+      </section>
+
+      <section className="mb-14">
+        <div className="flex items-end justify-between mb-6 flex-wrap gap-3">
+          <div>
+            <h2 className="text-xl font-semibold text-ink-900">
+              Pipeline
+            </h2>
+            <p className="text-sm text-ink-500 mt-1">
+              Nine vaults queued — three sources, always at least one live.{" "}
+              <Link href="/economics" className="text-forest-500 hover:underline">
+                How deal flow works →
+              </Link>
+            </p>
+          </div>
+          <div className="flex items-center gap-3 text-xs text-ink-500 flex-wrap">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-forest-500" />
+              Always-on
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-peach-500" />
+              RHJ detected
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-ink-900" />
+              Curated / Grants
+            </span>
+          </div>
+        </div>
+        <div className="card divide-y divide-line">
+          {PIPELINE.map((p) => {
+            const dot =
+              p.source === "Aftermarket Vault"
+                ? "bg-forest-500"
+                : p.source === "RHJ Reg-S"
+                ? "bg-peach-500"
+                : "bg-ink-900";
+            return (
+              <div
+                key={p.ticker}
+                className="p-5 grid grid-cols-[auto_1fr_auto] gap-4 items-center hover:bg-paper-100 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span className={"h-2 w-2 rounded-full " + dot} />
+                  <div className="h-9 w-9 rounded-xl bg-paper-100 border border-line flex items-center justify-center text-[10px] font-mono text-ink-500">
+                    {p.ticker.slice(0, 4)}
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-baseline gap-3 flex-wrap">
+                    <span className="text-ink-900 font-semibold">
+                      {p.ticker}
+                    </span>
+                    <span className="text-sm text-ink-500 truncate">
+                      {p.name}
+                    </span>
+                  </div>
+                  <div className="text-xs text-ink-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                    <Badge className="!py-0 !px-1.5 !text-[10px]">
+                      {p.source}
+                    </Badge>
+                    {p.note && <span className="truncate">{p.note}</span>}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-ink-500 font-mono">
+                    {p.etaDays === 0 ? "Live now" : `Opens in`}
+                  </div>
+                  <div className="font-mono tabular-nums text-sm text-ink-900 mt-0.5">
+                    {p.etaDays === 0 ? (
+                      <span className="text-forest-500">
+                        {fmtUSD(p.targetUSD, { compact: true })} cap
+                      </span>
+                    ) : (
+                      <>
+                        {p.etaDays}d ·{" "}
+                        <span className="text-ink-500">
+                          {fmtUSD(p.targetUSD, { compact: true })}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 

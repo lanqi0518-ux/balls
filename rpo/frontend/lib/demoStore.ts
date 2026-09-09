@@ -295,6 +295,102 @@ export const IPO_SEEDS: IPOSeed[] = [
   },
 ];
 
+/**
+ * Deal-flow pipeline: what the keeper + curation team have queued but
+ * hasn't yet opened for subscription. Kept visible on the app calendar
+ * so users can confirm continuous deal flow, not just what's currently
+ * live. In production, populated from IPORegistry.getPipeline() and the
+ * off-chain curation feed.
+ */
+export type PipelineItem = {
+  ticker: string;
+  name: string;
+  source:
+    | "RHJ Reg-S"
+    | "Aftermarket Vault"
+    | "Direct Reg-S"
+    | "Reg-A+"
+    | "Grants";
+  etaDays: number;
+  targetUSD: number;
+  note?: string;
+};
+
+export const PIPELINE: PipelineItem[] = [
+  {
+    ticker: "DBX",
+    name: "Databricks, Inc.",
+    source: "RHJ Reg-S",
+    etaDays: 14,
+    targetUSD: 6_000_000,
+    note: "Detected on /rhj/assets · propose() eligible",
+  },
+  {
+    ticker: "OAI",
+    name: "OpenAI (secondary)",
+    source: "Direct Reg-S",
+    etaDays: 21,
+    targetUSD: 10_000_000,
+    note: "Cayman SPV in escrow · legal review passed",
+  },
+  {
+    ticker: "SPY",
+    name: "SPDR S&P 500 (aftermarket)",
+    source: "Aftermarket Vault",
+    etaDays: 0,
+    targetUSD: 2_000_000,
+    note: "Always-on · batch-fulfills every 4h",
+  },
+  {
+    ticker: "TSLA",
+    name: "Tesla Inc. (aftermarket)",
+    source: "Aftermarket Vault",
+    etaDays: 0,
+    targetUSD: 2_000_000,
+    note: "Always-on · Chainlink-bound",
+  },
+  {
+    ticker: "SHEIN",
+    name: "Roadget Business (SHEIN)",
+    source: "RHJ Reg-S",
+    etaDays: 42,
+    targetUSD: 8_000_000,
+    note: "Filing rumored · monitoring /rhj/assets",
+  },
+  {
+    ticker: "PLTR-2",
+    name: "Palantir Class B",
+    source: "RHJ Reg-S",
+    etaDays: 30,
+    targetUSD: 4_000_000,
+    note: "Waiting on RHJ confirmation",
+  },
+  {
+    ticker: "NEURA",
+    name: "Neura Robotics (Grants)",
+    source: "Grants",
+    etaDays: 55,
+    targetUSD: 3_000_000,
+    note: "$120k legal underwriting approved",
+  },
+  {
+    ticker: "MSTR",
+    name: "MicroStrategy (aftermarket)",
+    source: "Aftermarket Vault",
+    etaDays: 0,
+    targetUSD: 1_500_000,
+    note: "Always-on",
+  },
+  {
+    ticker: "PLURAL",
+    name: "Plural Energy (Reg-A+ pilot)",
+    source: "Reg-A+",
+    etaDays: 180,
+    targetUSD: 25_000_000,
+    note: "SEC qualification in progress · Q2 2027",
+  },
+];
+
 export function findIPO(ticker: string): IPOSeed | undefined {
   return IPO_SEEDS.find(
     (s) => s.ticker.toLowerCase() === ticker.toLowerCase()

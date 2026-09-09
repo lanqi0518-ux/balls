@@ -89,6 +89,54 @@ export default function StakePage() {
         </p>
       </header>
 
+      {/* USDG-vs-$RPO clarifier — the single most-asked question */}
+      <div className="card p-6 mb-10 grid md:grid-cols-[1fr_auto_1fr] gap-6 items-center">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-7 w-7 rounded-full bg-ink-900 text-white flex items-center justify-center text-xs font-bold">
+              1
+            </div>
+            <div className="font-semibold text-ink-900">Pay with USDG</div>
+          </div>
+          <p className="text-sm text-ink-500 leading-relaxed">
+            The actual money that buys the underlying Stock Token. Required to
+            subscribe. Fully refundable if the IPO doesn&apos;t list on time.
+          </p>
+        </div>
+        <div className="text-2xl text-ink-300 hidden md:block">+</div>
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-7 w-7 rounded-full bg-forest-500 text-white flex items-center justify-center text-xs font-bold">
+              2
+            </div>
+            <div className="font-semibold text-ink-900">
+              Stake $RPO for priority
+            </div>
+          </div>
+          <p className="text-sm text-ink-500 leading-relaxed">
+            Optional. Multiplies your subscription weight (1× → 3×), so if the
+            IPO is oversubscribed you get a bigger cut of the fixed share pool.
+          </p>
+        </div>
+        <div className="md:col-span-3 mt-2 pt-4 border-t border-line flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-ink-500">
+          <span>
+            <span className="font-mono text-ink-900">1</span> USDG @{" "}
+            <span className="font-mono text-ink-900">1.00×</span> → weight{" "}
+            <span className="font-mono text-ink-900">1.00</span>
+          </span>
+          <span>
+            <span className="font-mono text-ink-900">1</span> USDG @{" "}
+            <span className="font-mono text-forest-500">2.00×</span> → weight{" "}
+            <span className="font-mono text-forest-500">2.00</span>
+          </span>
+          <span className="ml-auto">
+            <a href="/economics#02" className="text-forest-500 hover:underline">
+              Full mechanics table →
+            </a>
+          </span>
+        </div>
+      </div>
+
       <div className="grid lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3 space-y-6">
           <div className="card-floating p-8">
