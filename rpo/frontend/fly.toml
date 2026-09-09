@@ -10,7 +10,12 @@ kill_signal = "SIGINT"
 kill_timeout = "5s"
 
 [build]
-  dockerfile = "Dockerfile"
+  # Fly's Depot builder produces subtly-broken output for our root
+  # marketing route (compiles `app/page.tsx` to a near-empty client
+  # bundle, so the deployed `/` responded with `/app` content instead
+  # of the Hero). Ship a locally-built `.next/standalone` directly
+  # instead — the runtime image just runs `node server.js`.
+  dockerfile = "Dockerfile.prebuilt"
 
 [env]
   NEXT_TELEMETRY_DISABLED = "1"

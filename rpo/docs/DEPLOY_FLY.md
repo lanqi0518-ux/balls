@@ -37,18 +37,29 @@ From the repo root:
 ```bash
 cd rpo/frontend
 
-# First launch — Fly reads fly.toml, sets up the app + machine, deploys.
-# The default app name in fly.toml is "rpo-web". If that's already taken
-# in your org, flyctl will prompt for a new name.
+# 1. Build locally FIRST. Fly's Depot builder currently emits a broken
+#    root chunk for `app/page.tsx` (compiles to a 158-byte stub, so the
+#    deployed `/` renders the `/app` dashboard instead of the marketing
+#    Hero). Until that regression is diagnosed upstream, we ship the
+#    pre-built `.next/standalone` output directly.
+npm run build
+
+# 2. Deploy. fly.toml already points at Dockerfile.prebuilt, which just
+#    COPYs .next/standalone + .next/static + public into a node:20-alpine
+#    runtime and runs `node server.js`. No transpilation on Fly.
 flyctl launch --copy-config --now
 ```
 
 That's it. Fly will:
 
-1. Build the Docker image from `Dockerfile` (multi-stage, ~150 MB).
+1. Package your local `.next/standalone` (~40 MB) + static assets into a
+   50 MB image via `Dockerfile.prebuilt`.
 2. Push it to the Fly registry.
 3. Spin up a `shared-cpu-1x` machine in `fra` (Frankfurt).
 4. Print your app URL: `https://rpo-web.fly.dev`.
+
+> **Redeploy workflow:** any code change → `npm run build && flyctl deploy`.
+> Skip the build and you'll ship a stale image.
 
 Verify:
 

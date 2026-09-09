@@ -1,0 +1,30 @@
+# syntax=docker/dockerfile:1.7
+# Fly's Depot builder produces subtly-wrong output for our marketing
+# root route (compiles `app/page.tsx` to an empty client bundle).
+# Reason isn't clear yet — likely a webpack cache miss on the shared
+# `chunks/fd9d10*` group. To unblock production we ship a pre-built
+# `.next/standalone` from a known-good local build and let the runtime
+# image just run `node server.js`. No transpilation happens in the image.
+
+FROM node:20-alpine
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+RUN addgroup --system --gid 1001 nodejs \
+ && adduser --system --uid 1001 nextjs
+
+# Copy pre-built standalone output (includes minimal node_modules)
+COPY --chown=nextjs:nodejs .next/standalone/ ./
+# Static assets served directly by the standalone server
+COPY --chown=nextjs:nodejs .next/static/ ./.next/static/
+# Public assets (icons, robots.txt, etc.)
+COPY --chown=nextjs:nodejs public/ ./public/
+
+USER nextjs
+EXPOSE 3000
+
+CMD ["node", "server.js"]
