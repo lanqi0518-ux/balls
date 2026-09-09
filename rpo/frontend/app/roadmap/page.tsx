@@ -30,8 +30,21 @@ const PHASES = [
       "The current RPO protocol: users subscribe to Robinhood Assets Jersey Reg-S Stock Tokens the moment they are listed. Priced via Rialto propAMM, allocated by $RPO-weighted staker boost, refunded permissionlessly if the underlying doesn't list.",
     who: "Any non-US wallet",
     legal: "None required — reads existing Reg-S offerings",
-    modules: ["IPORegistry", "SubscriptionVault", "AllocationBooster", "RialtoAdapter", "LeverageLooper"],
+    modules: ["IPORegistry", "SubscriptionVault", "AssetDiscovery", "AllocationBooster", "RialtoAdapter", "LeverageLooper"],
     delivered: "March 2026",
+  },
+  {
+    n: "00b",
+    year: "Live · 2026",
+    codename: "Scale",
+    status: "shipped" as const,
+    title: "AssetDiscovery — 200-500 vaults live every day",
+    body:
+      "Deploy AssetDiscovery.sol: a permissionless factory anyone can call to spawn subscription vaults for (a) every RHJ-listed stock token as an always-on aftermarket vault (rolled every 4h), and (b) every Pons Launchpad token that graduates to Uniswap V4 as a 72h subscription window. Same subscribe flow, but the calendar is never empty — connect wallet, browse hundreds of live vaults, subscribe with USDG.",
+    who: "Any non-US wallet",
+    legal: "None required — same Reg-S posture as Phase 00",
+    modules: ["AssetDiscovery", "PonsGraduationHandler", "RhjStockTokenSet", "ChainlinkRegistry"],
+    delivered: "September 2026",
   },
   {
     n: "01",

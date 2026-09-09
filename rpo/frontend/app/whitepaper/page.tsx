@@ -16,21 +16,23 @@ const toc: TocItem[] = [
   { id: "abstract", label: "Abstract" },
   { id: "problem", label: "1. The IPO access problem" },
   { id: "rhc", label: "2. Robinhood Chain as native rails" },
-  { id: "protocol", label: "3. Protocol architecture" },
-  { id: "vault", label: "3.1 SubscriptionVault", depth: 3 },
-  { id: "registry", label: "3.2 IPORegistry", depth: 3 },
-  { id: "booster", label: "3.3 AllocationBooster", depth: 3 },
-  { id: "rialto", label: "3.4 RialtoAdapter", depth: 3 },
-  { id: "looper", label: "3.5 LeverageLooper", depth: 3 },
-  { id: "token", label: "4. The $RPO token" },
-  { id: "boost", label: "4.1 Boost curve", depth: 3 },
-  { id: "flywheel", label: "4.2 Fee-to-buyback flywheel", depth: 3 },
-  { id: "launch", label: "5. Fair launch on Pons" },
-  { id: "bridging", label: "6. Cross-chain via LiFi" },
-  { id: "security", label: "7. Security model" },
-  { id: "governance", label: "8. Governance" },
-  { id: "regulatory", label: "9. Regulatory posture" },
-  { id: "roadmap", label: "10. Roadmap" },
+  { id: "dealflow", label: "3. Deal-flow topology" },
+  { id: "protocol", label: "4. Protocol architecture" },
+  { id: "vault", label: "4.1 SubscriptionVault", depth: 3 },
+  { id: "registry", label: "4.2 IPORegistry", depth: 3 },
+  { id: "discovery", label: "4.3 AssetDiscovery", depth: 3 },
+  { id: "booster", label: "4.4 AllocationBooster", depth: 3 },
+  { id: "rialto", label: "4.5 RialtoAdapter", depth: 3 },
+  { id: "looper", label: "4.6 LeverageLooper", depth: 3 },
+  { id: "token", label: "5. The $RPO token" },
+  { id: "boost", label: "5.1 Boost curve", depth: 3 },
+  { id: "flywheel", label: "5.2 Fee-to-buyback flywheel", depth: 3 },
+  { id: "launch", label: "6. Fair launch on Pons" },
+  { id: "bridging", label: "7. Cross-chain via LiFi" },
+  { id: "security", label: "8. Security model" },
+  { id: "governance", label: "9. Governance" },
+  { id: "regulatory", label: "10. Regulatory posture" },
+  { id: "roadmap", label: "11. Roadmap" },
   { id: "references", label: "References" },
 ];
 
@@ -227,7 +229,102 @@ export default function WhitepaperPage() {
             granularity.
           </p>
 
-          <H2 id="protocol">3. Protocol architecture</H2>
+          <H2 id="dealflow">3. Deal-flow topology</H2>
+          <p>
+            RPO is a subscription rail, and a subscription rail is only as
+            useful as its steady-state deal flow. A rail that opens one vault
+            per week is theatre; a rail that opens hundreds per day is
+            infrastructure. The protocol is therefore explicitly designed
+            around <strong>four independent, non-correlated sources</strong>{" "}
+            of new vaults, three of which are fully automated and one of
+            which is human-curated.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Cadence</th>
+                <th>Discovery mechanism</th>
+                <th>Vault window</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <strong>RHJ Reg-S Stock Tokens</strong>
+                </td>
+                <td>~5 – 20 / month</td>
+                <td>
+                  Keeper polls <code>GET /rhj/assets</code> every 60s;
+                  diff against last snapshot; call{" "}
+                  <code>IPORegistry.propose(ticker)</code> on any new asset.
+                </td>
+                <td>7 – 14 days</td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Aftermarket Vaults</strong>
+                </td>
+                <td>~500 always-on</td>
+                <td>
+                  One vault per RHJ-listed token, deployed permissionlessly
+                  via <code>AssetDiscovery.openAftermarket(token)</code>.
+                  Rotated every <code>AFTERMARKET_WINDOW = 4h</code>.
+                </td>
+                <td>4h rolling</td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Pons Launchpad graduations</strong>
+                </td>
+                <td>20 – 100 / day</td>
+                <td>
+                  Keeper subscribes to the{" "}
+                  <code>TokenGraduated(address, address pool)</code> event
+                  on the Pons factory; every event triggers{" "}
+                  <code>AssetDiscovery.openPonsGraduation(token)</code>.
+                </td>
+                <td>72h</td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>Direct Reg-S / Reg-A+ / Reg-D</strong>
+                </td>
+                <td>3 – 10 / month</td>
+                <td>
+                  Manual <code>propose()</code> call by RPO Labs after
+                  Cayman-SPV or SEC-qualification legal review. Cap tables
+                  in <code>CapTable.sol</code>.
+                </td>
+                <td>14 – 30 days</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            The composite steady-state is <strong>200 – 500 live vaults</strong>{" "}
+            on any given day. The critical property is that the three
+            automated pipelines are independent: a Robinhood listing freeze
+            leaves Aftermarket + Pons unaffected, a Pons market collapse
+            leaves RHJ + Aftermarket unaffected, and even a total shutdown
+            of both external pipelines still leaves Aftermarket — every
+            already-listed equity remains subscribable at Chainlink oracle
+            pricing.
+          </p>
+          <p>
+            <code>AssetDiscovery.sol</code> is the permissionless factory
+            that carries the three automated pipelines. It has no owner and
+            no upgrade path; anyone (a user, a bot, an MEV searcher, a rival
+            protocol) can call any of{" "}
+            <code>openAftermarket</code>,{" "}
+            <code>openPonsGraduation</code> or the generic escape hatch{" "}
+            <code>openGeneric</code>, provided the referenced token has a
+            Chainlink feed. This is what makes deal flow{" "}
+            <em>capital-efficient</em>: RPO Labs is never in the loop for
+            the 99% case, and the operational cost of a new vault is one
+            keeper transaction (~$0.005).
+          </p>
+
+          <H2 id="protocol">4. Protocol architecture</H2>
           <p>
             RPO is built from five contracts. They are deployed once,
             ownership is immediately renounced (with the exception of
@@ -239,7 +336,7 @@ export default function WhitepaperPage() {
 
           <ArchitectureDiagram className="my-8" />
 
-          <H3 id="vault">3.1 SubscriptionVault</H3>
+          <H3 id="vault">4.1 SubscriptionVault</H3>
           <p>
             One <code>SubscriptionVault</code> is deployed per IPO via
             CREATE2 with the ticker as salt, giving every IPO a deterministic
@@ -270,7 +367,7 @@ export default function WhitepaperPage() {
             by governance.
           </p>
 
-          <H3 id="registry">3.2 IPORegistry</H3>
+          <H3 id="registry">4.2 IPORegistry</H3>
           <p>
             <code>IPORegistry</code> is the factory. It exposes{" "}
             <code>propose(bytes32 ticker, uint256 expectedPrice, uint256 target, uint64 subDeadline, uint64 fulfillDeadline)</code>{" "}
@@ -283,7 +380,27 @@ export default function WhitepaperPage() {
             gatekeeper.
           </p>
 
-          <H3 id="booster">3.3 AllocationBooster</H3>
+          <H3 id="discovery">4.3 AssetDiscovery</H3>
+          <p>
+            <code>AssetDiscovery</code> is the permissionless twin of{" "}
+            <code>IPORegistry</code>. Where <code>IPORegistry</code> handles
+            bonded, curated proposals (typically for RHJ Reg-S adds and
+            Direct issuance), <code>AssetDiscovery</code> handles the
+            programmatic bulk: any wallet can call{" "}
+            <code>openAftermarket(token)</code>,{" "}
+            <code>openPonsGraduation(token)</code>, or the generic escape
+            hatch <code>openGeneric(token, windowSeconds)</code>. Each entry
+            point applies a specific gate (RHJ whitelist, Pons graduation
+            flag, or Chainlink-feed existence) and then deploys a{" "}
+            <code>SubscriptionVault</code> via CREATE2 with a deterministic
+            salt so the vault address can be predicted before the tx even
+            lands. There is no owner, no admin, no upgrade path — it is a
+            pure dispatcher. This is the mechanism that lets steady-state
+            live vault count sit in the 200 – 500 range without any human
+            operational cost.
+          </p>
+
+          <H3 id="booster">4.4 AllocationBooster</H3>
           <p>
             $RPO holders can stake into <code>AllocationBooster</code> to
             earn a multiplier on their vault claims:
@@ -300,7 +417,7 @@ export default function WhitepaperPage() {
             boost decays linearly.
           </p>
 
-          <H3 id="rialto">3.4 RialtoAdapter</H3>
+          <H3 id="rialto">4.5 RialtoAdapter</H3>
           <p>
             RialtoAdapter is a thin router that abstracts the fill venue.
             Its default path is <code>IRialtoRouter.exactInput</code> which
@@ -313,7 +430,7 @@ export default function WhitepaperPage() {
             windows.
           </p>
 
-          <H3 id="looper">3.5 LeverageLooper</H3>
+          <H3 id="looper">4.6 LeverageLooper</H3>
           <p>
             After a fulfilled IPO, users can deposit their newly-received
             Stock Token into <code>LeverageLooper.loop()</code>. The looper:
@@ -338,7 +455,7 @@ export default function WhitepaperPage() {
             deleverage.
           </p>
 
-          <H2 id="token">4. The $RPO token</H2>
+          <H2 id="token">5. The $RPO token</H2>
           <p>
             $RPO is the protocol token. It has a fixed supply of{" "}
             <strong>1,000,000,000</strong> and was launched fair on{" "}
@@ -347,7 +464,7 @@ export default function WhitepaperPage() {
             team allocation vesting cliff and no VC round.
           </p>
 
-          <H3 id="boost">4.1 Boost curve</H3>
+          <H3 id="boost">5.1 Boost curve</H3>
           <p>
             The staking-to-boost curve is a square-root because it
             provides the following invariants:
@@ -371,7 +488,7 @@ export default function WhitepaperPage() {
             boost every epoch.
           </p>
 
-          <H3 id="flywheel">4.2 Fee-to-buyback flywheel</H3>
+          <H3 id="flywheel">5.2 Fee-to-buyback flywheel</H3>
           <p>
             RPO charges a flat 2% fee on every filled subscription. 80% of
             fee revenue is spent on open-market $RPO buybacks through the
@@ -384,7 +501,7 @@ export default function WhitepaperPage() {
             fallback path.
           </p>
 
-          <H2 id="launch">5. Fair launch on Pons</H2>
+          <H2 id="launch">6. Fair launch on Pons</H2>
           <p>
             $RPO launched on the <a href="https://pons.dev">Pons launchpad</a>
             {" "}with the following configuration: bonding-curve start price
@@ -394,7 +511,7 @@ export default function WhitepaperPage() {
             resulting SPY↔$RPO pool is the canonical trading venue.
           </p>
 
-          <H2 id="bridging">6. Cross-chain via LiFi</H2>
+          <H2 id="bridging">7. Cross-chain via LiFi</H2>
           <p>
             Users bridging in from Ethereum, Base or Arbitrum interact with
             the <code>LiFiWidget</code> embedded in the subscribe form. The
@@ -406,7 +523,7 @@ export default function WhitepaperPage() {
             approval to sign twice.
           </p>
 
-          <H2 id="security">7. Security model</H2>
+          <H2 id="security">8. Security model</H2>
           <p>
             RPO&apos;s security guarantees rest on four assumptions, listed
             in decreasing order of trust required:
@@ -441,7 +558,7 @@ export default function WhitepaperPage() {
             <a href="/bounty">/bounty</a>.
           </p>
 
-          <H2 id="governance">8. Governance</H2>
+          <H2 id="governance">9. Governance</H2>
           <p>
             RPO is governed by a{" "}
             <strong>Compound-style GovernorBravo</strong> plus a 48-hour
@@ -472,7 +589,7 @@ export default function WhitepaperPage() {
             $RPO supply.
           </p>
 
-          <H2 id="regulatory">9. Regulatory posture</H2>
+          <H2 id="regulatory">10. Regulatory posture</H2>
           <p>
             Robinhood Stock Tokens are{" "}
             <strong>Reg-S debt securities</strong> issued by Robinhood
@@ -493,7 +610,7 @@ export default function WhitepaperPage() {
             <a href="/legal/risk">Risk Disclosure</a>.
           </p>
 
-          <H2 id="roadmap">10. Roadmap</H2>
+          <H2 id="roadmap">11. Roadmap</H2>
           <p>
             The protocol&apos;s trajectory is deliberately staged into four
             phases, each ending in a self-contained legal and technical

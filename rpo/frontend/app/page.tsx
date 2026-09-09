@@ -9,6 +9,7 @@ import { FeaturedIPOs } from "@/components/marketing/FeaturedIPOs";
 import { StackDiagram } from "@/components/marketing/StackDiagram";
 import { RPOTokenSection } from "@/components/marketing/RPOTokenSection";
 import { RoadmapTease } from "@/components/marketing/RoadmapTease";
+import { DealFlow } from "@/components/marketing/DealFlow";
 import { Partners } from "@/components/marketing/Partners";
 import { Testimonials } from "@/components/marketing/Testimonials";
 import { FAQ } from "@/components/marketing/FAQ";
@@ -23,6 +24,7 @@ export default function HomePage() {
         <Hero />
         <StatsBar />
         <Partners />
+        <DealFlow />
         <Features />
         <HowItWorks />
         <FeaturedIPOs />

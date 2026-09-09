@@ -15,7 +15,7 @@ const SOURCES = [
   {
     n: "01",
     name: "RHJ Reg-S Stock Token listings",
-    monthly: "5 – 15",
+    monthly: "5 – 20 / month",
     control: "Low",
     controlColor: "bg-peach-100 text-peach-600",
     depends: "Robinhood's listing cadence",
@@ -26,18 +26,29 @@ const SOURCES = [
   {
     n: "02",
     name: "Aftermarket Vaults (always-on)",
-    monthly: "∞",
+    monthly: "~500 live · always",
     control: "High",
     controlColor: "bg-forest-50 text-forest-500",
-    depends: "RPO Labs operations",
-    live: "Q2 2026",
+    depends: "RPO Labs + AssetDiscovery.sol",
+    live: true,
     body:
-      "For high-demand already-listed equities (SPY / TSLA / NVDA / MSTR), RPO deploys standing SubscriptionVaults that batch-execute against Rialto every 4h. This guarantees ZERO dry days even if the primary IPO market cools completely — subscription is always open.",
+      "One always-on vault per Robinhood-listed stock token (~200 today, growing). Users deposit USDG at any time; keeper batch-fulfills every 4h via Rialto propAMM at oracle-bound pricing. AAPL, TSLA, NVDA, SPY — real equities, subscribable at any moment. Deployed permissionlessly via AssetDiscovery.openAftermarket(token).",
   },
   {
     n: "03",
+    name: "Pons Launchpad graduations",
+    monthly: "20 – 100 / day",
+    control: "Medium",
+    controlColor: "bg-peach-100 text-peach-600",
+    depends: "Pons factory event stream",
+    live: true,
+    body:
+      "Every token that completes its bonding curve on Pons Launchpad graduates to Uniswap V4 and, in the same block, gets a 72-hour RPO subscription vault via AssetDiscovery.openPonsGraduation(token). Fair-launch community tokens with real cap tables, at web-scale volume: dozens of new vaults per day, fully automated.",
+  },
+  {
+    n: "04",
     name: "Direct Reg-S issuance (Phase 01)",
-    monthly: "2 – 4",
+    monthly: "2 – 4 / month",
     control: "High",
     controlColor: "bg-forest-50 text-forest-500",
     depends: "SPV template + curation",
@@ -46,9 +57,9 @@ const SOURCES = [
       "Companies incorporate a Cayman/Jersey SPV, file a Reg-S offering circular, and issue ERC-8056 shares directly through RPO's IssuanceFactory. Curated by RPO Labs; expected to skew crypto-native + global-non-US SaaS.",
   },
   {
-    n: "04",
+    n: "05",
     name: "Reg-D 506(c) / Reg-A+",
-    monthly: "5 – 10",
+    monthly: "5 – 10 / month",
     control: "Medium",
     controlColor: "bg-peach-100 text-peach-600",
     depends: "SEC qualification (Reg-A+)",
@@ -57,9 +68,9 @@ const SOURCES = [
       "Once accreditation-SBT and Reg-A+ prospectus templates are live, RPO enters the US-retail issuance market. Reg-A+ is the first path where a founder can IPO in the ordinary sense without paying Goldman Sachs $50M.",
   },
   {
-    n: "05",
+    n: "06",
     name: "Grants-funded launches",
-    monthly: "1 – 3",
+    monthly: "1 – 3 / month",
     control: "High",
     controlColor: "bg-forest-50 text-forest-500",
     depends: "Treasury allocation",
@@ -163,14 +174,15 @@ export default function EconomicsPage() {
         <div className="container-wide">
           <div className="eyebrow mb-4">01 · Deal Flow</div>
           <h2 className="font-display text-3xl lg:text-5xl text-ink-900 mb-6 max-w-3xl">
-            Five independent sources. Three of them we control.
+            Six independent sources. Three fully automated. Zero human bottleneck.
           </h2>
           <p className="text-ink-500 max-w-2xl mb-12 leading-relaxed text-lg">
             The single largest failure mode for any launchpad is running out of
             things to launch. RPO&apos;s design refuses to depend on any single
-            upstream. If Robinhood stops listing, if the IPO market freezes, if
-            regulators pause primary issuance — the calendar keeps a live vault
-            open every day.
+            upstream. Even in a nuclear-winter scenario where the RHJ pipeline
+            freezes, Aftermarket (~500 always-on) and Pons (20-100 new / day)
+            keep the calendar dense enough that a wallet-connected user always
+            has something meaningful to subscribe to.
           </p>
 
           <div className="space-y-3">
@@ -230,15 +242,15 @@ export default function EconomicsPage() {
               </div>
               <div>
                 <div className="font-semibold text-forest-700 mb-2 text-lg">
-                  Composite Year-1 projection (Phase 00 + Aftermarket only):
-                  80 – 200 subscription windows
+                  Composite target (steady-state): 200 – 500 live vaults on any given day
                 </div>
                 <p className="text-forest-700 text-sm leading-relaxed">
-                  Even in a nuclear-winter scenario where every single external
-                  IPO source dries up — no NASDAQ IPOs, no RHJ listings — the
-                  Aftermarket Vault subsystem alone guarantees at least one
-                  active subscription per day, indefinitely, priced against
-                  Chainlink oracle feeds of already-listed equities.
+                  Aftermarket alone gives ~500 always-on vaults (one per
+                  RHJ-listed token, rotated every 4h). Pons layers 20-100 new
+                  72h subscription windows on top per day. RHJ Reg-S adds 5-20
+                  headline IPOs per month. Anything else (Direct Reg-S,
+                  Reg-A+, Grants) is a bonus. Connect a wallet, no KYC, no
+                  gate — subscribe.
                 </p>
               </div>
             </div>

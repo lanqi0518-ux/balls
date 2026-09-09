@@ -1,10 +1,33 @@
 import { Container } from "@/components/ui/Container";
+import { TOTAL_LIVE, LIVE_BY_SOURCE } from "@/lib/catalog";
 
+/**
+ * Above-the-fold proof-of-life:
+ *   - live vault count is derived from the current catalog snapshot
+ *     (same source the /app calendar reads), so it never lies.
+ *   - four other metrics are seeded and updated on release.
+ */
 const STATS = [
-  { label: "Cumulative volume", value: "$8.4M", hint: "since Aug 2026" },
-  { label: "IPOs subscribed", value: "12", hint: "avg fill 87%" },
-  { label: "Active subscribers", value: "4,218", hint: "in 63 countries" },
-  { label: "$RPO staked", value: "1.7M", hint: "39% of supply" },
+  {
+    label: "Live vaults right now",
+    value: TOTAL_LIVE.toLocaleString(),
+    hint: `${LIVE_BY_SOURCE.Aftermarket} aftermarket · ${LIVE_BY_SOURCE["RHJ Reg-S"]} RHJ · ${LIVE_BY_SOURCE["Pons Launchpad"]} Pons`,
+  },
+  {
+    label: "Cumulative volume",
+    value: "$8.4M",
+    hint: "since Aug 2026",
+  },
+  {
+    label: "Active subscribers",
+    value: "4,218",
+    hint: "in 63 countries",
+  },
+  {
+    label: "$RPO staked",
+    value: "1.7M",
+    hint: "39% of supply",
+  },
 ];
 
 export function StatsBar() {

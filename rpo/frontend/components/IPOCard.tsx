@@ -12,6 +12,7 @@ type IPOCardProps = {
   countdownSec: number;
   boost: number;
   status?: "Subscribing" | "Announced" | "Fulfilled" | "Refunded";
+  source?: string;
 };
 
 function formatCountdown(seconds: number): string {
@@ -36,6 +37,7 @@ export function IPOCard({
   countdownSec,
   boost,
   status = "Subscribing",
+  source,
 }: IPOCardProps) {
   const pct = Math.min(100, Math.round((subscribedUSD / targetUSD) * 100));
 
@@ -60,6 +62,11 @@ export function IPOCard({
         <div className="flex-1 min-w-0">
           <div className="text-lg font-semibold text-ink-900">{ticker}</div>
           <div className="text-xs text-ink-500 truncate">{name}</div>
+          {source && (
+            <div className="text-[10px] uppercase tracking-[0.14em] text-ink-500 mt-1 font-mono">
+              {source}
+            </div>
+          )}
         </div>
         <Badge
           variant={status === "Subscribing" ? "forest" : "default"}

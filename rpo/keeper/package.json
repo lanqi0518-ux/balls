@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
+    "start:discovery": "tsx src/discovery.ts",
+    "start:all": "concurrently -n listing,discovery -c green,cyan \"tsx src/index.ts\" \"tsx src/discovery.ts\"",
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
