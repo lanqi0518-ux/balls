@@ -22,9 +22,9 @@ kill_timeout = "5s"
 [http_service]
   internal_port         = 3000
   force_https           = true
-  auto_stop_machines    = "stop"     # scale to zero when idle to save $$
+  auto_stop_machines    = "off"      # always-on for smooth global UX
   auto_start_machines   = true
-  min_machines_running  = 0          # 1 keeps it always-hot; 0 sleeps
+  min_machines_running  = 1          # keep at least 1 hot per region
   processes             = ["app"]
 
   [http_service.concurrency]
