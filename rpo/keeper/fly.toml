@@ -1,0 +1,27 @@
+# --- Fly.io app config: RPO keeper bot ------------------------------------
+# Long-running worker (no HTTP service). Watches /rhj/assets and triggers
+# on-chain propose() / fulfill() calls when new Stock Tokens appear.
+
+app = "rpo-keeper"
+primary_region = "fra"
+kill_signal = "SIGINT"
+kill_timeout = "10s"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  # Secrets set via `flyctl secrets set` — never checked in:
+  #   RPC_URL, KEEPER_PRIVATE_KEY, IPO_REGISTRY_ADDR, RHJ_ASSETS_URL
+
+# No [http_service] — this is a worker, not a web app.
+# Fly still runs 1 machine 24/7 for `[processes]` apps like this.
+
+[[vm]]
+  size    = "shared-cpu-1x"
+  memory  = "256mb"
+  cpus    = 1
+
+[processes]
+  worker = "npx tsx src/index.ts"

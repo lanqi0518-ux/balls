@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Emit a minimal self-contained server bundle at .next/standalone.
+  // Halves Docker image size and lets us `node server.js` without npm.
+  output: "standalone",
+  poweredByHeader: false,
+  compress: true,
   images: {
     domains: ["cdn.robinhood.com"],
   },
