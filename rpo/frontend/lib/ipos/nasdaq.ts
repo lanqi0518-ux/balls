@@ -79,6 +79,30 @@ function normaliseRow(
   };
 }
 
+/**
+ * Nasdaq's public JSON endpoint is fronted by an Akamai bot-detection
+ * layer that will silently blackhole (drop with no reply) any request
+ * that doesn't look like a real browser hitting nasdaq.com. Fly.io
+ * datacenter IPs are especially hot. Matching the header set a real
+ * Chrome makes gets us through consistently.
+ */
+const BROWSER_HEADERS: Record<string, string> = {
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+  Accept: "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Accept-Encoding": "gzip, deflate, br",
+  Origin: "https://www.nasdaq.com",
+  Referer: "https://www.nasdaq.com/market-activity/ipos",
+  "Sec-Fetch-Site": "same-site",
+  "Sec-Fetch-Mode": "cors",
+  "Sec-Fetch-Dest": "empty",
+  "Sec-Ch-Ua":
+    '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
+  "Sec-Ch-Ua-Mobile": "?0",
+  "Sec-Ch-Ua-Platform": '"macOS"',
+};
+
 async function fetchMonth(month: string): Promise<{
   upcoming: IpoRow[];
   priced: IpoRow[];
@@ -86,15 +110,14 @@ async function fetchMonth(month: string): Promise<{
   withdrawn: IpoRow[];
 }> {
   const res = await fetch(`${BASE}?date=${month}`, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (rpo-web/1.0; +https://rpo-web.fly.dev)",
-      Accept: "application/json",
-    },
+    headers: BROWSER_HEADERS,
     // Route caching handled by ISR revalidate on the page, but hint
     // Next fetch cache too so overlapping renders share responses.
     next: { revalidate: 60 },
-    // Hard cap so a slow Nasdaq response never stalls a page render.
-    signal: AbortSignal.timeout(6_000),
+    // Fly ↔ Nasdaq handshake is longer than dev, and the JSON payload
+    // itself streams for a few hundred ms. 10 s is comfortably above
+    // observed p99 while still safely under the page render budget.
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) {
     throw new Error(`Nasdaq IPO calendar ${month}: HTTP ${res.status}`);
