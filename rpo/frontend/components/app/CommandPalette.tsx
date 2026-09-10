@@ -14,7 +14,7 @@ import {
   Layers,
   ArrowUpRight,
 } from "@/components/ui/Icons";
-import { IPO_SEEDS } from "@/lib/demoStore";
+import { IPO_SEEDS } from "@/lib/catalog";
 import { cn } from "@/lib/cn";
 
 type Command = {

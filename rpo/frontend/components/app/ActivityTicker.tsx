@@ -1,6 +1,6 @@
 "use client";
 
-import type { ActivityEvent } from "@/lib/demoStore";
+import type { ActivityEvent } from "@/lib/catalog";
 
 /**
  * Continuous horizontal marquee of the latest on-chain subscribe events.

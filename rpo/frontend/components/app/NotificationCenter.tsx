@@ -1,14 +1,98 @@
 "use client";
 
-import { useState } from "react";
-import { useDemoStore } from "@/lib/demoStore";
+/**
+ * Live event feed. Subscribes to onchain Subscribed / Staked / Unstaked
+ * / Claimed events from the deployed contracts and shows the most
+ * recent ones. When no contracts are deployed on the active chain, or
+ * no wallet is connected, the drawer is empty (never fake).
+ */
+
+import { useCallback, useEffect, useState } from "react";
+import { useAccount, usePublicClient } from "wagmi";
+import { getContract } from "viem";
+import {
+  AllocationBoosterABI,
+  SubscriptionVaultABI,
+} from "@/lib/abi";
+import {
+  CONTRACTS,
+  activeChain,
+  explorerTx,
+  isDeployed,
+} from "@/lib/chain";
+import { useActiveIPOs } from "@/lib/onchain/reads";
 import { Bell, X } from "@/components/ui/Icons";
 import { cn } from "@/lib/cn";
 
+type Entry = {
+  id: string;
+  ts: number;
+  kind: "Subscribed" | "Staked" | "Unstaked" | "Claimed";
+  ticker?: string;
+  amount: string;
+  hash: string;
+};
+
 export function NotificationCenter() {
   const [open, setOpen] = useState(false);
-  const history = useDemoStore((s) => s.history);
-  const unread = history.length;
+  const { address } = useAccount();
+  const publicClient = usePublicClient({ chainId: activeChain.id });
+  const active = useActiveIPOs();
+  const [entries, setEntries] = useState<Entry[]>([]);
+
+  // Watch booster stake / unstake for the connected wallet
+  useEffect(() => {
+    if (!publicClient || !address || !isDeployed(CONTRACTS.booster))
+      return;
+    const unsub1 = publicClient.watchContractEvent({
+      address: CONTRACTS.booster,
+      abi: AllocationBoosterABI,
+      eventName: "Staked",
+      args: { user: address },
+      onLogs: (logs) => addFromLogs(logs, "Staked", setEntries),
+    });
+    const unsub2 = publicClient.watchContractEvent({
+      address: CONTRACTS.booster,
+      abi: AllocationBoosterABI,
+      eventName: "Unstaked",
+      args: { user: address },
+      onLogs: (logs) => addFromLogs(logs, "Unstaked", setEntries),
+    });
+    return () => {
+      unsub1?.();
+      unsub2?.();
+    };
+  }, [address, publicClient]);
+
+  // Watch every active vault for Subscribed / Claimed
+  useEffect(() => {
+    if (!publicClient || !address) return;
+    const unsubs = active.data
+      .filter((v) => isDeployed(v.vault))
+      .flatMap((v) => [
+        publicClient.watchContractEvent({
+          address: v.vault,
+          abi: SubscriptionVaultABI,
+          eventName: "Subscribed",
+          args: { user: address },
+          onLogs: (logs) =>
+            addFromLogs(logs, "Subscribed", setEntries, v.ticker),
+        }),
+        publicClient.watchContractEvent({
+          address: v.vault,
+          abi: SubscriptionVaultABI,
+          eventName: "Claimed",
+          args: { user: address },
+          onLogs: (logs) =>
+            addFromLogs(logs, "Claimed", setEntries, v.ticker),
+        }),
+      ]);
+    return () => {
+      unsubs.forEach((u) => u?.());
+    };
+  }, [active.data, address, publicClient]);
+
+  const unread = entries.length;
 
   return (
     <>
@@ -41,7 +125,7 @@ export function NotificationCenter() {
               <div>
                 <div className="font-semibold text-ink-900">Notifications</div>
                 <div className="text-xs text-ink-500">
-                  {history.length} event{history.length === 1 ? "" : "s"}
+                  {entries.length} event{entries.length === 1 ? "" : "s"}
                 </div>
               </div>
               <button
@@ -53,7 +137,7 @@ export function NotificationCenter() {
             </div>
 
             <div className="flex-1 overflow-y-auto">
-              {history.length === 0 ? (
+              {entries.length === 0 ? (
                 <div className="p-12 text-center">
                   <div className="h-12 w-12 rounded-2xl bg-paper-100 border border-line flex items-center justify-center mx-auto mb-4">
                     <Bell className="h-5 w-5 text-ink-500" />
@@ -62,12 +146,13 @@ export function NotificationCenter() {
                     Nothing yet.
                   </div>
                   <div className="text-sm text-ink-500">
-                    Subscribe, stake, or claim to see events here.
+                    Onchain events for your wallet will land here in
+                    real time.
                   </div>
                 </div>
               ) : (
                 <ul className="divide-y divide-line">
-                  {history.slice(0, 40).map((h) => (
+                  {entries.slice(0, 40).map((h) => (
                     <li
                       key={h.id + h.hash}
                       className="p-5 hover:bg-paper-100 transition-colors"
@@ -76,11 +161,9 @@ export function NotificationCenter() {
                         <div
                           className={cn(
                             "h-2 w-2 rounded-full mt-2 flex-shrink-0",
-                            h.kind === "Subscribe"
+                            h.kind === "Subscribed"
                               ? "bg-forest-500"
-                              : h.kind === "Cancel"
-                              ? "bg-rose-500"
-                              : h.kind === "Claim"
+                              : h.kind === "Claimed"
                               ? "bg-peach-500"
                               : "bg-ink-500"
                           )}
@@ -103,7 +186,9 @@ export function NotificationCenter() {
                             <span>{relative(h.ts)}</span>
                             <span className="text-ink-300">·</span>
                             <a
-                              href="#"
+                              href={explorerTx(h.hash)}
+                              target="_blank"
+                              rel="noreferrer"
                               className="text-forest-500 hover:underline"
                             >
                               {h.hash.slice(0, 10)}…
@@ -119,10 +204,10 @@ export function NotificationCenter() {
 
             <div className="border-t border-line p-4 flex-shrink-0">
               <button
-                onClick={() => useDemoStore.getState().reset()}
+                onClick={() => setEntries([])}
                 className="text-xs text-ink-500 hover:text-ink-900"
               >
-                Reset demo state
+                Clear list
               </button>
             </div>
           </div>
@@ -130,6 +215,30 @@ export function NotificationCenter() {
       )}
     </>
   );
+}
+
+function addFromLogs(
+  logs: any[],
+  kind: Entry["kind"],
+  setEntries: React.Dispatch<React.SetStateAction<Entry[]>>,
+  ticker?: string
+) {
+  if (!logs || logs.length === 0) return;
+  setEntries((prev) => {
+    const next = [...prev];
+    for (const log of logs) {
+      const amount = log.args?.amount?.toString?.() ?? "";
+      next.unshift({
+        id: `${log.transactionHash}-${log.logIndex}`,
+        ts: Date.now(),
+        kind,
+        ticker,
+        amount: amount ? `${amount}` : "",
+        hash: log.transactionHash ?? "",
+      });
+    }
+    return next.slice(0, 200);
+  });
 }
 
 function relative(ts: number): string {

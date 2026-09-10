@@ -9,16 +9,16 @@ import { ActivityTicker } from "@/components/app/ActivityTicker";
 import {
   ACTIVITY_FEED,
   ALL_FULFILLED,
-  ALL_LIVE,
   BY_SOURCE,
-  computeBoost,
   IPO_SEEDS,
   LIVE_BY_SOURCE,
   PIPELINE,
   Source,
   TOTAL_LIVE,
-  useDemoStore,
-} from "@/lib/demoStore";
+} from "@/lib/catalog";
+import { useActiveIPOs } from "@/lib/onchain/reads";
+import { useBoost } from "@/lib/onchain/reads";
+import { boostToNumber } from "@/lib/onchain/units";
 import { fmtUSD } from "@/lib/format";
 
 const SOURCE_TABS: Array<Source | "All"> = [
@@ -32,8 +32,10 @@ const SOURCE_TABS: Array<Source | "All"> = [
 const PAGE_SIZE = 24;
 
 export default function AppHomePage() {
-  const { stakedRPO, totalStakedPool, subscriptions } = useDemoStore();
-  const boost = computeBoost(stakedRPO, totalStakedPool);
+  const boostRead = useBoost();
+  const boost = boostToNumber(boostRead.data);
+  const onchain = useActiveIPOs();
+  const onchainCount = onchain.data.length;
 
   const [tab, setTab] = useState<Source | "All">("All");
   const [query, setQuery] = useState("");
@@ -87,8 +89,12 @@ export default function AppHomePage() {
         <div>
           <div className="eyebrow mb-3">IPO calendar</div>
           <h1 className="font-display text-4xl lg:text-5xl text-ink-900">
-            <span className="text-forest-500 tabular-nums">{TOTAL_LIVE}</span>{" "}
-            <span className="text-ink-500 font-normal">live vaults right now.</span>
+            <span className="text-forest-500 tabular-nums">
+              {onchainCount > 0 ? onchainCount : TOTAL_LIVE}
+            </span>{" "}
+            <span className="text-ink-500 font-normal">
+              {onchainCount > 0 ? "live vaults onchain" : "vaults in pipeline"}.
+            </span>
           </h1>
           <p className="text-sm text-ink-500 mt-3 max-w-2xl">
             Auto-discovered from four independent pipelines. New adds every
@@ -103,21 +109,16 @@ export default function AppHomePage() {
           </p>
         </div>
         <div className="text-right">
-          <div className="flex items-center gap-2 justify-end mb-1">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500">
-              Your boost
-            </div>
-            <span className="text-[10px] uppercase tracking-[0.14em] text-peach-600 bg-peach-50 border border-peach-200 rounded-full px-2 py-0.5 font-mono">
-              simulated
-            </span>
+          <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500 mb-1">
+            Your boost
           </div>
           <div className="font-display text-3xl text-peach-600 tabular-nums">
             {boost.toFixed(2)}×
           </div>
-          {subscriptions.length > 0 && (
+          {onchainCount > 0 && (
             <div className="text-xs text-forest-500 mt-1 font-mono">
-              {subscriptions.length} active subscription
-              {subscriptions.length > 1 ? "s" : ""}
+              {onchainCount} onchain vault
+              {onchainCount > 1 ? "s" : ""}
             </div>
           )}
         </div>

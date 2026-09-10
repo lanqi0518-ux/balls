@@ -5,50 +5,51 @@ import { useAccount } from "wagmi";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ConnectButton } from "@/components/wallet/ConnectButton";
+import { PendingDeploymentPanel } from "@/components/app/NetworkStatus";
 import { ArrowUpRight, Wallet } from "@/components/ui/Icons";
 import {
-  computeBoost,
-  findIPO,
-  useDemoStore,
-} from "@/lib/demoStore";
-import { useOffsetCountdown } from "@/lib/useOffsetCountdown";
-import { useTx } from "@/lib/useTx";
-import { fmtUSD, fmtNum, fmtCountdown } from "@/lib/format";
-
-// Mock current market prices for tokens the user holds (in a real app read
-// from Chainlink oracles).
-const MARKET_PRICES: Record<string, number> = {
-  dCORZ: 20.02,
-  dRDDT: 25.61,
-  dSTRIPE: 85.2,
-  dKLARNA: 32.0,
-};
+  useBoost,
+  useRpoBalance,
+  useStake,
+  useTotalStaked,
+  useUsdgBalance,
+} from "@/lib/onchain/reads";
+import {
+  OnchainPosition,
+  useOnchainPositions,
+} from "@/lib/onchain/positions";
+import {
+  useCancelSubscription,
+  useClaimAllocation,
+} from "@/lib/onchain/writes";
+import {
+  boostToNumber,
+  RPO_DECIMALS,
+  toNumber,
+  USDG_DECIMALS,
+} from "@/lib/onchain/units";
+import { useProtocol } from "@/lib/onchain/protocol";
+import { fmtNum, fmtUSD } from "@/lib/format";
 
 export default function PositionsPage() {
   const { isConnected } = useAccount();
-  const {
-    subscriptions,
-    holdings,
-    history,
-    balanceUSDG,
-    stakedRPO,
-    totalStakedPool,
-    cancel,
-    claim,
-  } = useDemoStore();
-  const { pending, run } = useTx();
+  const proto = useProtocol();
 
-  const boost = computeBoost(stakedRPO, totalStakedPool);
+  const usdgBalance = useUsdgBalance();
+  const rpoBalance = useRpoBalance();
+  const stake = useStake();
+  const totalStaked = useTotalStaked();
+  const boost = useBoost();
+  const positions = useOnchainPositions();
 
-  // Portfolio math
-  const holdingsValue = holdings.reduce(
-    (acc, h) => acc + h.amount * (MARKET_PRICES[h.ticker] ?? h.entryPrice),
-    0
-  );
-  const activeValue = subscriptions.reduce((a, s) => a + s.amountUSDG, 0);
-  const realizedPnL = holdings.reduce(
-    (acc, h) =>
-      acc + h.amount * ((MARKET_PRICES[h.ticker] ?? h.entryPrice) - h.entryPrice),
+  const balanceUSDG = toNumber(usdgBalance.data, USDG_DECIMALS);
+  const balanceRPO = toNumber(rpoBalance.data, RPO_DECIMALS);
+  const stakedRPO = toNumber(stake.data.amount, RPO_DECIMALS);
+  const totalStakedPool = toNumber(totalStaked.data, RPO_DECIMALS);
+  const currentBoost = boostToNumber(boost.data);
+
+  const activeValue = positions.data.reduce(
+    (a, p) => a + toNumber(p.deposits, USDG_DECIMALS),
     0
   );
 
@@ -61,14 +62,14 @@ export default function PositionsPage() {
             Your positions
           </h1>
         </div>
-        {isConnected && (
-          <span className="text-[10px] uppercase tracking-[0.14em] text-peach-600 bg-peach-50 border border-peach-200 rounded-full px-2 py-0.5 font-mono">
-            simulated
-          </span>
-        )}
       </header>
 
-      {!isConnected ? (
+      {!proto.isLive ? (
+        <PendingDeploymentPanel
+          title="Positions · pending deployment"
+          hint="Once contracts are deployed on the active chain, this page reads real balances, stakes, and vault subscriptions directly from the IPORegistry — nothing is stored in your browser."
+        />
+      ) : !isConnected ? (
         <div className="card p-12 text-center">
           <div className="h-14 w-14 rounded-2xl bg-paper-100 border border-line flex items-center justify-center mx-auto mb-6">
             <Wallet className="h-6 w-6 text-ink-500" />
@@ -77,8 +78,9 @@ export default function PositionsPage() {
             Wallet not connected
           </div>
           <div className="text-ink-500 text-sm mb-6">
-            Connect a wallet to see your active subscriptions and Stock-Token
-            holdings.
+            Connect a wallet to see your active subscriptions, stake, and
+            Stock-Token holdings — all read directly from{" "}
+            <span className="font-mono">{proto.chainName}</span>.
           </div>
           <div className="inline-flex">
             <ConnectButton size="md" variant="primary" />
@@ -88,39 +90,45 @@ export default function PositionsPage() {
         <>
           <div className="grid md:grid-cols-4 gap-4 mb-10">
             <SummaryCard
-              label="Total value"
-              value={fmtUSD(holdingsValue + activeValue + balanceUSDG)}
+              label="USDG"
+              value={fmtUSD(balanceUSDG)}
+              hint="Wallet balance"
+            />
+            <SummaryCard
+              label="$RPO"
+              value={fmtNum(balanceRPO, 0)}
+              hint={`${fmtNum(stakedRPO, 0)} staked`}
             />
             <SummaryCard
               label="Active subs"
               value={fmtUSD(activeValue)}
-              hint={`${subscriptions.length} vault${
-                subscriptions.length === 1 ? "" : "s"
+              hint={`${positions.data.length} vault${
+                positions.data.length === 1 ? "" : "s"
               }`}
             />
             <SummaryCard
-              label="Unrealized PnL"
-              value={`${realizedPnL >= 0 ? "+" : ""}${fmtUSD(realizedPnL)}`}
-              tone={realizedPnL >= 0 ? "forest" : "rose"}
-            />
-            <SummaryCard
               label="Boost"
-              value={`${boost.toFixed(2)}×`}
+              value={`${currentBoost.toFixed(2)}×`}
               tone="forest"
-              hint={`${stakedRPO.toLocaleString()} $RPO staked`}
+              hint={
+                totalStakedPool > 0
+                  ? `${((stakedRPO / totalStakedPool) * 100).toFixed(3)}% of pool`
+                  : "Stake to earn boost"
+              }
             />
           </div>
 
           <section className="mb-12">
             <div className="flex items-center gap-2 mb-5">
               <Badge variant="forest" dot>
-                Active · {subscriptions.length}
+                Onchain · {positions.data.length}
               </Badge>
               <div className="text-xs text-ink-500">
-                Cancel any time before the subscription deadline for 100% refund
+                Read live from every SubscriptionVault you&apos;ve deposited
+                into.
               </div>
             </div>
-            {subscriptions.length === 0 ? (
+            {positions.data.length === 0 ? (
               <div className="card p-8 text-center">
                 <div className="text-sm text-ink-500 mb-4">
                   No active subscriptions yet.
@@ -131,183 +139,15 @@ export default function PositionsPage() {
               </div>
             ) : (
               <div className="card divide-y divide-line">
-                {subscriptions.map((s) => {
-                  const ipo = findIPO(s.ticker);
-                  return (
-                    <ActiveRow
-                      key={s.id}
-                      sub={s}
-                      launchOffsetSec={ipo?.launchOffsetSec ?? 0}
-                      expectedPrice={ipo?.expectedPrice ?? 1}
-                      onCancel={() =>
-                        run(() => cancel(s.id), {
-                          loading: "Simulating cancel() …",
-                          success: `Refunded ${fmtUSD(s.amountUSDG)}`,
-                        })
-                      }
-                      pending={pending}
-                    />
-                  );
-                })}
+                {positions.data.map((p) => (
+                  <PositionRow
+                    key={p.ipo.vault}
+                    p={p}
+                    onChanged={() => positions.refetch()}
+                  />
+                ))}
               </div>
             )}
-          </section>
-
-          <section className="mb-12">
-            <h2 className="text-xl font-semibold text-ink-900 mb-5">Holdings</h2>
-            {holdings.length === 0 ? (
-              <div className="card p-8 text-center text-sm text-ink-500">
-                No Stock Tokens claimed yet.
-              </div>
-            ) : (
-              <div className="card divide-y divide-line">
-                {holdings.map((h) => {
-                  const mark = MARKET_PRICES[h.ticker] ?? h.entryPrice;
-                  const value = h.amount * mark;
-                  const changePct = ((mark - h.entryPrice) / h.entryPrice) * 100;
-                  return (
-                    <div
-                      key={h.ticker}
-                      className="p-5 flex items-center justify-between hover:bg-paper-100 transition-colors"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-ink-900 to-ink-700 flex items-center justify-center text-sm font-semibold text-white">
-                          {h.ticker.slice(1, 3)}
-                        </div>
-                        <div>
-                          <div className="text-ink-900 font-semibold">
-                            {h.ticker}
-                          </div>
-                          <div className="text-xs text-ink-500">
-                            {fmtNum(h.amount)} tokens · entry $
-                            {h.entryPrice.toFixed(2)}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-8 text-right">
-                        <div>
-                          <div className="text-[10px] uppercase tracking-[0.14em] text-ink-500">
-                            Mark
-                          </div>
-                          <div className="font-mono text-sm text-ink-900 mt-1">
-                            ${mark.toFixed(2)}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] uppercase tracking-[0.14em] text-ink-500">
-                            Value
-                          </div>
-                          <div className="font-mono text-sm text-ink-900 mt-1">
-                            {fmtUSD(value)}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] uppercase tracking-[0.14em] text-ink-500">
-                            PnL
-                          </div>
-                          <div
-                            className={
-                              "font-mono text-sm mt-1 " +
-                              (changePct >= 0
-                                ? "text-forest-500"
-                                : "text-rose-600")
-                            }
-                          >
-                            {changePct >= 0 ? "+" : ""}
-                            {changePct.toFixed(2)}%
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 ml-4">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          disabled={pending}
-                          onClick={() =>
-                            run(
-                              () => {}, // sell would call adapter.sell — stub
-                              {
-                                loading: `Selling ${h.ticker} …`,
-                                success: `Sold at $${mark.toFixed(2)}`,
-                              }
-                            )
-                          }
-                        >
-                          Sell
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={pending}
-                          onClick={() =>
-                            run(
-                              () => {},
-                              {
-                                loading: `Looping ${h.ticker} → Morpho → next IPO …`,
-                                success: "Looped into next vault",
-                              }
-                            )
-                          }
-                        >
-                          Loop
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          <section>
-            <h2 className="text-xl font-semibold text-ink-900 mb-5">History</h2>
-            <div className="card overflow-hidden">
-              {history.length === 0 ? (
-                <div className="p-8 text-center text-sm text-ink-500">
-                  No transactions yet.
-                </div>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-line text-xs uppercase tracking-[0.14em] text-ink-500">
-                      <th className="text-left p-4 font-normal">When</th>
-                      <th className="text-left p-4 font-normal">Ticker</th>
-                      <th className="text-left p-4 font-normal">Action</th>
-                      <th className="text-right p-4 font-normal">Size</th>
-                      <th className="text-right p-4 font-normal">Tx</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {history.slice(0, 20).map((h) => (
-                      <tr
-                        key={h.id + h.hash}
-                        className="border-b border-line last:border-0 hover:bg-paper-100 transition-colors"
-                      >
-                        <td className="p-4 text-ink-500 font-mono">
-                          {relative(h.ts)}
-                        </td>
-                        <td className="p-4 text-ink-900">
-                          {h.ticker ?? "—"}
-                        </td>
-                        <td className="p-4 text-ink-500">{h.kind}</td>
-                        <td className="p-4 text-right text-ink-900 font-mono">
-                          {h.amount}
-                        </td>
-                        <td className="p-4 text-right">
-                          <a
-                            href="#"
-                            className="text-forest-500 hover:underline inline-flex items-center gap-1 font-mono text-xs"
-                          >
-                            {h.hash.slice(0, 8)}…
-                            <ArrowUpRight className="h-3 w-3" />
-                          </a>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
           </section>
         </>
       )}
@@ -315,57 +155,79 @@ export default function PositionsPage() {
   );
 }
 
-function ActiveRow({
-  sub,
-  launchOffsetSec,
-  expectedPrice,
-  onCancel,
-  pending,
+function PositionRow({
+  p,
+  onChanged,
 }: {
-  sub: { id: string; ticker: string; amountUSDG: number; weight: number };
-  launchOffsetSec: number;
-  expectedPrice: number;
-  onCancel: () => void;
-  pending: boolean;
+  p: OnchainPosition;
+  onChanged: () => void;
 }) {
-  const remaining = Math.max(0, useOffsetCountdown(launchOffsetSec));
-  const expected = sub.amountUSDG / expectedPrice;
+  const cancel = useCancelSubscription(p.ipo.vault);
+  const claim = useClaimAllocation(p.ipo.vault);
+
+  const depositUSD = toNumber(p.deposits, USDG_DECIMALS);
+  const now = Math.floor(Date.now() / 1000);
+  const remaining = Math.max(0, Number(p.ipo.subscriptionDeadline) - now);
+
   return (
     <div className="p-5 flex items-center justify-between hover:bg-paper-100 transition-colors">
       <div className="flex items-center gap-4">
         <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-ink-900 to-ink-700 flex items-center justify-center text-sm font-semibold text-white">
-          {sub.ticker.slice(0, 2)}
+          {p.ipo.ticker.slice(0, 2)}
         </div>
         <div>
-          <div className="text-ink-900 font-semibold">{sub.ticker}</div>
+          <div className="text-ink-900 font-semibold">{p.ipo.ticker}</div>
           <div className="text-xs text-ink-500">
-            {fmtUSD(sub.amountUSDG)} subscribed · launch in{" "}
-            {fmtCountdown(remaining)}
+            {p.ipo.name} · deposit {fmtUSD(depositUSD)} · weight{" "}
+            {p.weight.toString()}
           </div>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-8 text-right">
         <div>
           <div className="text-[10px] uppercase tracking-[0.14em] text-ink-500">
-            Expected
+            State
           </div>
           <div className="font-mono text-sm text-ink-900 mt-1">
-            {fmtNum(expected, 4)} d{sub.ticker}
+            {p.fulfilled
+              ? p.claimed
+                ? "Claimed"
+                : "Ready to claim"
+              : remaining > 0
+              ? "Subscribing"
+              : "Awaiting fulfillment"}
           </div>
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-[0.14em] text-ink-500">
-            Weight
+            Vault
           </div>
-          <div className="font-mono text-sm text-forest-500 mt-1 font-semibold">
-            {sub.weight.toLocaleString()}
+          <div className="font-mono text-xs text-ink-500 mt-1">
+            {p.ipo.vault.slice(0, 8)}…
           </div>
         </div>
       </div>
       <div className="flex gap-2 ml-4">
-        <Button variant="outline" size="sm" disabled={pending} onClick={onCancel}>
-          Cancel
-        </Button>
+        {p.fulfilled && !p.claimed && (
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={claim.pending}
+            onClick={() => claim.run({ onConfirmed: onChanged })}
+          >
+            {claim.pending ? "…" : "Claim"}
+          </Button>
+        )}
+        {!p.fulfilled && remaining > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={cancel.pending}
+            onClick={() => cancel.run({ onConfirmed: onChanged })}
+          >
+            {cancel.pending ? "…" : "Cancel"}
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -402,12 +264,4 @@ function SummaryCard({
       {hint && <div className="text-xs text-ink-500 mt-2">{hint}</div>}
     </div>
   );
-}
-
-function relative(ts: number): string {
-  const diffSec = Math.floor((Date.now() - ts) / 1000);
-  if (diffSec < 60) return `${diffSec}s ago`;
-  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
-  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
-  return new Date(ts).toISOString().slice(0, 10);
 }

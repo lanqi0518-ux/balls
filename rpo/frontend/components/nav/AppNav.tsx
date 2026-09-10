@@ -12,6 +12,7 @@ import {
   Coin,
   Trophy,
   Book,
+  Bolt,
   ArrowUpRight,
 } from "@/components/ui/Icons";
 import { cn } from "@/lib/cn";
@@ -21,6 +22,7 @@ const NAV = [
   { label: "Positions", href: "/app/positions", Icon: Wallet },
   { label: "Stake $RPO", href: "/app/stake", Icon: Coin },
   { label: "Leaderboard", href: "/app/leaderboard", Icon: Trophy },
+  { label: "Testnet Faucet", href: "/faucet", Icon: Bolt },
 ];
 
 const BOTTOM = [

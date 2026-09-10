@@ -4,7 +4,18 @@ import { useState } from "react";
 import { useAccount } from "wagmi";
 import { Badge } from "@/components/ui/Badge";
 import { fmtUSD, shortAddr } from "@/lib/format";
-import { computeBoost, useDemoStore } from "@/lib/demoStore";
+import {
+  useBoost,
+  useStake,
+  useTotalStaked,
+} from "@/lib/onchain/reads";
+import { useOnchainPositions } from "@/lib/onchain/positions";
+import {
+  boostToNumber,
+  RPO_DECIMALS,
+  toNumber,
+  USDG_DECIMALS,
+} from "@/lib/onchain/units";
 
 type Row = {
   addr: string;
@@ -39,22 +50,32 @@ type Period = "7d" | "30d" | "all";
 
 export default function LeaderboardPage() {
   const { address } = useAccount();
-  const { stakedRPO, totalStakedPool, subscriptions, holdings } = useDemoStore();
+  const boost = useBoost();
+  const stake = useStake();
+  const totalStaked = useTotalStaked();
+  const positions = useOnchainPositions();
   const [metric, setMetric] = useState<Metric>("subscribed");
   const [period, setPeriod] = useState<Period>("30d");
 
   const rows = [...SEED].sort((a, b) => b[metric] - a[metric]);
 
-  // Inject the user's own row if connected
+  const currentBoost = boostToNumber(boost.data);
+  const userSubscribed = positions.data.reduce(
+    (a, p) => a + toNumber(p.deposits, USDG_DECIMALS),
+    0
+  );
+  const userClaimed = positions.data.filter((p) => p.claimed).length;
+
+  // Inject the user's own row if connected — real onchain data
   const userRow: Row | null = address
     ? {
         addr: address,
         ens: undefined,
-        subscribed: subscriptions.reduce((a, s) => a + s.amountUSDG, 0),
+        subscribed: userSubscribed,
         pnl: 0,
-        boost: computeBoost(stakedRPO, totalStakedPool),
-        fills: holdings.length,
-        claimed: holdings.reduce((a, h) => a + h.amount * h.entryPrice, 0),
+        boost: currentBoost,
+        fills: positions.data.filter((p) => p.fulfilled).length,
+        claimed: userClaimed,
       }
     : null;
 
