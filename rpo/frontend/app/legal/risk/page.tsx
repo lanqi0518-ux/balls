@@ -68,10 +68,11 @@ export default function RiskPage() {
 
           <H2 id="smart">Smart-contract risk</H2>
           <p>
-            Two audits (Trail of Bits, Spearbit) found no critical issues,
-            but no audit is a guarantee. Undiscovered bugs could result in
-            loss, freezing, or partial recovery of funds. See{" "}
-            <a href="/audits">/audits</a> and{" "}
+            RPO is pre-launch. No third-party audits have been completed
+            on the current contract set, and no bug bounty is live. Even
+            after audits, no audit is a guarantee — undiscovered bugs
+            could result in loss, freezing, or partial recovery of funds.
+            See <a href="/audits">/audits</a> and{" "}
             <a href="/bounty">/bounty</a> for the current status.
           </p>
 

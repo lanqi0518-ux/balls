@@ -1,21 +1,28 @@
 /**
- * Release metadata shown in the footer, /changelog, and doc-page
- * headers. Wire these values to your CI at build time; the defaults
- * below mirror the current on-chain deployment.
+ * Release metadata shown in the footer.
+ *
+ * Pre-launch state: version is 0.x, nothing is on mainnet.
+ * When contracts deploy and the frontend cuts a real release,
+ * wire real values from CI (git SHA, tag, timestamp).
  */
+
 export const RELEASE = {
-  version: "v1.0.3",
-  commit: "4a8c2f9",
-  releasedAt: "2026-03-08",
-  channel: "mainnet",
-  builtBy: "gha-runner-9812",
+  version: "v0.1.0-pre",
+  channel: "pre-launch",
+  releasedAt: null as string | null,
+  /** Populated by CI when a real release is cut. Empty pre-launch. */
+  commit: "" as string,
 } as const;
 
+/**
+ * The whitepaper is a draft until the protocol is live. There is no
+ * PDF hosted yet — the /whitepaper route renders the current draft
+ * from the repo directly.
+ */
 export const WHITEPAPER = {
-  version: "v1.0",
-  releasedAt: "2026-03-01",
-  pdfUrl: "https://rpo.xyz/downloads/rpo-whitepaper-v1.0.pdf",
-  ipfsCid: "bafybeigd2fplk7czrn2y7q4a6ldk9lqm7xj3yebq3lqfd4vyagfwn6f4qy",
-  sha256:
-    "d0c4a91e2fbb6a4b73de1e2b83b16b6b8c8bbc4a5a56d9e4c3b0e0f18a37c9d1",
+  version: "draft",
+  releasedAt: null as string | null,
+  pdfUrl: null as string | null,
+  ipfsCid: null as string | null,
+  sha256: null as string | null,
 } as const;

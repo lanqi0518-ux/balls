@@ -22,8 +22,8 @@ export function RPOTokenSection() {
           </p>
 
           <div className="flex flex-wrap items-center gap-2 mb-10">
+            <Badge variant="peach">Pre-launch</Badge>
             <Badge variant="forest">1B fixed supply</Badge>
-            <Badge>39% staked</Badge>
             <Badge>Fair launch on Pons</Badge>
             <Badge>No team unlock cliff</Badge>
           </div>

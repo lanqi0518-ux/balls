@@ -7,36 +7,36 @@ const PHASES = [
   {
     n: "00",
     codename: "Subscribe",
-    year: "Live · 2026",
-    body: "Non-US retail subscribes to RHJ Reg-S Stock Tokens.",
-    status: "shipped" as const,
+    year: "Pre-launch",
+    body: "Non-US retail subscribes to RHJ Reg-S Stock Tokens. Contracts written; awaiting audits + mainnet deploy.",
+    status: "next" as const,
   },
   {
     n: "01",
     codename: "Issue · Reg-S",
-    year: "Q3 2026",
+    year: "Phase 01",
     body: "Companies IPO on RPO directly under Reg-S — global-non-US reach, day 1 on chain.",
-    status: "next" as const,
+    status: "planned" as const,
   },
   {
     n: "02",
     codename: "Issue · Reg-D",
-    year: "Q4 2026",
+    year: "Phase 02",
     body: "Unlimited-raise institutional issuances with on-chain accreditation gating.",
     status: "planned" as const,
   },
   {
     n: "03",
     codename: "Issue · Reg-A+",
-    year: "Q2 2027",
+    year: "Phase 03",
     body: "US retail IPOs on chain. $75M / yr per issuer, SEC-qualified.",
-    status: "planned" as const,
+    status: "vision" as const,
   },
   {
     n: "04",
     codename: "Compete",
-    year: "2027 – 2028",
-    body: "Full S-1 tokenized IPOs + FINRA ATS. Direct NASDAQ replacement.",
+    year: "Phase 04",
+    body: "Full S-1 tokenized IPOs + FINRA ATS. Direct NASDAQ alternative.",
     status: "vision" as const,
   },
 ];
@@ -45,7 +45,6 @@ const STATUS_STYLE: Record<
   (typeof PHASES)[number]["status"],
   { border: string; dot: string; badge: "forest" | "peach" | "default" }
 > = {
-  shipped: { border: "#0B4D3E", dot: "bg-forest-500", badge: "forest" },
   next: { border: "#FF6A3D", dot: "bg-peach-500", badge: "peach" },
   planned: { border: "rgba(10,10,10,0.15)", dot: "bg-ink-500", badge: "default" },
   vision: { border: "rgba(10,10,10,0.08)", dot: "bg-ink-300", badge: "default" },
@@ -58,13 +57,13 @@ export function RoadmapTease() {
         eyebrow="Roadmap"
         title={
           <>
-            From an IPO subscription protocol to the{" "}
+            From an IPO subscription protocol to an{" "}
             <span className="italic font-display text-peach-500">
-              NASDAQ replacement.
+              on-chain public market.
             </span>
           </>
         }
-        description="RPO is Phase 00. Four phases from here, every company can IPO on chain from day one — Reg-S first, then Reg-A+ US retail, then a fully tokenized S-1 offering settled on Robinhood Chain."
+        description="RPO is pre-launch. Phase 00 (permissionless subscription) is the near-term target once contracts are audited and deployed. Later phases add on-chain issuance under Reg-S, Reg-D, Reg-A+, and eventually S-1 with a FINRA-registered ATS."
       />
       <div className="grid md:grid-cols-5 gap-3 mt-4">
         {PHASES.map((p) => {
@@ -84,9 +83,6 @@ export function RoadmapTease() {
                 <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500 font-mono">
                   Phase {p.n}
                 </div>
-                {p.status === "shipped" && (
-                  <Badge variant="forest">Live</Badge>
-                )}
                 {p.status === "next" && (
                   <Badge variant="peach" dot>
                     Next

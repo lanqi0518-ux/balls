@@ -20,6 +20,7 @@ import { useActiveIPOs } from "@/lib/onchain/reads";
 import { useBoost } from "@/lib/onchain/reads";
 import { boostToNumber } from "@/lib/onchain/units";
 import { fmtUSD } from "@/lib/format";
+import { PROTOCOL_LIVE } from "@/lib/chain";
 
 const SOURCE_TABS: Array<Source | "All"> = [
   "All",
@@ -84,22 +85,40 @@ export default function AppHomePage() {
 
   return (
     <div className="p-5 lg:p-10">
+      {!PROTOCOL_LIVE && (
+        <div className="card p-6 border-l-4 border-peach-500 bg-peach-50/40 mb-8">
+          <Badge variant="peach">Pre-launch</Badge>
+          <div className="mt-3 text-ink-900 font-semibold">
+            No mainnet vaults deployed yet.
+          </div>
+          <p className="text-sm text-ink-500 mt-2 leading-relaxed">
+            The subscribe / stake / claim flows are real code, wired to the
+            configured chain. The moment the protocol&apos;s{" "}
+            <code>NEXT_PUBLIC_*_ADDRESS</code> env vars are set to the
+            deployed contracts, live vaults will populate this calendar
+            directly from <code>IPORegistry</code> and{" "}
+            <code>AssetDiscovery</code>. Nothing on this page is seeded from
+            fake data.
+          </p>
+        </div>
+      )}
+
       {/* ─── Header + big counter ─────────────────────────────────── */}
       <header className="flex items-end justify-between mb-6 gap-4 flex-wrap">
         <div>
           <div className="eyebrow mb-3">IPO calendar</div>
           <h1 className="font-display text-4xl lg:text-5xl text-ink-900">
             <span className="text-forest-500 tabular-nums">
-              {onchainCount > 0 ? onchainCount : TOTAL_LIVE}
+              {onchainCount}
             </span>{" "}
             <span className="text-ink-500 font-normal">
-              {onchainCount > 0 ? "live vaults onchain" : "vaults in pipeline"}.
+              live vault{onchainCount === 1 ? "" : "s"} on-chain.
             </span>
           </h1>
           <p className="text-sm text-ink-500 mt-3 max-w-2xl">
-            Auto-discovered from four independent pipelines. New adds every
-            few hours. Connect a wallet and subscribe — no KYC, no waitlist,
-            no whitelist.{" "}
+            Once contracts are live, vaults auto-discover from four
+            independent pipelines. Connect a wallet and subscribe — no KYC,
+            no waitlist, no whitelist.{" "}
             <Link
               href="/economics"
               className="text-forest-500 hover:underline"
@@ -302,12 +321,12 @@ export default function AppHomePage() {
         )}
       </section>
 
-      {/* ─── Pipeline preview ─────────────────────────────────────── */}
+      {PIPELINE.length > 0 && (
       <section className="mt-16">
         <div className="flex items-end justify-between mb-6 flex-wrap gap-3">
           <div>
             <h2 className="text-xl font-semibold text-ink-900">
-              Pipeline · what's next
+              Pipeline · what&apos;s next
             </h2>
             <p className="text-sm text-ink-500 mt-1">
               Curated deals under legal review + Pons launches trending
@@ -371,8 +390,10 @@ export default function AppHomePage() {
           })}
         </div>
       </section>
+      )}
 
       {/* ─── Recently fulfilled ───────────────────────────────────── */}
+      {ALL_FULFILLED.length > 0 && (
       <section className="mt-16">
         <div className="flex items-end justify-between mb-6">
           <h2 className="text-xl font-semibold text-ink-900">
@@ -445,6 +466,7 @@ export default function AppHomePage() {
           ))}
         </div>
       </section>
+      )}
     </div>
   );
 }

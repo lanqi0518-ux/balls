@@ -13,7 +13,6 @@ const ROUTES = [
   "/governance",
   "/about",
   "/faq",
-  "/status",
   "/ecosystem",
   "/changelog",
   "/explorer",
@@ -31,21 +30,12 @@ const ROUTES = [
   "/legal/terms",
   "/legal/privacy",
   "/legal/risk",
-  // Company
-  "/careers",
-  "/press",
-  "/grants",
-  "/brand",
-  // Blog
-  "/blog",
-  "/blog/mainnet",
-  "/blog/boost-mechanism",
-  "/blog/morpho-partnership",
   // App
   "/app",
   "/app/positions",
   "/app/stake",
   "/app/leaderboard",
+  "/faucet",
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -54,6 +44,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     url: `${BASE}${r}`,
     lastModified: now,
     changeFrequency: r.startsWith("/app") ? "always" : "weekly",
-    priority: r === "" ? 1 : r.startsWith("/docs") || r === "/whitepaper" ? 0.8 : 0.6,
+    priority:
+      r === "" ? 1 : r.startsWith("/docs") || r === "/whitepaper" ? 0.8 : 0.6,
   }));
 }

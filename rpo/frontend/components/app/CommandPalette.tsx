@@ -61,14 +61,10 @@ export function CommandPalette() {
       { id: "nav-sec", label: "Security", section: "Navigate", Icon: Shield, action: () => router.push("/security") },
       { id: "nav-audits", label: "Audits", section: "Navigate", Icon: Shield, action: () => router.push("/audits") },
       { id: "nav-bounty", label: "Bug bounty", section: "Navigate", Icon: Shield, action: () => router.push("/bounty") },
-      { id: "nav-status", label: "Status", section: "Navigate", Icon: Bolt, action: () => router.push("/status") },
       { id: "nav-eco", label: "Ecosystem", section: "Navigate", Icon: Layers, action: () => router.push("/ecosystem") },
       { id: "nav-chg", label: "Changelog", section: "Navigate", Icon: Book, action: () => router.push("/changelog") },
       { id: "nav-exp", label: "Explorer", section: "Navigate", Icon: Chart, action: () => router.push("/explorer") },
-      { id: "nav-brand", label: "Brand kit", section: "Navigate", Icon: Book, action: () => router.push("/brand") },
-      { id: "nav-careers", label: "Careers", section: "Navigate", Icon: ArrowUpRight, action: () => router.push("/careers") },
-      { id: "nav-grants", label: "Grants", section: "Navigate", Icon: ArrowUpRight, action: () => router.push("/grants") },
-      { id: "nav-press", label: "Press", section: "Navigate", Icon: ArrowUpRight, action: () => router.push("/press") },
+      { id: "nav-faucet", label: "Testnet Faucet", section: "Navigate", Icon: Bolt, action: () => router.push("/faucet") },
     ];
     const ipos: Command[] = IPO_SEEDS.map((s) => ({
       id: `ipo-${s.ticker}`,

@@ -1,12 +1,11 @@
 import { MarketingShell, PageHero } from "@/components/marketing/MarketingShell";
 import { Badge } from "@/components/ui/Badge";
 import { ArrowUpRight } from "@/components/ui/Icons";
-import { RPO_ADDRESSES, shortAddr } from "@/lib/addresses";
 
 export const metadata = {
   title: "Ecosystem",
   description:
-    "Every protocol RPO composes with, with exact contract version and integration path.",
+    "Protocol dependencies RPO is designed to compose with, and integrations planned for launch.",
 };
 
 const CATS = [
@@ -16,8 +15,7 @@ const CATS = [
       {
         name: "Chainlink Total-Return Feeds",
         role: "Canonical USDG-denominated mark for every Stock Token.",
-        version: "AggregatorV3Interface · TR feed rev 2",
-        address: RPO_ADDRESSES.external.Chainlink,
+        version: "AggregatorV3Interface · TR feed",
         docs: "https://docs.chain.link/data-feeds",
       },
     ],
@@ -28,15 +26,13 @@ const CATS = [
       {
         name: "Rialto propAMM",
         role: "Primary fill venue for SubscriptionVault.fulfill().",
-        version: "propAMM v1.2 · IRialtoRouter",
-        address: RPO_ADDRESSES.external.Rialto,
+        version: "propAMM · IRialtoRouter",
         docs: "https://rialto.finance/docs",
       },
       {
         name: "Uniswap V4",
         role: "Fallback route when Chainlink deviates > 30 bps from Rialto quote.",
-        version: "Universal Router v1.0 · PoolManager 0x…",
-        address: RPO_ADDRESSES.external.Uniswap,
+        version: "Universal Router · PoolManager",
         docs: "https://docs.uniswap.org/contracts/v4/overview",
       },
     ],
@@ -47,15 +43,13 @@ const CATS = [
       {
         name: "Aave v3",
         role: "Idle USDG in SubscriptionVault earns supply APY during the subscription window.",
-        version: "Pool v3.1 · USDG receipt aUSDG",
-        address: RPO_ADDRESSES.external.Aave,
+        version: "Pool v3 · USDG receipt aUSDG",
         docs: "https://docs.aave.com/developers",
       },
       {
         name: "Morpho Blue",
         role: "Isolated dTOKEN/USDG markets for LeverageLooper.",
-        version: "MorphoBlue v1 · 6 markets (dSPY, dQQQ, dCORZ, dRDDT, dTSMC-2, dNVDA-B)",
-        address: RPO_ADDRESSES.external.Morpho,
+        version: "MorphoBlue v1 — isolated markets per stock token",
         docs: "https://docs.morpho.org/morpho/overview",
       },
     ],
@@ -66,8 +60,7 @@ const CATS = [
       {
         name: "LiFi Diamond",
         role: "USDC → USDG bridge in the subscribe widget, single-tx UX.",
-        version: "LiFiDiamond v2 · Squid + Across facets",
-        address: RPO_ADDRESSES.external.LiFi,
+        version: "LiFiDiamond v2",
         docs: "https://docs.li.fi/",
       },
     ],
@@ -77,9 +70,8 @@ const CATS = [
     items: [
       {
         name: "Pons",
-        role: "$RPO fair-launched here; RPO/SPY pool is canonical trading venue.",
-        version: "Pons v2 bonding curve → Uniswap V4 graduation (LP burned)",
-        address: RPO_ADDRESSES.pons.RpoSpyPool,
+        role: "$RPO is designed to fair-launch on Pons; RPO/SPY pool will be the canonical trading venue.",
+        version: "Pons bonding curve → Uniswap V4 graduation (LP burned)",
         docs: "https://pons.dev/docs",
       },
     ],
@@ -90,28 +82,17 @@ const CATS = [
       {
         name: "ERC-8056 Scaled UI",
         role: "uiMultiplier() reads splits / cash-adjust events natively.",
-        version: "Draft 8056 · used by every RHJ Stock Token",
-        address: RPO_ADDRESSES.tokens.dSPY,
+        version: "Draft 8056 — target for every RHJ Stock Token",
         docs: "https://eips.ethereum.org/EIPS/eip-8056",
       },
       {
         name: "ERC-20 Votes",
         role: "$RPO snapshot voting weight for Governor.",
         version: "OpenZeppelin @5.0 ERC20Votes",
-        address: RPO_ADDRESSES.tokens.RPO,
         docs: "https://docs.openzeppelin.com/contracts/5.x/api/token/erc20",
       },
     ],
   },
-];
-
-const INTEGRATIONS = [
-  { app: "Zerion", what: "Portfolio balances + Stock Token PnL" },
-  { app: "DeBank", what: "Subscription positions + boost display" },
-  { app: "Rabby wallet", what: "Native RH-Chain support + subscribe extension" },
-  { app: "Safe (Gnosis)", what: "Vault ownership by DAO multisigs" },
-  { app: "Dune", what: "dune.com/rpo — subscription volume, boost distribution" },
-  { app: "Etherscan Explorer", what: "Full verified source + read/write tabs" },
 ];
 
 export default function EcosystemPage() {
@@ -120,8 +101,21 @@ export default function EcosystemPage() {
       <PageHero
         eyebrow="Ecosystem"
         title="Built on primitives that already work."
-        description="RPO is a thin wrapper on top of the best on-chain primitives Ethereum has produced. Every dependency below is enumerated with the exact contract version we integrate against."
+        description="RPO is designed as a thin wrapper on top of the best on-chain primitives Ethereum has produced. Every dependency below is enumerated with the exact interface we integrate against. Deployed addresses will be published on the Docs → Contracts page once mainnet is live."
       />
+
+      <section className="section">
+        <div className="container-wide">
+          <div className="card p-6 border-l-4 border-peach-500 bg-peach-50/40">
+            <Badge variant="peach">Pre-launch</Badge>
+            <p className="text-sm text-ink-500 mt-3 leading-relaxed">
+              No RPO contracts are deployed yet, so none of these
+              integrations are live on-chain. The list below reflects the
+              intended dependency graph the protocol will ship with.
+            </p>
+          </div>
+        </div>
+      </section>
 
       <section className="section">
         <div className="container-wide space-y-14">
@@ -161,47 +155,15 @@ export default function EcosystemPage() {
                       <span className="text-[10px] uppercase tracking-[0.14em] text-ink-500 font-mono">
                         Contract
                       </span>
-                      <a
-                        href={`${RPO_ADDRESSES.explorer}/address/${it.address}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-mono text-xs text-ink-900 hover:underline"
-                      >
-                        {shortAddr(it.address)}
-                      </a>
+                      <span className="font-mono text-xs text-ink-500">
+                        not deployed
+                      </span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
           ))}
-        </div>
-      </section>
-
-      <section className="section-tight border-t border-line bg-paper-100">
-        <div className="container-wide">
-          <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
-            <div>
-              <div className="eyebrow mb-3">Integrations</div>
-              <h2 className="font-display text-3xl text-ink-900">
-                Where RPO shows up.
-              </h2>
-            </div>
-            <a
-              href="/grants"
-              className="text-sm text-forest-500 hover:underline"
-            >
-              Building an integration? Get a grant →
-            </a>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {INTEGRATIONS.map((i) => (
-              <div key={i.app} className="card p-5">
-                <div className="font-semibold text-ink-900">{i.app}</div>
-                <div className="text-sm text-ink-500 mt-1.5">{i.what}</div>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
     </MarketingShell>

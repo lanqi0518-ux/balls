@@ -40,10 +40,12 @@ export default function GeoUnavailablePage({
       <header className="relative z-10 container-wide flex items-center justify-between h-16">
         <Logo />
         <a
-          href="mailto:hello@rpo.xyz"
+          href="https://github.com/lanqi0518-ux/balls"
+          target="_blank"
+          rel="noreferrer"
           className="text-sm text-ink-500 hover:text-ink-900"
         >
-          hello@rpo.xyz
+          GitHub
         </a>
       </header>
 
@@ -91,15 +93,17 @@ export default function GeoUnavailablePage({
               </div>
             </a>
             <a
-              href="mailto:hello@rpo.xyz?subject=Region availability"
+              href="https://github.com/lanqi0518-ux/balls/discussions"
+              target="_blank"
+              rel="noreferrer"
               className="card p-5 hover:border-line-strong transition-colors"
             >
               <div className="font-semibold text-ink-900 mb-1">
-                Contact us →
+                Ask a question →
               </div>
               <div className="text-sm text-ink-500">
-                Questions about eligibility or the offering circular?
-                Email us and we&apos;ll respond within 48h.
+                Questions about eligibility or the offering can be raised
+                on GitHub Discussions.
               </div>
             </a>
           </div>

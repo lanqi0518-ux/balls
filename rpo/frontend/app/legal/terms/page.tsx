@@ -116,8 +116,7 @@ export default function TermsPage() {
             Smart-contract source code is dual-licensed under MIT and
             Apache-2.0 and is <em>not</em> subject to these Terms — see
             the <code>LICENSE</code> file in the repository. The RPO
-            wordmark and aperture logomark are trademarks of RPO Labs;
-            usage guidelines are on <a href="/brand">/brand</a>.
+            wordmark and aperture logomark are trademarks of RPO Labs.
           </p>
 
           <H2 id="warranty">8. No warranty</H2>

@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { LogoMark } from "@/components/ui/Logo";
-import { NewsletterForm } from "@/components/forms/NewsletterForm";
-import { Twitter, Github, Discord, Book, Mail } from "@/components/ui/Icons";
+import { Github, Book } from "@/components/ui/Icons";
 import { RELEASE } from "@/lib/version";
 import { RPO_ADDRESSES } from "@/lib/addresses";
 
@@ -11,11 +10,9 @@ const COLS = [
     title: "Protocol",
     links: [
       { label: "IPO Calendar", href: "/app" },
-      { label: "Explorer", href: "/explorer" },
       { label: "Positions", href: "/app/positions" },
       { label: "Stake $RPO", href: "/app/stake" },
-      { label: "Leaderboard", href: "/app/leaderboard" },
-      { label: "Status", href: "/status" },
+      { label: "Testnet Faucet", href: "/faucet" },
     ],
   },
   {
@@ -26,8 +23,6 @@ const COLS = [
       { label: "Economics", href: "/economics" },
       { label: "Roadmap", href: "/roadmap" },
       { label: "Tokenomics", href: "/tokenomics" },
-      { label: "Governance", href: "/governance" },
-      { label: "Ecosystem", href: "/ecosystem" },
       { label: "FAQ", href: "/faq" },
     ],
   },
@@ -35,11 +30,12 @@ const COLS = [
     title: "Developers",
     links: [
       { label: "Docs", href: "/docs" },
-      { label: "REST API", href: "/docs/api" },
-      { label: "TypeScript SDK", href: "/docs/sdk" },
       { label: "Contracts", href: "/docs/contracts" },
-      { label: "Changelog", href: "/changelog" },
-      { label: "GitHub", href: "https://github.com/lanqi0518-ux/balls", external: true },
+      {
+        label: "GitHub",
+        href: "https://github.com/lanqi0518-ux/balls",
+        external: true,
+      },
     ],
   },
   {
@@ -51,51 +47,21 @@ const COLS = [
       { label: "Risk disclosure", href: "/legal/risk" },
     ],
   },
-  {
-    title: "Company",
-    links: [
-      { label: "About", href: "/about" },
-      { label: "Blog", href: "/blog" },
-      { label: "Careers", href: "/careers" },
-      { label: "Grants", href: "/grants" },
-      { label: "Press", href: "/press" },
-      { label: "Brand kit", href: "/brand" },
-    ],
-  },
 ];
 
 const SOCIALS = [
-  { label: "X / Twitter", href: "https://twitter.com/rpo_xyz", Icon: Twitter },
-  { label: "GitHub", href: "https://github.com/lanqi0518-ux/balls", Icon: Github },
-  { label: "Discord", href: "https://discord.gg/rpo", Icon: Discord },
+  {
+    label: "GitHub",
+    href: "https://github.com/lanqi0518-ux/balls",
+    Icon: Github,
+  },
   { label: "Docs", href: "/docs", Icon: Book },
-  { label: "Contact", href: "mailto:hello@rpo.xyz", Icon: Mail },
 ];
 
 export function Footer() {
   return (
     <footer className="border-t border-line bg-paper-100">
       <Container>
-        {/* Newsletter */}
-        <div className="border-b border-line py-12 lg:py-16 grid lg:grid-cols-2 gap-8 items-center">
-          <div>
-            <div className="eyebrow mb-3">Stay in the loop</div>
-            <h3 className="font-display text-3xl lg:text-4xl text-ink-900">
-              One email per protocol update. Never spam.
-            </h3>
-          </div>
-          <div>
-            <NewsletterForm />
-            <div className="mt-3 text-xs text-ink-500">
-              By subscribing you agree to our{" "}
-              <Link href="/legal/privacy" className="underline hover:text-ink-900">
-                Privacy Policy
-              </Link>
-              .
-            </div>
-          </div>
-        </div>
-
         <div className="grid lg:grid-cols-12 gap-10 py-16 lg:py-20">
           <div className="lg:col-span-3">
             <div className="flex items-center gap-2">
@@ -103,9 +69,9 @@ export function Footer() {
               <span className="font-semibold text-ink-900 text-lg">RPO</span>
             </div>
             <p className="mt-6 text-sm text-ink-500 max-w-sm leading-relaxed">
-              The permissionless IPO subscription protocol. Built on
-              Robinhood Chain, priced through Rialto propAMM, secured by
-              transparent on-chain vaults.
+              The permissionless IPO subscription protocol. Designed for
+              Robinhood Chain. Contracts audited-and-deployed process pending
+              $RPO launch on Pons.
             </p>
 
             <div className="mt-8 flex items-center gap-2 flex-wrap">
@@ -124,7 +90,7 @@ export function Footer() {
             </div>
           </div>
 
-          <div className="lg:col-span-9 grid grid-cols-2 md:grid-cols-5 gap-8">
+          <div className="lg:col-span-9 grid grid-cols-2 md:grid-cols-4 gap-8">
             {COLS.map((c) => (
               <div key={c.title}>
                 <div className="text-[11px] uppercase tracking-[0.22em] text-ink-500 mb-5 font-medium">
@@ -133,7 +99,7 @@ export function Footer() {
                 <ul className="space-y-3">
                   {c.links.map((l) => (
                     <li key={l.label}>
-                      {l.external ? (
+                      {"external" in l && l.external ? (
                         <a
                           href={l.href}
                           target="_blank"
@@ -173,29 +139,33 @@ export function Footer() {
 
         <div className="border-t border-line py-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="text-xs text-ink-500 leading-relaxed max-w-3xl">
-            © {new Date().getFullYear()} RPO Labs. Nothing on this site is
+            © {new Date().getFullYear()} RPO. Nothing on this site is
             investment advice. Robinhood Stock Tokens are Reg-S debt securities
             issued by Robinhood Assets (Jersey) Limited and are not offered or
             sold to U.S. persons, Canadians, U.K., Swiss, or U.A.E. residents.
           </div>
           <div className="flex items-center gap-5 text-xs text-ink-500 flex-wrap">
-            <Link href="/legal" className="hover:text-ink-900">Legal</Link>
-            <Link href="/legal/privacy" className="hover:text-ink-900">Privacy</Link>
-            <Link href="/legal/terms" className="hover:text-ink-900">Terms</Link>
-            <Link href="/legal/risk" className="hover:text-ink-900">Risk</Link>
-            <Link href="/status" className="hover:text-ink-900 inline-flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-forest-500" />
-              All systems operational
+            <Link href="/legal" className="hover:text-ink-900">
+              Legal
+            </Link>
+            <Link href="/legal/privacy" className="hover:text-ink-900">
+              Privacy
+            </Link>
+            <Link href="/legal/terms" className="hover:text-ink-900">
+              Terms
+            </Link>
+            <Link href="/legal/risk" className="hover:text-ink-900">
+              Risk
             </Link>
             <a
-              href={`https://github.com/lanqi0518-ux/balls/commit/${RELEASE.commit}`}
+              href="https://github.com/lanqi0518-ux/balls"
               target="_blank"
               rel="noreferrer"
               className="hover:text-ink-900 font-mono inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-white px-2.5 py-1"
-              title={`Released ${RELEASE.releasedAt} on ${RELEASE.channel} · chain ${RPO_ADDRESSES.chainId}`}
+              title={`Pre-launch scaffold for chain id ${RPO_ADDRESSES.chainId}`}
             >
               <span className="h-1 w-1 rounded-full bg-peach-500" />
-              {RELEASE.version} · {RELEASE.commit}
+              {RELEASE.version}
             </a>
           </div>
         </div>

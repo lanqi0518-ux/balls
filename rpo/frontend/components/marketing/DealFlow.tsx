@@ -8,41 +8,36 @@ const PIPES = [
     tag: "RHJ Reg-S",
     dot: "bg-peach-500",
     live: LIVE_BY_SOURCE["RHJ Reg-S"],
-    rate: "5-20 new / month",
+    rate: "depends on RHJ listing cadence",
     body:
-      "Every stock token Robinhood adds to its Jersey Reg-S catalog on /rhj/assets. Our keeper polls the endpoint every 5 minutes and calls IPORegistry.propose() the moment a new asset appears — the vault opens for subscription within one block.",
-    ex: "STRIPE · KLARNA · DBX · FIGMA · CANVA · DEEL",
+      "Every stock token Robinhood adds to its Jersey Reg-S catalog. The keeper polls the endpoint on a short cadence and calls IPORegistry.propose() the moment a new asset appears — the vault opens for subscription within one block. Requires the keeper to be live and the RPO registry to be deployed.",
   },
   {
     n: "02",
     tag: "Aftermarket",
     dot: "bg-forest-500",
     live: LIVE_BY_SOURCE.Aftermarket,
-    rate: "always-on · ~500 vaults",
+    rate: "one per listed token, always-on",
     body:
-      "One always-on subscription vault per Robinhood-listed stock token. Users stream USDG in; every 4h the keeper batch-fulfills via Rialto propAMM at oracle-bound pricing. AAPL, TSLA, NVDA, SPY — real equities, subscribable at any moment.",
-    ex: "AAPL · TSLA · NVDA · SPY · MSTR · COIN",
+      "One always-on subscription vault per Robinhood-listed stock token. Users stream USDG in; the keeper batch-fulfills via Rialto propAMM at oracle-bound pricing on a rolling schedule. Deployed permissionlessly via AssetDiscovery.openAftermarket(token).",
   },
   {
     n: "03",
     tag: "Pons Launchpad",
     dot: "bg-ink-900",
     live: LIVE_BY_SOURCE["Pons Launchpad"],
-    rate: "20-100 new / day",
+    rate: "one per Pons graduation",
     body:
-      "Every token that graduates from Pons' bonding curve to Uniswap V4 auto-spawns a 72-hour RPO subscription vault. RPO listens to the TokenGraduated event on the Pons factory and calls VaultFactory.deployFor(token) permissionlessly.",
-    ex: "BONSAI · ZORA · FRIEND · PENGU · POPCAT",
+      "Every token that graduates from Pons' bonding curve to Uniswap V4 auto-spawns a 72-hour RPO subscription vault. RPO listens to the TokenGraduated event on the Pons factory and calls AssetDiscovery.openPonsGraduation(token) permissionlessly.",
   },
   {
     n: "04",
     tag: "Direct Reg-S / Reg-A+",
     dot: "bg-ink-400",
-    live:
-      LIVE_BY_SOURCE["Direct Reg-S"] + LIVE_BY_SOURCE["Reg-A+"],
-    rate: "3-10 new / month",
+    live: LIVE_BY_SOURCE["Direct Reg-S"] + LIVE_BY_SOURCE["Reg-A+"],
+    rate: "curated cohort",
     body:
-      "Companies that don't wait for Robinhood — they issue directly on-chain via a Cayman SPV (Reg-S) or SEC-qualified vehicle (Reg-A+). Cap tables live in a CapTable.sol contract on Robinhood Chain, RPO underwrites the legal cost through Grants for early ones.",
-    ex: "OAI · NEURA · PLURAL · HELION · FIGURE",
+      "Companies that don't wait for Robinhood — they issue directly on-chain via a Cayman/Jersey SPV (Reg-S) or SEC-qualified vehicle (Reg-A+). Cap tables live in a CapTable.sol contract on Robinhood Chain.",
   },
 ];
 
@@ -54,14 +49,15 @@ export function DealFlow() {
         title={
           <>
             <span className="text-forest-500 tabular-nums">{TOTAL_LIVE}</span>{" "}
-            live vaults. Every day. Zero human bottleneck.
+            live vaults today. Designed for zero human bottleneck.
           </>
         }
         description={
           <>
-            RPO isn't rate-limited by any single upstream. Four independent
-            pipelines — three of them fully automated — push new subscription
-            vaults on-chain around the clock.
+            RPO is designed not to be rate-limited by any single upstream.
+            Four independent pipelines — three of them fully automatable —
+            push new subscription vaults on-chain around the clock once the
+            protocol is deployed.
           </>
         }
       />
@@ -97,13 +93,6 @@ export function DealFlow() {
             </div>
 
             <p className="text-sm text-ink-500 leading-relaxed">{p.body}</p>
-
-            <div className="pt-4 border-t border-line">
-              <div className="text-[10px] uppercase tracking-[0.14em] text-ink-500 font-mono mb-2">
-                Recent examples
-              </div>
-              <div className="text-xs font-mono text-ink-900">{p.ex}</div>
-            </div>
           </div>
         ))}
       </div>
@@ -111,8 +100,8 @@ export function DealFlow() {
       <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border border-line rounded-2xl p-6 bg-paper-100">
         <div>
           <div className="text-sm font-semibold text-ink-900">
-            Connect a wallet and subscribe. No KYC, no waitlist, no allocation
-            gate.
+            Once live: connect a wallet and subscribe. No KYC, no waitlist,
+            no allocation gate.
           </div>
           <div className="text-xs text-ink-500 mt-1">
             Compliance handled at the edge (Reg-S geo-block) + at the contract
@@ -123,7 +112,7 @@ export function DealFlow() {
           href="/app"
           className="inline-flex items-center gap-2 rounded-full bg-ink-900 hover:bg-ink-800 text-white text-sm px-5 py-2.5 shadow-soft"
         >
-          Browse all {TOTAL_LIVE} vaults →
+          Open the app →
         </Link>
       </div>
     </Section>

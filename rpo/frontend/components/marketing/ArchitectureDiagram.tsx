@@ -110,10 +110,10 @@ export function ArchitectureDiagram({ className }: { className?: string }) {
             </text>
 
             {/* SURFACES row */}
-            <Node x={90} y={70} w={180} h={72} title="Web App" sub="Next.js 14 + wagmi" fill="url(#ink)" />
-            <Node x={310} y={70} w={180} h={72} title="TypeScript SDK" sub="@rpo/sdk" fill="url(#ink)" />
-            <Node x={530} y={70} w={180} h={72} title="REST API" sub="api.rpo.xyz/v1" fill="url(#ink)" />
-            <Node x={750} y={70} w={180} h={72} title="Keeper" sub="10-of-10 gelato bond" fill="url(#ink)" />
+            <Node x={90} y={70} w={180} h={72} title="Web App" sub="Next.js + wagmi" fill="url(#ink)" />
+            <Node x={310} y={70} w={180} h={72} title="TypeScript SDK" sub="@rpo/sdk (planned)" fill="url(#ink)" />
+            <Node x={530} y={70} w={180} h={72} title="REST API" sub="planned indexer" fill="url(#ink)" />
+            <Node x={750} y={70} w={180} h={72} title="Keeper" sub="bonded executor set" fill="url(#ink)" />
 
             {/* PROTOCOL row */}
             <Node x={90} y={244} w={200} h={78} title="IPORegistry" sub="CREATE2 factory" fill="url(#forest)" light />
@@ -128,7 +128,7 @@ export function ArchitectureDiagram({ className }: { className?: string }) {
             <Node x={280} y={490} w={160} h={68} title="Uniswap V4" sub="fallback route" fill="url(#peach)" />
             <Node x={470} y={490} w={160} h={68} title="Chainlink TR" sub="0.4s TR feeds" fill="url(#peach)" />
             <Node x={660} y={490} w={160} h={68} title="Aave v3" sub="idle-USDG yield" fill="url(#peach)" />
-            <Node x={850} y={490} w={160} h={68} title="Morpho Blue" sub="6 dTOKEN markets" fill="url(#peach)" />
+            <Node x={850} y={490} w={160} h={68} title="Morpho Blue" sub="isolated dTOKEN markets" fill="url(#peach)" />
 
             {/* Arrows — Surfaces → Protocol */}
             <Edge d="M 180 142 L 190 244" label="propose()" />

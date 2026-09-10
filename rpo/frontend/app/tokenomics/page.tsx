@@ -5,12 +5,12 @@ import { Badge } from "@/components/ui/Badge";
 import { Sphere } from "@/components/ui/Sphere";
 import { BoostCurve } from "@/components/interactive/BoostCurve";
 import { LeverageSimulator } from "@/components/interactive/LeverageSimulator";
-import { RPO_ADDRESSES, shortAddr } from "@/lib/addresses";
+import { RPO_ADDRESSES, shortAddr, isDeployed } from "@/lib/addresses";
 
 export const metadata = {
   title: "Tokenomics",
   description:
-    "$RPO — supply, distribution, boost curve, and the fee-to-buyback flywheel.",
+    "$RPO — proposed supply, distribution, boost curve, and fee-to-buyback flywheel. Pre-launch: $RPO has not been minted.",
 };
 
 const ALLOC = [
@@ -28,14 +28,28 @@ export default function TokenomicsPage() {
       <PageHero
         eyebrow="$RPO"
         title="A boost token, not a governance placebo."
-        description="$RPO exists to solve one problem: allocate scarce IPO capacity fairly, so patient stakers get a real edge without letting a whale buy the entire book."
+        description="$RPO is designed to solve one problem: allocate scarce IPO capacity fairly, so patient stakers get a real edge without letting a whale buy the entire book. The token has not been minted or launched yet — everything below describes the proposed design."
       />
 
       <section className="section">
+        <div className="container-wide">
+          <div className="card p-6 border-l-4 border-peach-500 bg-peach-50/40">
+            <Badge variant="peach">Pre-launch</Badge>
+            <p className="text-sm text-ink-500 mt-3 leading-relaxed">
+              $RPO has not been minted, distributed, or listed. There is no
+              live buyback, no live staking, and no circulating supply. The
+              parameters below describe the target design that will ship
+              alongside mainnet.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
         <div className="container-wide grid lg:grid-cols-3 gap-6">
-          <StatBox label="Fixed supply" value="1,000,000,000" hint="No inflation, no vesting cliffs, no VC round" />
-          <StatBox label="Launch venue" value="Pons · fair launch" hint="Bonding curve → Uniswap V4 (LP burned)" />
-          <StatBox label="Fee capture" value="80% buyback → stakers" hint="20% to protocol-owned Pons LPs" />
+          <StatBox label="Proposed fixed supply" value="1,000,000,000" hint="No inflation, no vesting cliffs, no VC round" />
+          <StatBox label="Intended launch venue" value="Pons · fair launch" hint="Bonding curve → Uniswap V4 (LP burned)" />
+          <StatBox label="Intended fee capture" value="80% buyback → stakers" hint="20% to protocol-owned Pons LPs" />
         </div>
       </section>
 
@@ -46,7 +60,7 @@ export default function TokenomicsPage() {
             <DonutSVG data={ALLOC} />
           </div>
           <div>
-            <div className="eyebrow mb-4">Allocation</div>
+            <div className="eyebrow mb-4">Proposed allocation</div>
             <h2 className="font-display text-4xl text-ink-900 mb-6">
               550M to fair launch. Zero to VCs.
             </h2>
@@ -54,15 +68,9 @@ export default function TokenomicsPage() {
               The largest single allocation goes to the open market via the
               Pons bonding curve. The next largest — 20% — is streamed to
               stakers over 4 years as fee-to-buyback accrual. Everything
-              vests linearly with no cliffs; the team unlock is publicly
-              verifiable at{" "}
-              <a
-                href="https://sablier.com/vesting/rpo"
-                className="text-forest-500 hover:underline"
-              >
-                sablier.com/vesting/rpo
-              </a>
-              .
+              vests linearly with no cliffs. Vesting contracts and buyback
+              addresses will be published on this page as soon as they are
+              deployed on Robinhood Chain.
             </p>
             <div className="space-y-3">
               {ALLOC.map((a) => (
@@ -179,14 +187,13 @@ export default function TokenomicsPage() {
                 changes when the team allocation vests linearly.
               </li>
               <li>
-                Real yield on staked $RPO is a function of monthly platform
-                fee volume, published live at{" "}
-                <a href="https://dune.com/rpo">dune.com/rpo</a>.
+                Real yield on staked $RPO is a function of platform fee
+                volume. Once the protocol is live, on-chain buyback and
+                distribution events will be verifiable in the deployed
+                contracts.
               </li>
               <li>
-                In a zero-volume month, staker yield is zero (no dilution).
-                In a $100M-volume month, ~$2M of $RPO is purchased and
-                distributed.
+                In a zero-volume period, staker yield is zero (no dilution).
               </li>
             </ul>
           </Prose>
@@ -200,22 +207,26 @@ export default function TokenomicsPage() {
             <h2 className="font-display text-3xl mt-4 mb-6">
               $RPO on chain.
             </h2>
+            <p className="text-sm text-white/60 max-w-sm">
+              These addresses will populate from environment variables the
+              moment mainnet contracts are published. Until then, they read
+              as <em>not deployed</em>.
+            </p>
           </div>
           <div className="md:col-span-2 space-y-4">
             {[
               { k: "Chain", v: `${RPO_ADDRESSES.chainName} · id ${RPO_ADDRESSES.chainId}` },
-              { k: "$RPO token", v: shortAddr(RPO_ADDRESSES.tokens.RPO), mono: true },
-              { k: "AllocationBooster", v: shortAddr(RPO_ADDRESSES.contracts.AllocationBooster), mono: true },
-              { k: "Pons RPO/SPY pool", v: `${shortAddr(RPO_ADDRESSES.pons.RpoSpyPool)} · LP burned`, mono: true },
-              { k: "Timelock", v: shortAddr(RPO_ADDRESSES.contracts.Timelock), mono: true },
-              { k: "Governor", v: shortAddr(RPO_ADDRESSES.contracts.Governor), mono: true },
+              { k: "$RPO token", v: shortAddr(RPO_ADDRESSES.tokens.RPO), mono: isDeployed(RPO_ADDRESSES.tokens.RPO) },
+              { k: "AllocationBooster", v: shortAddr(RPO_ADDRESSES.contracts.AllocationBooster), mono: isDeployed(RPO_ADDRESSES.contracts.AllocationBooster) },
+              { k: "Timelock", v: shortAddr(RPO_ADDRESSES.contracts.Timelock), mono: isDeployed(RPO_ADDRESSES.contracts.Timelock) },
+              { k: "Governor", v: shortAddr(RPO_ADDRESSES.contracts.Governor), mono: isDeployed(RPO_ADDRESSES.contracts.Governor) },
             ].map((r) => (
               <div
                 key={r.k}
                 className="flex items-center justify-between border-b border-white/10 py-3"
               >
                 <div className="text-white/60 text-sm">{r.k}</div>
-                <div className={r.mono ? "font-mono text-sm text-white" : "text-white"}>
+                <div className={r.mono ? "font-mono text-sm text-white" : "text-sm text-white/80"}>
                   {r.v}
                 </div>
               </div>

@@ -28,7 +28,7 @@ const ITEMS = [
   },
   {
     q: "Has RPO been audited?",
-    a: "The v1 contracts are undergoing a rolling audit with two independent firms; the report will be published on /security. Testnet deployments have been running since Aug 2026 with public bug-bounty coverage.",
+    a: "No. RPO is pre-launch. Third-party audits are a hard prerequisite to any mainnet deployment; when they land the full reports will be published on /audits. The source is public on GitHub in the meantime.",
   },
   {
     q: "How do dividends and splits work?",

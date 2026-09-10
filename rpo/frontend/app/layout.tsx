@@ -47,11 +47,6 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "RPO — Subscribe to Real IPOs On-Chain",
-    creator: "@rpo_xyz",
-  },
   robots: { index: true, follow: true },
 };
 
@@ -66,12 +61,6 @@ export default function RootLayout({
       className={`${inter.variable} ${fraunces.variable} ${mono.variable}`}
     >
       <head>
-        <link
-          rel="alternate"
-          type="application/rss+xml"
-          title="RPO Blog"
-          href="/blog/rss.xml"
-        />
         <JsonLd />
       </head>
       <body className="min-h-screen bg-white text-ink-900 antialiased">

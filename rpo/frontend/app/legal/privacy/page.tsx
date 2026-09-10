@@ -114,8 +114,7 @@ export default function PrivacyPage() {
               <tr><td>Cloudflare</td><td>Edge network, WAF, geo-detection</td><td>Server logs</td></tr>
               <tr><td>Vercel</td><td>Frontend hosting</td><td>Server logs</td></tr>
               <tr><td>AWS eu-west-2</td><td>API + indexer</td><td>Server logs, API-key metadata</td></tr>
-              <tr><td>Resend</td><td>Transactional email</td><td>Email address of newsletter/API opt-ins</td></tr>
-              <tr><td>Immunefi</td><td>Bug bounty triage</td><td>Data you voluntarily submit</td></tr>
+              <tr><td>Resend</td><td>Transactional email</td><td>Email address of API opt-ins (if provided)</td></tr>
             </tbody>
           </table>
           <p>

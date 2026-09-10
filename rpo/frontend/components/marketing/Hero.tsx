@@ -31,7 +31,7 @@ export function Hero() {
       <Container className="relative">
         <div className="max-w-4xl">
           <Badge variant="dark" dot className="mb-8">
-            Live on Robinhood Chain · Chain ID 4663
+            Pre-launch · designed for Robinhood Chain (id 4663)
           </Badge>
 
           <h1 className="font-display text-display-lg text-ink-900">
@@ -46,9 +46,10 @@ export function Hero() {
           </h1>
 
           <p className="mt-8 text-xl text-ink-500 max-w-2xl leading-relaxed">
-            Subscribe to real IPOs on-chain. No broker. No KYC. In twenty
-            seconds. Priced through Rialto propAMM, allocated pro-rata,
-            settled the moment Robinhood mints a Stock Token.
+            Subscribe to real IPOs on-chain. No broker. No KYC. Priced
+            through Rialto propAMM, allocated pro-rata, settled the moment
+            Robinhood mints a Stock Token. Contracts are ready; addresses go
+            live the moment $RPO launches on Pons.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center gap-3">
@@ -70,9 +71,9 @@ export function Hero() {
           </div>
 
           <div className="mt-12 flex flex-wrap items-center gap-x-8 gap-y-3 text-sm text-ink-500">
-            <MetaBullet label="12 IPOs subscribed" />
-            <MetaBullet label="$8.4M cumulative volume" />
-            <MetaBullet label="0 seized allocations" />
+            <MetaBullet label="Contracts on GitHub" />
+            <MetaBullet label="Testnet faucet available" />
+            <MetaBullet label="No mainnet deploy yet" />
           </div>
         </div>
 
@@ -133,7 +134,10 @@ function HeroPreview() {
             <span className="h-2.5 w-2.5 rounded-full bg-paper-200" />
             <span className="h-2.5 w-2.5 rounded-full bg-paper-200" />
             <span className="ml-4 text-xs text-ink-400 font-mono">
-              app.rpo.xyz/ipo/STRIPE
+              app / ipo / EXAMPLE
+            </span>
+            <span className="ml-auto text-[10px] uppercase tracking-[0.18em] text-ink-400 font-mono">
+              interface preview
             </span>
           </div>
 
@@ -141,37 +145,34 @@ function HeroPreview() {
             <div className="lg:col-span-3 space-y-8">
               <div className="flex items-center gap-4">
                 <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-ink-900 to-ink-700 flex items-center justify-center text-white font-bold shadow-3d">
-                  ST
+                  EX
                 </div>
                 <div className="min-w-0">
                   <div className="text-2xl font-semibold text-ink-900 truncate">
-                    Stripe, Inc.
+                    Example Issuer
                   </div>
                   <div className="text-sm text-ink-500">
-                    dSTRIPE · Reg-S · underlying 1 STRIPE share
+                    dEXAMPLE · Reg-S · UI preview only
                   </div>
                 </div>
-                <Badge variant="forest" dot className="ml-auto">
-                  Subscribing
+                <Badge variant="peach" className="ml-auto">
+                  Preview
                 </Badge>
               </div>
 
               <div className="rounded-2xl bg-paper-100 border border-line p-6 grid grid-cols-3 gap-4">
-                <MiniStat label="Expected" value="$85.20" />
-                <MiniStat label="Subscribed" value="$2.31M" />
-                <MiniStat label="Target" value="$5.00M" />
+                <MiniStat label="Expected" value="—" />
+                <MiniStat label="Subscribed" value="—" />
+                <MiniStat label="Target" value="—" />
               </div>
 
               <div>
                 <div className="flex items-center justify-between text-xs text-ink-500 mb-2">
                   <span>Progress</span>
-                  <span className="font-mono tabular-nums text-ink-900">46%</span>
+                  <span className="font-mono tabular-nums text-ink-900">—</span>
                 </div>
                 <div className="h-2 rounded-full bg-paper-200 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-forest-500 to-peach-500"
-                    style={{ width: "46%" }}
-                  />
+                  <div className="h-full rounded-full bg-paper-200" style={{ width: "0%" }} />
                 </div>
               </div>
             </div>
@@ -181,19 +182,22 @@ function HeroPreview() {
                 Subscription
               </div>
               <div className="rounded-xl bg-paper-100 border border-line p-4 flex items-center justify-between">
-                <span className="text-3xl font-mono text-ink-900 tabular-nums">
-                  500
+                <span className="text-3xl font-mono text-ink-400 tabular-nums">
+                  0
                 </span>
                 <span className="badge">USDG</span>
               </div>
               <div className="space-y-2 text-sm">
-                <Row k="Allocation" v="~ 5.88 dSTRIPE" />
-                <Row k="Boost" v="2.5×" tone="forest" />
-                <Row k="Fee (2%)" v="$10.00" />
+                <Row k="Allocation" v="—" />
+                <Row k="Boost" v="1.00×" tone="forest" />
+                <Row k="Fee (2%)" v="—" />
                 <Row k="Refund" v="100%" />
               </div>
-              <button className="btn-primary w-full py-3 text-sm">
-                Subscribe · 20s
+              <button
+                disabled
+                className="btn-primary w-full py-3 text-sm opacity-60 cursor-not-allowed"
+              >
+                Preview only — no live vault
               </button>
             </div>
           </div>

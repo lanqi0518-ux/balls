@@ -6,26 +6,26 @@ import { ArrowUpRight, Book, Bolt, Shield, Coin } from "@/components/ui/Icons";
 export const metadata = {
   title: "Documentation",
   description:
-    "Integrate RPO — REST API, TypeScript SDK, and Solidity contract reference.",
+    "Integrate RPO — REST API, TypeScript SDK, and Solidity contract reference. Pre-launch — endpoints are draft targets.",
 };
 
 const CATS = [
   {
     Icon: Book,
     title: "Whitepaper",
-    body: "The full technical protocol description in 12 sections.",
+    body: "The full technical protocol description.",
     href: "/whitepaper",
   },
   {
     Icon: Bolt,
     title: "REST API",
-    body: "Read active IPOs, subscription state and boost multipliers without a wallet.",
+    body: "Planned public endpoints for reading active IPOs, subscription state, and boost multipliers.",
     href: "/docs/api",
   },
   {
     Icon: Coin,
     title: "TypeScript SDK",
-    body: "@rpo/sdk — typed wrappers around every write path. wagmi-ready.",
+    body: "@rpo/sdk (planned) — typed wrappers around every write path. wagmi-ready.",
     href: "/docs/sdk",
   },
   {
@@ -36,33 +36,37 @@ const CATS = [
   },
 ];
 
-const QUICK = [
-  {
-    h: "Watch new IPOs",
-    body: "GET https://api.rpo.xyz/v1/ipos?status=subscribing",
-  },
-  {
-    h: "Subscribe with the SDK",
-    body: "await rpo.vault('STRIPE').subscribe({ amount: 500n })",
-  },
-  {
-    h: "Compute your boost",
-    body: "const boost = await rpo.booster.boostOf('0xabc…')",
-  },
-  {
-    h: "Deploy a keeper",
-    body: "docker run rpo/keeper:latest --vault 0x… --rpc $RPC_URL",
-  },
-];
-
 export default function DocsHomePage() {
   return (
     <MarketingShell>
       <PageHero
         eyebrow="Developers"
         title="Everything you need to build on RPO."
-        description="Contracts are deployed on Robinhood Chain (id 4663). Read paths need no wallet; write paths accept USDG on any wagmi-compatible connector."
+        description="Contracts are designed for Robinhood Chain (id 4663). Read paths will need no wallet; write paths will accept USDG on any wagmi-compatible connector."
       />
+
+      <section className="section">
+        <div className="container-wide">
+          <div className="card p-6 border-l-4 border-peach-500 bg-peach-50/40">
+            <Badge variant="peach">Pre-launch</Badge>
+            <p className="text-sm text-ink-500 mt-3 leading-relaxed">
+              RPO is not deployed on mainnet. The API endpoints, SDK npm
+              package, and RPC URLs described in these docs are the target
+              interface — they don&apos;t exist yet. Source of truth today
+              is the{" "}
+              <a
+                href="https://github.com/lanqi0518-ux/balls"
+                target="_blank"
+                rel="noreferrer"
+                className="text-forest-500 hover:underline"
+              >
+                GitHub repository
+              </a>
+              .
+            </p>
+          </div>
+        </div>
+      </section>
 
       <section className="section">
         <div className="container-wide grid md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -87,68 +91,33 @@ export default function DocsHomePage() {
 
       <section className="section-tight border-t border-line bg-paper-100">
         <div className="container-wide">
-          <div className="eyebrow mb-4">Quick tour</div>
-          <h2 className="font-display text-3xl text-ink-900 mb-10">
-            Four integrations, one afternoon.
+          <div className="eyebrow mb-4">Reference chain config</div>
+          <h2 className="font-display text-3xl text-ink-900 mb-8">
+            Robinhood Chain — the target network.
           </h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            {QUICK.map((q) => (
-              <div key={q.h} className="card p-6">
-                <div className="text-sm font-semibold text-ink-900 mb-3">
-                  {q.h}
+          <div className="card p-8 max-w-2xl">
+            <div className="space-y-3 text-sm">
+              {[
+                { k: "Chain name", v: "Robinhood Chain" },
+                { k: "Chain ID", v: "4663" },
+                { k: "Public RPC", v: "https://rpc.mainnet.chain.robinhood.com" },
+                { k: "Docs", v: "https://docs.robinhood.com/chain/" },
+              ].map((r) => (
+                <div
+                  key={r.k}
+                  className="flex items-center justify-between border-b border-line last:border-0 py-2 gap-4"
+                >
+                  <span className="text-ink-500 flex-shrink-0">{r.k}</span>
+                  <span className="font-mono text-ink-900 text-xs truncate">
+                    {r.v}
+                  </span>
                 </div>
-                <pre className="bg-ink-900 text-ink-100 rounded-xl p-4 text-[13px] font-mono overflow-x-auto">
-                  <code>{q.body}</code>
-                </pre>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="container-wide">
-          <div className="grid lg:grid-cols-2 gap-8">
-            <div className="card p-8">
-              <Badge variant="forest" dot>
-                RPC endpoints
-              </Badge>
-              <div className="mt-5 space-y-3 text-sm">
-                {[
-                  { k: "Public HTTP", v: "https://rpc.robinhoodchain.com" },
-                  { k: "Alchemy", v: "https://rhc-mainnet.g.alchemy.com/v2/{key}" },
-                  { k: "WebSocket", v: "wss://rpc.robinhoodchain.com/ws" },
-                  { k: "Chain ID", v: "4663" },
-                ].map((r) => (
-                  <div
-                    key={r.k}
-                    className="flex items-center justify-between border-b border-line last:border-0 py-2"
-                  >
-                    <span className="text-ink-500">{r.k}</span>
-                    <span className="font-mono text-ink-900 text-xs">
-                      {r.v}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
-
-            <div className="card p-8">
-              <Badge variant="peach" dot>
-                Subgraph
-              </Badge>
-              <div className="mt-5 text-sm text-ink-500 mb-4">
-                RPO indexes every vault event to a public subgraph. Free tier
-                is 100k queries/mo; keys are provisioned instantly.
-              </div>
-              <div className="rounded-xl bg-ink-900 text-ink-100 p-4 font-mono text-[13px]">
-                <div className="text-ink-400">
-                  # POST https://api.rpo.xyz/subgraph
-                </div>
-                <div className="mt-2">
-                  {`{ ipos(where: {status:"Subscribing"}) { ticker target subscribed launchAt } }`}
-                </div>
-              </div>
+            <div className="text-xs text-ink-500 mt-6 leading-relaxed">
+              RPO&apos;s deployed-contract addresses will be published on
+              the Contracts reference page as soon as they land on
+              Robinhood Chain.
             </div>
           </div>
         </div>

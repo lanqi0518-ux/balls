@@ -26,11 +26,11 @@ export default function SdkPage() {
     <MarketingShell>
       <DocLayout
         meta={{
-          eyebrow: "Reference · sdk v1",
+          eyebrow: "Reference · sdk v1 (draft)",
           title: "TypeScript SDK",
           subtitle:
-            "@rpo/sdk is a ~14KB (gzipped) client that wraps every RPO write path in a strongly-typed, viem-compatible API.",
-          updated: "March 2026",
+            "@rpo/sdk (planned) — a small, typed, viem-compatible client that will wrap every RPO write path. Pre-launch: the package is not published to npm yet.",
+          updated: "Draft",
         }}
         toc={toc}
         breadcrumbs={[
@@ -39,7 +39,18 @@ export default function SdkPage() {
         ]}
       >
         <Prose>
-          <H2 id="install">Install</H2>
+          <blockquote>
+            <strong>Pre-launch notice.</strong> The <code>@rpo/sdk</code>
+            {" "}npm package has not been published. The API described here
+            is the planned surface. Until the package ships, integrators
+            can reference the source in the{" "}
+            <a href="https://github.com/lanqi0518-ux/balls" target="_blank" rel="noreferrer">
+              GitHub repository
+            </a>
+            .
+          </blockquote>
+
+          <H2 id="install">Install (planned)</H2>
           <pre>
             <code>{`pnpm add @rpo/sdk viem
 # or

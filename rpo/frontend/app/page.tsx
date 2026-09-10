@@ -11,7 +11,6 @@ import { RPOTokenSection } from "@/components/marketing/RPOTokenSection";
 import { RoadmapTease } from "@/components/marketing/RoadmapTease";
 import { DealFlow } from "@/components/marketing/DealFlow";
 import { Partners } from "@/components/marketing/Partners";
-import { Testimonials } from "@/components/marketing/Testimonials";
 import { FAQ } from "@/components/marketing/FAQ";
 import { CTA } from "@/components/marketing/CTA";
 
@@ -31,7 +30,6 @@ export default function HomePage() {
         <StackDiagram />
         <RPOTokenSection />
         <RoadmapTease />
-        <Testimonials />
         <FAQ />
         <CTA />
       </main>

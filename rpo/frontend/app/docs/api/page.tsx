@@ -28,11 +28,11 @@ export default function ApiPage() {
     <MarketingShell>
       <DocLayout
         meta={{
-          eyebrow: "Reference · REST v1",
+          eyebrow: "Reference · REST v1 (draft)",
           title: "REST API",
           subtitle:
-            "Read-only endpoints for the RPO indexer. All responses are JSON; all writes go through the SDK or direct contract calls.",
-          updated: "March 2026",
+            "Planned read-only endpoints for the RPO indexer. Pre-launch — none of these endpoints are currently live.",
+          updated: "Draft",
         }}
         toc={toc}
         breadcrumbs={[
@@ -41,21 +41,27 @@ export default function ApiPage() {
         ]}
       >
         <Prose>
+          <blockquote>
+            <strong>Pre-launch notice.</strong> RPO is not deployed and the
+            indexer described below has not been stood up. This page
+            documents the planned REST surface so integrators can review it
+            in advance. All base URLs, API-key issuance, and rate-limit
+            numbers are targets, not live infrastructure.
+          </blockquote>
+
           <p>
-            Base URL:{" "}
-            <code>https://api.rpo.xyz/v1</code>. All endpoints support{" "}
-            <code>?limit</code>, <code>?offset</code> and <code>?cursor</code>{" "}
-            pagination. Rate limit: 60 req/min per IP, 6000 req/min per API
-            key. Response times average 40ms from us-east-1 to the indexer
-            in eu-west-2.
+            Planned base URL:{" "}
+            <code>https://api.rpo.xyz/v1</code>. All endpoints will
+            support <code>?limit</code>, <code>?offset</code> and{" "}
+            <code>?cursor</code> pagination. Response shapes are described
+            below.
           </p>
 
           <H2 id="auth">Authentication</H2>
           <p>
-            Read endpoints are open. Higher rate limits and webhook
-            registration require an API key issued via the{" "}
-            <a href="https://dash.rpo.xyz">developer dashboard</a>. Send it
-            as either <code>X-RPO-API-Key: rpo_live_xxx</code> or the{" "}
+            Read endpoints are planned to be open. Higher rate limits and
+            webhook registration will require an API key. The key can be
+            sent as either <code>X-RPO-API-Key: rpo_live_xxx</code> or the{" "}
             <code>Authorization: Bearer rpo_live_xxx</code> header.
           </p>
 

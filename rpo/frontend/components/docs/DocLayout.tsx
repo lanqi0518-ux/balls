@@ -168,5 +168,4 @@ const DOC_LINKS = [
   { label: "Security", href: "/security" },
   { label: "Audits", href: "/audits" },
   { label: "Bug bounty", href: "/bounty" },
-  { label: "Brand kit", href: "/brand" },
 ];

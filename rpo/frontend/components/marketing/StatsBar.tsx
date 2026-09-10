@@ -1,32 +1,30 @@
 import { Container } from "@/components/ui/Container";
-import { TOTAL_LIVE, LIVE_BY_SOURCE } from "@/lib/catalog";
 
 /**
- * Above-the-fold proof-of-life:
- *   - live vault count is derived from the current catalog snapshot
- *     (same source the /app calendar reads), so it never lies.
- *   - four other metrics are seeded and updated on release.
+ * Pre-launch stats: no live volume, no live subscribers, no staked $RPO.
+ * The bar advertises what the site will show once the protocol goes live,
+ * without inventing any of the numbers.
  */
 const STATS = [
   {
-    label: "Live vaults right now",
-    value: TOTAL_LIVE.toLocaleString(),
-    hint: `${LIVE_BY_SOURCE.Aftermarket} aftermarket · ${LIVE_BY_SOURCE["RHJ Reg-S"]} RHJ · ${LIVE_BY_SOURCE["Pons Launchpad"]} Pons`,
+    label: "Contracts deployed",
+    value: "0",
+    hint: "audits + deploy pending",
   },
   {
     label: "Cumulative volume",
-    value: "$8.4M",
-    hint: "since Aug 2026",
+    value: "—",
+    hint: "no mainnet yet",
   },
   {
     label: "Active subscribers",
-    value: "4,218",
-    hint: "in 63 countries",
+    value: "—",
+    hint: "no mainnet yet",
   },
   {
     label: "$RPO staked",
-    value: "1.7M",
-    hint: "39% of supply",
+    value: "—",
+    hint: "token not launched",
   },
 ];
 

@@ -18,7 +18,7 @@ export function Partners() {
     <section className="py-20 border-y border-line bg-white">
       <Container>
         <div className="text-center text-[11px] uppercase tracking-[0.28em] text-ink-500 mb-12">
-          Built on the Robinhood Chain stack
+          Designed to compose with the Robinhood Chain stack
         </div>
         <Marquee speed={50}>
           {NAMES.map((n) => (
