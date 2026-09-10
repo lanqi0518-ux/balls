@@ -19,7 +19,7 @@ import {
   findIPO,
   useDemoStore,
 } from "@/lib/demoStore";
-import { useCountdown } from "@/lib/useCountdown";
+import { useOffsetCountdown } from "@/lib/useOffsetCountdown";
 import { useTx } from "@/lib/useTx";
 import { fmtUSD, fmtNum, fmtCountdown, pct } from "@/lib/format";
 
@@ -43,7 +43,7 @@ export default function SubscribePage({
   const { pending, run } = useTx();
 
   const boost = computeBoost(stakedRPO, totalStakedPool);
-  const remaining = useCountdown(ipo.launchAtMs);
+  const remaining = Math.max(0, useOffsetCountdown(ipo.launchOffsetSec));
 
   const [amountStr, setAmountStr] = useState("500");
   const [payToken, setPayToken] = useState<"USDG" | "USDC-BASE" | "USDC-ARB" | "ETH">(
@@ -77,8 +77,8 @@ export default function SubscribePage({
     run(
       () => subscribe(ticker, amount, boost),
       {
-        loading: `Signing subscribe(${fmtUSD(amount)}) …`,
-        success: `Subscribed ${fmtUSD(amount)} to ${ticker}`,
+        loading: `Simulating subscribe(${fmtUSD(amount)}) …`,
+        success: `Simulated subscribe ${fmtUSD(amount)} → ${ticker} (preview)`,
       }
     );
   };
@@ -268,9 +268,9 @@ export default function SubscribePage({
                 }
               >
                 {pending
-                  ? "Signing…"
+                  ? "Simulating…"
                   : validation.ok
-                  ? "Subscribe · 20s"
+                  ? "Preview subscribe (demo)"
                   : validation.hint}
               </Button>
             ) : (

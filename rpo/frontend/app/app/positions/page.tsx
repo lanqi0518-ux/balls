@@ -11,7 +11,7 @@ import {
   findIPO,
   useDemoStore,
 } from "@/lib/demoStore";
-import { useCountdown } from "@/lib/useCountdown";
+import { useOffsetCountdown } from "@/lib/useOffsetCountdown";
 import { useTx } from "@/lib/useTx";
 import { fmtUSD, fmtNum, fmtCountdown } from "@/lib/format";
 
@@ -54,11 +54,18 @@ export default function PositionsPage() {
 
   return (
     <div className="p-5 lg:p-10 max-w-6xl">
-      <header className="mb-10">
-        <div className="eyebrow mb-3">Portfolio</div>
-        <h1 className="font-display text-4xl lg:text-5xl text-ink-900">
-          Your positions
-        </h1>
+      <header className="mb-10 flex items-end justify-between flex-wrap gap-3">
+        <div>
+          <div className="eyebrow mb-3">Portfolio</div>
+          <h1 className="font-display text-4xl lg:text-5xl text-ink-900">
+            Your positions
+          </h1>
+        </div>
+        {isConnected && (
+          <span className="text-[10px] uppercase tracking-[0.14em] text-peach-600 bg-peach-50 border border-peach-200 rounded-full px-2 py-0.5 font-mono">
+            simulated
+          </span>
+        )}
       </header>
 
       {!isConnected ? (
@@ -130,11 +137,11 @@ export default function PositionsPage() {
                     <ActiveRow
                       key={s.id}
                       sub={s}
-                      launchAtMs={ipo?.launchAtMs ?? Date.now()}
+                      launchOffsetSec={ipo?.launchOffsetSec ?? 0}
                       expectedPrice={ipo?.expectedPrice ?? 1}
                       onCancel={() =>
                         run(() => cancel(s.id), {
-                          loading: "Signing cancel() …",
+                          loading: "Simulating cancel() …",
                           success: `Refunded ${fmtUSD(s.amountUSDG)}`,
                         })
                       }
@@ -310,18 +317,18 @@ export default function PositionsPage() {
 
 function ActiveRow({
   sub,
-  launchAtMs,
+  launchOffsetSec,
   expectedPrice,
   onCancel,
   pending,
 }: {
   sub: { id: string; ticker: string; amountUSDG: number; weight: number };
-  launchAtMs: number;
+  launchOffsetSec: number;
   expectedPrice: number;
   onCancel: () => void;
   pending: boolean;
 }) {
-  const remaining = useCountdown(launchAtMs);
+  const remaining = Math.max(0, useOffsetCountdown(launchOffsetSec));
   const expected = sub.amountUSDG / expectedPrice;
   return (
     <div className="p-5 flex items-center justify-between hover:bg-paper-100 transition-colors">

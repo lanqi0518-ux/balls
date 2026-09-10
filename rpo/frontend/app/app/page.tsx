@@ -19,7 +19,6 @@ import {
   TOTAL_LIVE,
   useDemoStore,
 } from "@/lib/demoStore";
-import { useCountdown } from "@/lib/useCountdown";
 import { fmtUSD } from "@/lib/format";
 
 const SOURCE_TABS: Array<Source | "All"> = [
@@ -63,7 +62,7 @@ export default function AppHomePage() {
       const scoreA = a.status === "Subscribing" ? 0 : 1;
       const scoreB = b.status === "Subscribing" ? 0 : 1;
       if (scoreA !== scoreB) return scoreA - scoreB;
-      return a.launchAtMs - b.launchAtMs;
+      return a.launchOffsetSec - b.launchOffsetSec;
     });
     return sorted;
   }, [tab, query, sort]);
@@ -104,8 +103,13 @@ export default function AppHomePage() {
           </p>
         </div>
         <div className="text-right">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500 mb-1">
-            Your boost
+          <div className="flex items-center gap-2 justify-end mb-1">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500">
+              Your boost
+            </div>
+            <span className="text-[10px] uppercase tracking-[0.14em] text-peach-600 bg-peach-50 border border-peach-200 rounded-full px-2 py-0.5 font-mono">
+              simulated
+            </span>
           </div>
           <div className="font-display text-3xl text-peach-600 tabular-nums">
             {boost.toFixed(2)}×
@@ -451,7 +455,6 @@ function LiveIPOCard({
   ipo: (typeof IPO_SEEDS)[number];
   boost: number;
 }) {
-  const remaining = useCountdown(ipo.launchAtMs);
   return (
     <IPOCard
       ticker={ipo.ticker}
@@ -459,10 +462,11 @@ function LiveIPOCard({
       subscribedUSD={ipo.seedSubscribedUSD}
       targetUSD={ipo.targetUSD}
       expectedPrice={ipo.expectedPrice}
-      countdownSec={remaining}
+      launchOffsetSec={ipo.launchOffsetSec}
       boost={boost}
       status={ipo.status as "Subscribing" | "Announced"}
       source={ipo.source}
+      alwaysOn={ipo.alwaysOn}
     />
   );
 }

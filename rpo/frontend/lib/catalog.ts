@@ -24,10 +24,24 @@ export type IPOSeed = {
   targetUSD: number;
   seedSubscribedUSD: number;
   expectedPrice: number;
+  /** Absolute launch timestamp (unused by UI, kept for tooling). */
   launchAtMs: number;
+  /**
+   * Seconds until launch (positive for Subscribing/Announced) or since
+   * fulfillment (negative for Fulfilled). The UI uses THIS instead of
+   * launchAtMs so a stale build never displays "Closed" for every vault
+   * — the number is baked once at build time and simply ticks down on
+   * the client from wherever it started.
+   */
+  launchOffsetSec: number;
   fillPrice?: number;
   change24hPct?: number;
   note?: string;
+  /**
+   * Aftermarket vaults are always-on rolling batches; there's no useful
+   * countdown for them, so the UI hides the ticker for these.
+   */
+  alwaysOn?: boolean;
 };
 
 export type ActivityEvent = {
@@ -200,10 +214,16 @@ function buildIPOs(): IPOSeed[] {
     if (i < 14) status = "Subscribing";
     else if (i < 22) status = "Announced";
     else status = "Fulfilled";
-    const offsetDays =
+
+    // Positive offsets for Subscribing (2-14d) & Announced (14-45d).
+    // Negative offsets for Fulfilled (1-25 days ago).
+    const offsetSec =
       status === "Fulfilled"
-        ? -Math.round(between(1, 25))
-        : Math.round(between(1, 21));
+        ? -Math.round(between(1, 25)) * 86_400
+        : status === "Announced"
+        ? Math.round(between(14, 45) * 86_400)
+        : Math.round(between(2, 14) * 86_400);
+
     const change = Math.round(between(-6, 32) * 10) / 10;
     out.push({
       ticker,
@@ -213,7 +233,8 @@ function buildIPOs(): IPOSeed[] {
       targetUSD: target,
       seedSubscribedUSD: Math.round(target * filled),
       expectedPrice: price,
-      launchAtMs: ANCHOR_MS + offsetDays * 86_400_000,
+      launchAtMs: ANCHOR_MS + offsetSec * 1000,
+      launchOffsetSec: offsetSec,
       fillPrice: status === "Fulfilled" ? price : undefined,
       change24hPct: status === "Fulfilled" ? change : undefined,
       note:
@@ -235,12 +256,15 @@ function buildIPOs(): IPOSeed[] {
       targetUSD: cap,
       seedSubscribedUSD: Math.round(cap * fillFrac),
       expectedPrice: price,
-      launchAtMs: ANCHOR_MS + (i % 4) * 3_600_000 + 4 * 3_600_000,
+      // Always-on: batch rolls every 4h. The number is decorative.
+      launchAtMs: ANCHOR_MS + 4 * 3_600_000,
+      launchOffsetSec: 4 * 3600,
+      alwaysOn: true,
       note: "Always-on · Rialto propAMM · batch-fulfills every 4h",
     });
   });
 
-  PONS_NAMES.forEach(([ticker, name], i) => {
+  PONS_NAMES.forEach(([ticker, name]) => {
     const cap = Math.round(between(0.1, 1.2) * 1_000_000);
     const fillFrac = between(0.2, 0.99);
     const price = Math.round(between(0.001, 4.2) * 10_000) / 10_000;
@@ -249,10 +273,15 @@ function buildIPOs(): IPOSeed[] {
     if (roll < 0.6) status = "Subscribing";
     else if (roll < 0.85) status = "Fulfilled";
     else status = "Announced";
-    const offsetHrs =
+
+    // Subscribing Pons: 12-70h window remaining. Announced: 2-6d. Fulfilled: 2-60h ago.
+    const offsetSec =
       status === "Fulfilled"
-        ? -Math.round(between(2, 60))
-        : Math.round(between(2, 60));
+        ? -Math.round(between(2, 60)) * 3600
+        : status === "Announced"
+        ? Math.round(between(2, 6) * 86_400)
+        : Math.round(between(12, 70) * 3600);
+
     const change = Math.round(between(-30, 400) * 10) / 10;
     out.push({
       ticker,
@@ -262,7 +291,8 @@ function buildIPOs(): IPOSeed[] {
       targetUSD: cap,
       seedSubscribedUSD: Math.round(cap * fillFrac),
       expectedPrice: price,
-      launchAtMs: ANCHOR_MS + offsetHrs * 3_600_000,
+      launchAtMs: ANCHOR_MS + offsetSec * 1000,
+      launchOffsetSec: offsetSec,
       fillPrice: status === "Fulfilled" ? price : undefined,
       change24hPct: status === "Fulfilled" ? change : undefined,
       note:
@@ -277,6 +307,7 @@ function buildIPOs(): IPOSeed[] {
   DIRECT_ISSUERS.forEach(([ticker, name, source, note], i) => {
     const target = Math.round(between(3, 25)) * 1_000_000;
     const filled = between(0.05, 0.7);
+    const offsetSec = Math.round(between(5, 180)) * 86_400;
     out.push({
       ticker,
       name,
@@ -285,7 +316,8 @@ function buildIPOs(): IPOSeed[] {
       targetUSD: target,
       seedSubscribedUSD: Math.round(target * filled),
       expectedPrice: Math.round(between(20, 200) * 100) / 100,
-      launchAtMs: ANCHOR_MS + Math.round(between(5, 180)) * 86_400_000,
+      launchAtMs: ANCHOR_MS + offsetSec * 1000,
+      launchOffsetSec: offsetSec,
       note,
     });
   });

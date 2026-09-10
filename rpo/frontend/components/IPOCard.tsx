@@ -1,6 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { ArrowUpRight } from "@/components/ui/Icons";
+import {
+  formatOffsetCountdown,
+  useOffsetCountdown,
+} from "@/lib/useOffsetCountdown";
 
 type IPOCardProps = {
   ticker: string;
@@ -9,19 +15,14 @@ type IPOCardProps = {
   subscribedUSD: number;
   targetUSD: number;
   expectedPrice?: number;
-  countdownSec: number;
+  /** Seconds until launch (positive) or since launch (negative). */
+  launchOffsetSec: number;
   boost: number;
   status?: "Subscribing" | "Announced" | "Fulfilled" | "Refunded";
   source?: string;
+  /** Aftermarket vaults are rolling; hide the countdown, show 'Always-on'. */
+  alwaysOn?: boolean;
 };
-
-function formatCountdown(seconds: number): string {
-  if (seconds <= 0) return "Closed";
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  return `${d}d ${h}h ${m}m`;
-}
 
 function fmtM(x: number): string {
   return `$${(x / 1_000_000).toFixed(2)}M`;
@@ -34,12 +35,25 @@ export function IPOCard({
   subscribedUSD,
   targetUSD,
   expectedPrice,
-  countdownSec,
+  launchOffsetSec,
   boost,
   status = "Subscribing",
   source,
+  alwaysOn = false,
 }: IPOCardProps) {
   const pct = Math.min(100, Math.round((subscribedUSD / targetUSD) * 100));
+  const remaining = useOffsetCountdown(launchOffsetSec);
+
+  const countdownLabel = alwaysOn
+    ? "always-on"
+    : formatOffsetCountdown(remaining);
+
+  const countdownTone =
+    alwaysOn || remaining > 3600
+      ? "forest"
+      : remaining > 0
+      ? "peach"
+      : "default";
 
   return (
     <Link
@@ -94,12 +108,12 @@ export function IPOCard({
       <div className="grid grid-cols-3 border-t border-line pt-4 gap-3">
         <MiniStat
           k="Expected"
-          v={expectedPrice ? `$${expectedPrice.toFixed(2)}` : "TBD"}
+          v={expectedPrice ? `$${expectedPrice.toFixed(expectedPrice < 1 ? 4 : 2)}` : "TBD"}
         />
         <MiniStat
-          k="Launch in"
-          v={formatCountdown(countdownSec)}
-          tone="forest"
+          k={alwaysOn ? "Batch" : remaining > 0 ? "Launch in" : "Status"}
+          v={countdownLabel}
+          tone={countdownTone as "forest" | "peach" | undefined}
         />
         <MiniStat k="Boost" v={`${boost.toFixed(1)}×`} tone="peach" />
       </div>

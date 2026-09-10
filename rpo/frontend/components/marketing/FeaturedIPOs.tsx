@@ -7,24 +7,20 @@ import { ALL_LIVE, TOTAL_LIVE } from "@/lib/catalog";
 import { fmtUSD } from "@/lib/format";
 
 /**
- * Show the six biggest live vaults right now — sampled from the same
- * catalog the /app calendar reads, so it never disagrees with the app.
+ * Six biggest live vaults, sampled from the same catalog the /app
+ * calendar reads. Countdowns are baked at build time (SSR-stable) and
+ * displayed as static "in Xd Yh" labels — no ticking in the marketing
+ * hero to keep it lightweight; the real ticking cards live on /app.
  */
 const featured = [...ALL_LIVE]
   .sort((a, b) => b.targetUSD - a.targetUSD)
   .slice(0, 6);
 
-/**
- * SSR-safe "opens in" using the same anchor timestamps the catalog was
- * built with. Never touches Date.now(), so it renders identically on
- * server and client (no hydration mismatches).
- */
-const ANCHOR_MS = new Date("2026-09-08T00:00:00Z").getTime();
-function countdown(launchAtMs: number): string {
-  const s = Math.max(0, Math.floor((launchAtMs - ANCHOR_MS) / 1000));
-  if (s <= 0) return "Live now";
-  const d = Math.floor(s / 86400);
-  const h = Math.floor((s % 86400) / 3600);
+function staticLabel(offsetSec: number, alwaysOn: boolean): string {
+  if (alwaysOn) return "Always-on";
+  if (offsetSec <= 0) return "Live now";
+  const d = Math.floor(offsetSec / 86400);
+  const h = Math.floor((offsetSec % 86400) / 3600);
   if (d > 0) return `${d}d ${h}h`;
   return `${h}h`;
 }
@@ -72,7 +68,7 @@ export function FeaturedIPOs() {
             expectedPrice={`$${ipo.expectedPrice.toFixed(
               ipo.expectedPrice < 1 ? 4 : 2
             )}`}
-            countdown={countdown(ipo.launchAtMs)}
+            countdown={staticLabel(ipo.launchOffsetSec, !!ipo.alwaysOn)}
           />
         ))}
       </div>

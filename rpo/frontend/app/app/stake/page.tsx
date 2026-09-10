@@ -58,13 +58,13 @@ export default function StakePage() {
     if (!validation.ok) return;
     if (mode === "stake") {
       run(() => stake(amount), {
-        loading: `Signing stake(${fmtNum(amount, 0)} $RPO) …`,
-        success: `Staked ${fmtNum(amount, 0)} $RPO`,
+        loading: `Simulating stake(${fmtNum(amount, 0)} $RPO) …`,
+        success: `Simulated stake of ${fmtNum(amount, 0)} $RPO (preview)`,
       });
     } else {
       run(() => unstake(amount), {
-        loading: `Signing unstake(${fmtNum(amount, 0)} $RPO) …`,
-        success: `Unstaked ${fmtNum(amount, 0)} $RPO — 14d cooldown`,
+        loading: `Simulating unstake(${fmtNum(amount, 0)} $RPO) …`,
+        success: `Simulated unstake of ${fmtNum(amount, 0)} $RPO — 14d cooldown (preview)`,
       });
     }
   };
@@ -253,11 +253,11 @@ export default function StakePage() {
                   onClick={handleSubmit}
                 >
                   {pending
-                    ? "Signing…"
+                    ? "Simulating…"
                     : validation.ok
                     ? mode === "stake"
-                      ? "Stake $RPO"
-                      : "Unstake $RPO"
+                      ? "Preview stake (demo)"
+                      : "Preview unstake (demo)"
                     : validation.hint}
                 </Button>
               ) : (
@@ -289,14 +289,42 @@ export default function StakePage() {
 
         <aside className="lg:col-span-2 space-y-6">
           <div className="card p-6">
-            <div className="text-xs uppercase tracking-[0.18em] text-ink-500 mb-4">
-              Your stake
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-ink-500">
+                Your stake
+              </div>
+              <span className="text-[10px] uppercase tracking-[0.14em] text-peach-600 bg-peach-50 border border-peach-200 rounded-full px-2 py-0.5 font-mono">
+                simulated
+              </span>
             </div>
-            <div className="space-y-3 text-sm">
-              <Row k="Staked" v={`${fmtNum(stakedRPO, 0)} $RPO`} />
-              <Row k="Current boost" v={`${currentBoost.toFixed(2)}×`} tone="forest" />
-              <Row k="Wallet balance" v={`${fmtNum(balanceRPO, 0)} $RPO`} />
-            </div>
+            {isConnected ? (
+              <div className="space-y-3 text-sm">
+                <Row k="Staked" v={`${fmtNum(stakedRPO, 0)} $RPO`} />
+                <Row
+                  k="Current boost"
+                  v={`${currentBoost.toFixed(2)}×`}
+                  tone="forest"
+                />
+                <Row
+                  k="Wallet balance"
+                  v={`${fmtNum(balanceRPO, 0)} $RPO`}
+                />
+                <p className="text-[11px] text-ink-500 leading-snug pt-2 border-t border-line mt-3">
+                  These numbers are a local browser preview — no on-chain
+                  balance is read from your wallet. Real $RPO ships with
+                  mainnet ({" "}
+                  <a href="/roadmap" className="text-forest-500 hover:underline">
+                    Q4 2026
+                  </a>
+                  ).
+                </p>
+              </div>
+            ) : (
+              <div className="text-sm text-ink-500 leading-relaxed">
+                Connect a wallet to preview the stake UX. All numbers are
+                simulated in your browser — no real $RPO is read or moved.
+              </div>
+            )}
           </div>
 
           <div className="card p-6">

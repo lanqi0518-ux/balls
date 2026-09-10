@@ -97,10 +97,12 @@ const initial: Pick<
 };
 
 function fakeHash(): string {
+  // Prefix with "demo" so the user can never mistake this for a real
+  // on-chain tx hash. Every /app write action uses this same function.
   const chars = "0123456789abcdef";
-  let out = "0x";
-  for (let i = 0; i < 64; i++) out += chars[Math.floor(Math.random() * 16)];
-  return out;
+  let rest = "";
+  for (let i = 0; i < 60; i++) rest += chars[Math.floor(Math.random() * 16)];
+  return "0xdemo" + rest;
 }
 
 export const useDemoStore = create<State>()(
