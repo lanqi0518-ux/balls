@@ -57,6 +57,15 @@ export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (isBypass(pathname)) return NextResponse.next();
 
+  // Legacy URL redirect: `/app/ipo/*` was renamed to `/app/markets/*`
+  // when we reframed NVDA/AAPL/SPY as aftermarket (not IPO). Preserve
+  // any bookmarks / external links pointing at the old path.
+  if (pathname.startsWith("/app/ipo/") || pathname === "/app/ipo") {
+    const url = req.nextUrl.clone();
+    url.pathname = pathname.replace(/^\/app\/ipo/, "/app/markets");
+    return NextResponse.redirect(url, { status: 308 });
+  }
+
   const country = detectCountry(req);
 
   // Local dev / unknown edge → allow through (avoids blocking your own team)
