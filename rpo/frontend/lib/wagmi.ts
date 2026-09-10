@@ -5,9 +5,9 @@ import {
   coinbaseWallet,
   injectedWallet,
   metaMaskWallet,
-  okxWallet,
   rabbyWallet,
   rainbowWallet,
+  okxWallet,
   trustWallet,
   walletConnectWallet,
 } from "@rainbow-me/rainbowkit/wallets";
@@ -18,20 +18,26 @@ import { robinhoodChain } from "./chain";
 /**
  * wagmi + RainbowKit config.
  *
- * Robinhood Chain is the primary chain. Arbitrum Sepolia is included so
- * pre-mainnet dry runs work end-to-end with real wallets. Ethereum /
- * Arbitrum / Base are registered for cross-chain USDC/ETH balance sensing.
- *
  * ────────────────────────────────────────────────────────────────
- * WalletConnect handling:
+ * WalletConnect handling (fully guarded):
  *
- * Injected wallets (MetaMask, Rabby, OKX, Trust, Rainbow, Brave, Coinbase
- * Wallet extension) and Coinbase Wallet SDK do NOT require a real
- * WalletConnect Cloud projectId — they connect over their own transports.
- * The WalletConnect wallet is only listed when a real projectId is set
- * via NEXT_PUBLIC_WC_PROJECT_ID, so we never ship a broken WC QR to
- * production. Without a projectId, users on desktop or in an in-wallet
- * browser can still connect — they just don't get the WC QR fallback.
+ * Almost every wallet connector in RainbowKit v2 (MetaMask, Rabby,
+ * OKX, Rainbow, Trust) uses WalletConnect as its mobile-deeplink
+ * fallback. When the WalletConnect projectId is invalid, those
+ * connectors initialise a WC Relay socket on page load that keeps
+ * failing with `code: 1006 (Project not found)` — spamming the
+ * console and stalling connect clicks with an infinite "Opening…"
+ * spinner (production regression, reported 2026-09-10).
+ *
+ * To avoid that failure mode entirely when no real projectId is set,
+ * we fall back to a wallet list that uses ONLY pure-injected paths:
+ *   - injectedWallet: pure window.ethereum, no WC dependency
+ *   - coinbaseWallet: uses @coinbase/wallet-sdk with its own transport
+ *
+ * When NEXT_PUBLIC_WC_PROJECT_ID is set to a valid Cloud project id
+ * (>8 chars, not the stale "rpo-demo-project" placeholder), the full
+ * wallet menu is enabled — MetaMask, Rabby, OKX, Rainbow, Trust,
+ * WalletConnect QR — because those connectors work correctly.
  * ────────────────────────────────────────────────────────────────
  */
 
@@ -41,29 +47,32 @@ const WC_ENABLED =
   WC_PROJECT_ID.length > 8 &&
   WC_PROJECT_ID !== "rpo-demo-project";
 
-const popularWallets = [
-  injectedWallet,
-  metaMaskWallet,
-  rabbyWallet,
-  coinbaseWallet,
-  okxWallet,
-  rainbowWallet,
-  trustWallet,
-  ...(WC_ENABLED ? [walletConnectWallet] : []),
-];
+const wallets = WC_ENABLED
+  ? [
+      injectedWallet,
+      metaMaskWallet,
+      rabbyWallet,
+      coinbaseWallet,
+      okxWallet,
+      rainbowWallet,
+      trustWallet,
+      walletConnectWallet,
+    ]
+  : [injectedWallet, coinbaseWallet];
 
 const connectors = connectorsForWallets(
   [
     {
       groupName: "Recommended",
-      wallets: popularWallets,
+      wallets,
     },
   ],
   {
     appName: "RPO — permissionless IPO subscription",
-    // RainbowKit still requires this field even if WC is disabled —
-    // passing a string keeps it happy without registering the WC provider.
-    projectId: WC_PROJECT_ID ?? "wc-disabled",
+    // RainbowKit demands a projectId string even when we've stripped
+    // every WC-backed wallet from the list. This placeholder is only
+    // used by dead code paths in that case.
+    projectId: WC_ENABLED ? WC_PROJECT_ID! : "wc-disabled-see-lib-wagmi-ts",
     appDescription:
       "Buy tokenized IPOs on Robinhood Chain. No broker, no KYC.",
     appUrl: "https://rpo-web.fly.dev",
@@ -82,3 +91,7 @@ export const wagmiConfig = createConfig({
   },
   ssr: true,
 });
+
+/** True when the deployment has a real WalletConnect projectId; used
+ * by the UI to show/hide the "mobile wallet" hint. */
+export const walletConnectEnabled = WC_ENABLED;

@@ -377,12 +377,36 @@ export function BuyPanel({
             : validation.hint}
         </Button>
       ) : (
-        <ConnectButton
-          size="md"
-          variant="primary"
-          className="w-full [&>div]:w-full [&_button]:w-full [&_button]:justify-center"
-          label="Connect wallet to buy"
-        />
+        <div className="space-y-3">
+          <ConnectButton
+            size="md"
+            variant="primary"
+            className="w-full [&>div]:w-full [&_button]:w-full [&_button]:justify-center"
+            label="Connect wallet to buy"
+          />
+          <div className="text-[11px] text-ink-500 leading-relaxed">
+            Need a wallet? Install{" "}
+            <a
+              href="https://metamask.io/download"
+              target="_blank"
+              rel="noreferrer"
+              className="text-forest-500 hover:underline"
+            >
+              MetaMask
+            </a>{" "}
+            or{" "}
+            <a
+              href="https://rabby.io"
+              target="_blank"
+              rel="noreferrer"
+              className="text-forest-500 hover:underline"
+            >
+              Rabby
+            </a>{" "}
+            (any EVM wallet works). On mobile, open this page{" "}
+            <em>inside</em> your wallet&apos;s browser tab.
+          </div>
+        </div>
       )}
 
       <div className="grid sm:grid-cols-3 gap-3 pt-2 border-t border-line">
