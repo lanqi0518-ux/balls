@@ -14,6 +14,10 @@ import { Partners } from "@/components/marketing/Partners";
 import { FAQ } from "@/components/marketing/FAQ";
 import { CTA } from "@/components/marketing/CTA";
 
+// Revalidate live on-chain reads every 60 seconds so first-paint
+// always shows current Chainlink marks without hammering the RPC.
+export const revalidate = 60;
+
 export default function HomePage() {
   return (
     <>

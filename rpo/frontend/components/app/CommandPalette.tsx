@@ -14,7 +14,7 @@ import {
   Layers,
   ArrowUpRight,
 } from "@/components/ui/Icons";
-import { IPO_SEEDS } from "@/lib/catalog";
+import { STOCK_TOKENS } from "@/lib/robinhood/tokens";
 import { cn } from "@/lib/cn";
 
 type Command = {
@@ -66,12 +66,12 @@ export function CommandPalette() {
       { id: "nav-exp", label: "Explorer", section: "Navigate", Icon: Chart, action: () => router.push("/explorer") },
       { id: "nav-faucet", label: "Testnet Faucet", section: "Navigate", Icon: Bolt, action: () => router.push("/faucet") },
     ];
-    const ipos: Command[] = IPO_SEEDS.map((s) => ({
-      id: `ipo-${s.ticker}`,
-      label: `${s.ticker} — ${s.name}`,
-      hint: s.status,
-      section: "IPOs",
-      action: () => router.push(`/app/ipo/${s.ticker.toLowerCase()}`),
+    const ipos: Command[] = STOCK_TOKENS.map((t) => ({
+      id: `ipo-${t.ticker}`,
+      label: `${t.ticker} — ${t.name}`,
+      hint: "Live on RH Chain",
+      section: "Underlying markets",
+      action: () => router.push(`/app/ipo/${t.ticker.toLowerCase()}`),
     }));
     return [...nav, ...ipos];
   }, [router]);

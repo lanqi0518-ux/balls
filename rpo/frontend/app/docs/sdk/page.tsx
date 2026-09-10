@@ -87,18 +87,18 @@ const rpo = createRpo({ wallet });`}</code>
           <H3 id="subscribe">subscribe / cancel / claim</H3>
           <pre>
             <code>{`// Subscribe $500 USDG to a vault (example ticker)
-const tx = await rpo.vault("EXAMPLE").subscribe({
+const tx = await rpo.vault("NVDA").subscribe({
   amount: 500_000000n, // 6-decimal USDG
 });
 await tx.wait();
 
 // Cancel and refund before fulfillment
-await rpo.vault("EXAMPLE").cancel();
+await rpo.vault("NVDA").cancel();
 
 // Claim d-token after fulfillment
-const claimTx = await rpo.vault("EXAMPLE").claim();
+const claimTx = await rpo.vault("NVDA").claim();
 const receipt = await claimTx.wait();
-console.log("Received", receipt.tokensOut, "dEXAMPLE");`}</code>
+console.log("Received", receipt.tokensOut, "dNVDA");`}</code>
           </pre>
 
           <H2 id="booster">AllocationBooster</H2>
@@ -119,17 +119,17 @@ const boost = await rpo.booster.boostOf("0xabc…");
             <code>{`// Deposit a dTOKEN as collateral, borrow USDG to 60% LTV,
 // and auto-subscribe borrowed USDG to the next open vault.
 await rpo.looper.loop({
-  collateral: "dEXAMPLE",
+  collateral: "dNVDA",
   amount: 100n * 10n ** 18n,
   targetLtv: 0.6,
-  autoSubscribeTo: "EXAMPLE2",
+  autoSubscribeTo: "SPY",
 });`}</code>
           </pre>
 
           <H2 id="reads">Convenience reads</H2>
           <pre>
             <code>{`const active = await rpo.ipos.active();
-const detail = await rpo.ipos.get("EXAMPLE");
+const detail = await rpo.ipos.get("NVDA");
 const positions = await rpo.user.positions("0xabc…");
 const boost = await rpo.user.boost("0xabc…");
 const leaderboard = await rpo.leaderboard.top(100);`}</code>
@@ -140,7 +140,7 @@ const leaderboard = await rpo.leaderboard.top(100);`}</code>
             <code>{`import { useRpoVault, useBoost } from "@rpo/sdk/wagmi";
 
 function SubscribeButton() {
-  const { subscribe, isPending } = useRpoVault("EXAMPLE");
+  const { subscribe, isPending } = useRpoVault("NVDA");
   const { data: boost } = useBoost();
 
   return (

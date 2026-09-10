@@ -3,41 +3,39 @@ import { Section } from "@/components/ui/Section";
 import { LinkButton } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { ArrowRight, ArrowUpRight } from "@/components/ui/Icons";
-import { ALL_LIVE, TOTAL_LIVE } from "@/lib/catalog";
-import { fmtUSD } from "@/lib/format";
+import { readAllStockSnapshots } from "@/lib/robinhood/reads";
+import { fmtNum, fmtUSD } from "@/lib/format";
 
 /**
- * When the protocol is live, this section surfaces the top-6 currently
- * open vaults sourced from the catalog (which itself is empty until
- * PROTOCOL_LIVE is true). Pre-launch it renders an honest empty state.
+ * Featured section — real, live Robinhood-Chain Stock Tokens sourced
+ * from the RPC on every ISR revalidation. These are the underlying
+ * assets an RPO SubscriptionVault will buy when the protocol goes
+ * live. The subscribe surface is gated on the RPO vault being
+ * deployed; the underlying market data is real either way.
  */
-const featured = [...ALL_LIVE]
-  .sort((a, b) => b.targetUSD - a.targetUSD)
-  .slice(0, 6);
+export async function FeaturedIPOs() {
+  const snapshots = await readAllStockSnapshots();
+  const rankedByCap = [...snapshots]
+    .filter((s) => s.priceUsd != null && s.totalSupply != null)
+    .sort((a, b) => (b.priceUsd! * b.totalSupply!) - (a.priceUsd! * a.totalSupply!));
+  const featured = rankedByCap.slice(0, 6);
 
-function staticLabel(offsetSec: number, alwaysOn: boolean): string {
-  if (alwaysOn) return "Always-on";
-  if (offsetSec <= 0) return "Live now";
-  const d = Math.floor(offsetSec / 86400);
-  const h = Math.floor((offsetSec % 86400) / 3600);
-  if (d > 0) return `${d}d ${h}h`;
-  return `${h}h`;
-}
-
-export function FeaturedIPOs() {
   if (featured.length === 0) {
     return (
       <Section id="ipos">
         <div className="max-w-2xl">
-          <div className="eyebrow mb-5">Featured today</div>
+          <div className="eyebrow mb-5">Underlying markets</div>
           <h2 className="font-display text-display-sm text-ink-900">
-            No live vaults yet.
+            Robinhood Chain RPC unreachable.
           </h2>
           <p className="text-sm text-ink-500 mt-4 max-w-xl">
-            The protocol has not been deployed on mainnet. Once contracts
-            are live, this section will surface the biggest live vaults
-            sampled directly from{" "}
-            <code className="text-ink-900">IPORegistry.getAll()</code>.
+            The site could not fetch live Chainlink prices from{" "}
+            <code className="text-ink-900">
+              rpc.mainnet.chain.robinhood.com
+            </code>
+            . Once the RPC is reachable, this section surfaces every
+            deployed Robinhood Stock Token with its live mark and
+            on-chain supply — no fake data will ever be displayed.
           </p>
           <div className="mt-8">
             <LinkButton
@@ -58,45 +56,38 @@ export function FeaturedIPOs() {
     <Section id="ipos">
       <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-16 gap-6">
         <div className="max-w-2xl">
-          <div className="eyebrow mb-5">Featured today</div>
+          <div className="eyebrow mb-5">Underlying markets · live</div>
           <h2 className="font-display text-display-sm text-ink-900">
-            Six of {TOTAL_LIVE} live vaults, right now.
+            Real Robinhood-Chain Stock Tokens, priced by Chainlink.
           </h2>
           <p className="text-sm text-ink-500 mt-4 max-w-xl">
-            Handpicked from today&apos;s board — biggest targets across all
-            four deal-flow pipelines. Full catalog on{" "}
-            <Link href="/app" className="text-forest-500 hover:underline">
-              /app
-            </Link>
-            .
+            These are already deployed on Robinhood Chain (id 4663).
+            When an RPO SubscriptionVault ships, its fill leg buys the
+            underlying token directly from Rialto propAMM. Marks below
+            come from the on-chain Chainlink feeds and refresh every 60
+            seconds.
           </p>
         </div>
         <LinkButton
-          href="/app"
+          href="/explorer"
           variant="outline"
           size="md"
           trailingIcon={<ArrowRight className="h-4 w-4" />}
         >
-          Browse all {TOTAL_LIVE} vaults
+          Full onchain explorer
         </LinkButton>
       </div>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {featured.map((ipo) => (
-          <IPOPreviewCard
-            key={ipo.ticker}
-            ticker={ipo.ticker}
-            name={ipo.name}
-            status={ipo.status as "Subscribing" | "Announced"}
-            source={ipo.source}
-            target={fmtUSD(ipo.targetUSD, { compact: true })}
-            progress={Math.round(
-              (ipo.seedSubscribedUSD / ipo.targetUSD) * 100
-            )}
-            expectedPrice={`$${ipo.expectedPrice.toFixed(
-              ipo.expectedPrice < 1 ? 4 : 2
-            )}`}
-            countdown={staticLabel(ipo.launchOffsetSec, !!ipo.alwaysOn)}
+        {featured.map((s) => (
+          <UnderlyingCard
+            key={s.token.ticker}
+            ticker={s.token.ticker}
+            name={s.token.name}
+            priceUsd={s.priceUsd!}
+            totalSupply={s.totalSupply!}
+            updatedAt={s.updatedAt}
+            assetClass={s.token.assetClass}
           />
         ))}
       </div>
@@ -104,16 +95,18 @@ export function FeaturedIPOs() {
   );
 }
 
-function IPOPreviewCard(props: {
+function UnderlyingCard(props: {
   ticker: string;
   name: string;
-  status: "Subscribing" | "Announced";
-  source: string;
-  target: string;
-  progress: number;
-  expectedPrice: string;
-  countdown: string;
+  priceUsd: number;
+  totalSupply: number;
+  updatedAt: number | null;
+  assetClass: string;
 }) {
+  const marketCap = props.priceUsd * props.totalSupply;
+  const ageSec = props.updatedAt
+    ? Math.max(0, Math.floor(Date.now() / 1000) - props.updatedAt)
+    : null;
   return (
     <Link
       href={`/app/ipo/${props.ticker.toLowerCase()}`}
@@ -121,7 +114,7 @@ function IPOPreviewCard(props: {
     >
       <div className="flex items-center gap-4">
         <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-ink-900 to-ink-700 flex items-center justify-center text-white text-sm font-semibold">
-          {props.ticker.slice(0, 2)}
+          {props.ticker.slice(0, 4)}
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-lg font-semibold text-ink-900">
@@ -129,47 +122,60 @@ function IPOPreviewCard(props: {
           </div>
           <div className="text-xs text-ink-500 truncate">{props.name}</div>
           <div className="text-[10px] uppercase tracking-[0.14em] text-ink-500 mt-1 font-mono">
-            {props.source}
+            {props.assetClass} · Chainlink
           </div>
         </div>
-        <Badge
-          variant={props.status === "Subscribing" ? "forest" : "default"}
-          dot={props.status === "Subscribing"}
-        >
-          {props.status}
+        <Badge variant="forest" dot>
+          Live
         </Badge>
       </div>
 
       <div>
         <div className="flex items-center justify-between text-xs text-ink-500 mb-2">
-          <span>Subscribed</span>
+          <span>Chainlink mark</span>
           <span className="font-mono text-ink-900 tabular-nums">
-            {props.progress}% · {props.target}
+            {fmtUSD(props.priceUsd)}
           </span>
         </div>
-        <div className="h-1.5 bg-paper-200 rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-forest-500 to-peach-500"
-            style={{ width: `${props.progress}%` }}
-          />
+        <div className="flex items-center justify-between text-xs text-ink-500 mt-1">
+          <span>On-chain supply</span>
+          <span className="font-mono text-ink-900 tabular-nums">
+            {fmtNum(props.totalSupply, 0)} d{props.ticker}
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-xs text-ink-500 mt-1">
+          <span>Market value</span>
+          <span className="font-mono text-ink-900 tabular-nums">
+            {marketCap >= 1_000_000
+              ? `$${(marketCap / 1_000_000).toFixed(2)}M`
+              : marketCap >= 1_000
+              ? `$${(marketCap / 1_000).toFixed(1)}k`
+              : fmtUSD(marketCap)}
+          </span>
         </div>
       </div>
 
       <div className="flex items-center justify-between text-sm border-t border-line pt-5">
         <div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500">
-            Expected
+            Feed updated
           </div>
           <div className="font-mono text-ink-900 tabular-nums mt-1">
-            {props.expectedPrice}
+            {ageSec != null
+              ? ageSec < 60
+                ? `${ageSec}s ago`
+                : ageSec < 3600
+                ? `${Math.floor(ageSec / 60)}m ago`
+                : `${Math.floor(ageSec / 3600)}h ago`
+              : "—"}
           </div>
         </div>
         <div className="text-right">
           <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500">
-            Launch in
+            Ticker
           </div>
           <div className="font-mono text-forest-500 tabular-nums mt-1 font-semibold">
-            {props.countdown}
+            d{props.ticker}
           </div>
         </div>
         <ArrowUpRight className="h-4 w-4 text-ink-400 group-hover:text-ink-900 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />

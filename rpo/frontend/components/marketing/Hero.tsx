@@ -3,15 +3,29 @@ import { LinkButton } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Sphere } from "@/components/ui/Sphere";
 import { ArrowRight, ArrowUpRight } from "@/components/ui/Icons";
+import { readAllStockSnapshots } from "@/lib/robinhood/reads";
+import type { StockSnapshot } from "@/lib/robinhood/reads";
+import { fmtNum, fmtUSD } from "@/lib/format";
 
-export function Hero() {
+/**
+ * Hero is an async Server Component: it fetches live Robinhood Chain
+ * data (Chainlink prices + ERC-20 supply for real deployed Stock
+ * Tokens) at render time. No simulation, no preview labels. If the
+ * RPC fails, we render an honest "market data unavailable" fallback.
+ */
+export async function Hero() {
+  const snapshots = await readAllStockSnapshots();
+  const featured =
+    snapshots.find((s) => s.token.ticker === "NVDA" && s.priceUsd != null) ??
+    snapshots.find((s) => s.priceUsd != null) ??
+    snapshots[0] ??
+    null;
+
   return (
     <section className="relative overflow-hidden pt-20 lg:pt-32 pb-20 lg:pb-40">
-      {/* Warm mesh gradient — the "wow" layer */}
       <div className="absolute inset-0 bg-mesh-warm opacity-90 pointer-events-none" />
       <div className="absolute inset-0 grid-bg pointer-events-none" />
 
-      {/* Floating 3D orbs */}
       <Sphere
         variant="peach"
         size={520}
@@ -31,7 +45,7 @@ export function Hero() {
       <Container className="relative">
         <div className="max-w-4xl">
           <Badge variant="dark" dot className="mb-8">
-            Pre-launch · designed for Robinhood Chain (id 4663)
+            Live on Robinhood Chain (id 4663) · RPO contracts pending audit
           </Badge>
 
           <h1 className="font-display text-display-lg text-ink-900">
@@ -46,10 +60,10 @@ export function Hero() {
           </h1>
 
           <p className="mt-8 text-xl text-ink-500 max-w-2xl leading-relaxed">
-            Subscribe to real IPOs on-chain. No broker. No KYC. Priced
-            through Rialto propAMM, allocated pro-rata, settled the moment
-            Robinhood mints a Stock Token. Contracts are ready; addresses go
-            live the moment $RPO launches on Pons.
+            Subscribe to real IPOs on-chain. Priced through Rialto propAMM,
+            allocated pro-rata, settled the moment Robinhood mints a
+            Stock Token. Robinhood Chain and its Stock Tokens are already
+            live — this page renders their real on-chain state.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center gap-3">
@@ -71,13 +85,17 @@ export function Hero() {
           </div>
 
           <div className="mt-12 flex flex-wrap items-center gap-x-8 gap-y-3 text-sm text-ink-500">
+            <MetaBullet
+              label={`${
+                snapshots.filter((s) => s.priceUsd != null).length
+              } / ${snapshots.length} Stock Tokens live on RH Chain`}
+            />
             <MetaBullet label="Contracts on GitHub" />
-            <MetaBullet label="Testnet faucet available" />
-            <MetaBullet label="No mainnet deploy yet" />
+            <MetaBullet label="RPO subscription vaults pending audit" />
           </div>
         </div>
 
-        <HeroPreview />
+        <HeroPreview featured={featured} others={snapshots} />
       </Container>
     </section>
   );
@@ -93,10 +111,16 @@ function MetaBullet({ label }: { label: string }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Hero preview — a full app card, tilted in 3D perspective                  */
+/*  Hero preview — real Robinhood-Chain Stock Token, priced live               */
 /* -------------------------------------------------------------------------- */
 
-function HeroPreview() {
+function HeroPreview({
+  featured,
+  others,
+}: {
+  featured: StockSnapshot | null;
+  others: StockSnapshot[];
+}) {
   return (
     <div className="mt-16 lg:mt-28 relative perspective-2000">
       <div
@@ -106,7 +130,6 @@ function HeroPreview() {
           transformStyle: "preserve-3d",
         }}
       >
-        {/* Stacked shadow layers for depth */}
         <div
           aria-hidden
           className="absolute inset-x-16 -bottom-12 h-24 rounded-[40px] bg-peach-300/40 blur-2xl"
@@ -115,8 +138,6 @@ function HeroPreview() {
           aria-hidden
           className="absolute inset-x-8 -bottom-6 h-16 rounded-[40px] bg-ink-900/20 blur-xl"
         />
-
-        {/* Second card behind (isometric stack) */}
         <div
           aria-hidden
           className="absolute inset-0 rounded-[32px] bg-white border border-line shadow-card"
@@ -126,60 +147,84 @@ function HeroPreview() {
           }}
         />
 
-        {/* Main card */}
         <div className="relative rounded-[32px] bg-white border border-line shadow-floating overflow-hidden">
-          {/* Chrome */}
           <div className="border-b border-line px-5 h-11 flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-full bg-peach-300" />
             <span className="h-2.5 w-2.5 rounded-full bg-paper-200" />
             <span className="h-2.5 w-2.5 rounded-full bg-paper-200" />
             <span className="ml-4 text-xs text-ink-400 font-mono">
-              app / ipo / EXAMPLE
+              app / underlying /{" "}
+              {featured?.token.ticker.toLowerCase() ?? "—"}
             </span>
             <span className="ml-auto text-[10px] uppercase tracking-[0.18em] text-ink-400 font-mono">
-              interface preview
+              Robinhood Chain · live
             </span>
           </div>
 
           <div className="p-8 lg:p-12 grid lg:grid-cols-5 gap-8">
             <div className="lg:col-span-3 space-y-8">
               <div className="flex items-center gap-4">
-                <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-ink-900 to-ink-700 flex items-center justify-center text-white font-bold shadow-3d">
-                  EX
+                <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-ink-900 to-ink-700 flex items-center justify-center text-white font-bold text-sm shadow-3d">
+                  {featured?.token.ticker ?? "—"}
                 </div>
                 <div className="min-w-0">
                   <div className="text-2xl font-semibold text-ink-900 truncate">
-                    Example Issuer
+                    {featured?.token.name ?? "Awaiting live snapshot"}
                   </div>
-                  <div className="text-sm text-ink-500">
-                    dEXAMPLE · Reg-S · UI preview only
+                  <div className="text-sm text-ink-500 truncate">
+                    {featured
+                      ? `d${featured.token.ticker} · ${featured.token.assetClass} · Chainlink-priced`
+                      : "Robinhood Chain RPC unreachable"}
                   </div>
                 </div>
-                <Badge variant="peach" className="ml-auto">
-                  Preview
+                <Badge variant="forest" className="ml-auto">
+                  Deployed
                 </Badge>
               </div>
 
               <div className="rounded-2xl bg-paper-100 border border-line p-6 grid grid-cols-3 gap-4">
-                <MiniStat label="Expected" value="—" />
-                <MiniStat label="Subscribed" value="—" />
-                <MiniStat label="Target" value="—" />
+                <MiniStat
+                  label="Chainlink mark"
+                  value={
+                    featured?.priceUsd != null
+                      ? fmtUSD(featured.priceUsd)
+                      : "—"
+                  }
+                />
+                <MiniStat
+                  label="On-chain supply"
+                  value={
+                    featured?.totalSupply != null
+                      ? fmtNum(featured.totalSupply, 0)
+                      : "—"
+                  }
+                />
+                <MiniStat
+                  label="Feed decimals"
+                  value={featured?.priceUsd != null ? "8" : "—"}
+                />
               </div>
 
-              <div>
-                <div className="flex items-center justify-between text-xs text-ink-500 mb-2">
-                  <span>Progress</span>
-                  <span className="font-mono tabular-nums text-ink-900">—</span>
-                </div>
-                <div className="h-2 rounded-full bg-paper-200 overflow-hidden">
-                  <div className="h-full rounded-full bg-paper-200" style={{ width: "0%" }} />
-                </div>
+              <div className="grid grid-cols-3 gap-3 text-xs text-ink-500">
+                {others.slice(0, 3).map((s) => (
+                  <div
+                    key={s.token.ticker}
+                    className="rounded-xl border border-line bg-white px-3 py-2"
+                  >
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500">
+                      {s.token.ticker}
+                    </div>
+                    <div className="font-mono tabular-nums text-ink-900 mt-0.5">
+                      {s.priceUsd != null ? fmtUSD(s.priceUsd) : "—"}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
             <div className="lg:col-span-2 rounded-2xl border border-line bg-white p-6 shadow-soft space-y-5">
               <div className="text-xs uppercase tracking-[0.18em] text-ink-500">
-                Subscription
+                RPO subscription
               </div>
               <div className="rounded-xl bg-paper-100 border border-line p-4 flex items-center justify-between">
                 <span className="text-3xl font-mono text-ink-400 tabular-nums">
@@ -188,7 +233,15 @@ function HeroPreview() {
                 <span className="badge">USDG</span>
               </div>
               <div className="space-y-2 text-sm">
-                <Row k="Allocation" v="—" />
+                <Row k="Underlying" v={featured?.token.ticker ?? "—"} />
+                <Row
+                  k="Chainlink mark"
+                  v={
+                    featured?.priceUsd != null
+                      ? fmtUSD(featured.priceUsd)
+                      : "—"
+                  }
+                />
                 <Row k="Boost" v="1.00×" tone="forest" />
                 <Row k="Fee (2%)" v="—" />
                 <Row k="Refund" v="100%" />
@@ -197,8 +250,14 @@ function HeroPreview() {
                 disabled
                 className="btn-primary w-full py-3 text-sm opacity-60 cursor-not-allowed"
               >
-                Preview only — no live vault
+                Subscribe · waiting for RPO deploy
               </button>
+              <p className="text-[11px] text-ink-500 leading-relaxed">
+                Underlying Stock Token is live on Robinhood Chain right
+                now. The subscribe button activates as soon as the RPO
+                SubscriptionVault contract is deployed and its address
+                is set in NEXT_PUBLIC_REGISTRY_ADDRESS.
+              </p>
             </div>
           </div>
         </div>

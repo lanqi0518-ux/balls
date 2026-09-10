@@ -78,15 +78,13 @@ export default function ApiPage() {
 {
   "data": [
     {
-      "ticker": "EXAMPLE",
-      "name": "Example Issuer",
-      "vault": "0x0000…0000",
-      "status": "Subscribing",
-      "subscribedUSD": "0",
-      "targetUSD": "0",
-      "expectedPrice": "0",
-      "subscriptionDeadline": 0,
-      "fulfillmentDeadline": 0,
+      "ticker": "NVDA",
+      "name": "NVIDIA · Robinhood Token",
+      "underlying": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+      "priceFeed": "0x379EC4f7C378F34a1B47E4F3cbeBCbAC3E8E9F15",
+      "vault": null,
+      "status": "PendingRpoDeploy",
+      "chainlinkMark": "221.13",
       "boostAppliedToVault": true
     }
   ],

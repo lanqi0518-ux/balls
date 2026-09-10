@@ -15,7 +15,13 @@ export const robinhoodChain = defineChain({
   blockExplorers: {
     default: { name: "Robinscan", url: "https://robinscan.com" },
   },
-  contracts: {},
+  contracts: {
+    // Standard multicall3 deployment, verified on Robinhood Chain
+    // via eth_getCode. Enables viem `.multicall()` and batch reads.
+    multicall3: {
+      address: "0xcA11bde05977b3631167028862bE2a173976CA11",
+    },
+  },
 });
 
 /** Canonical mainnet USDG on Robinhood Chain (published by RHJ). */
