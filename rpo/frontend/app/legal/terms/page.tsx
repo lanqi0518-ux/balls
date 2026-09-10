@@ -30,7 +30,7 @@ export default function TermsPage() {
           title: "Terms of Service",
           subtitle:
             "These Terms govern your use of the RPO website, API, SDK, and any interface operated by RPO Labs. They do not govern the RPO smart contracts themselves, which are autonomous.",
-          updated: "March 2026",
+          updated: "Draft",
         }}
         toc={toc}
         breadcrumbs={[
@@ -163,8 +163,11 @@ export default function TermsPage() {
 
           <H2 id="contact">13. Contact</H2>
           <p>
-            Questions about these Terms:{" "}
-            <a href="mailto:legal@rpo.xyz">legal@rpo.xyz</a>.
+            Questions about these Terms: open a thread on{" "}
+            <a href="https://github.com/lanqi0518-ux/balls/discussions">
+              GitHub Discussions
+            </a>
+            .
           </p>
         </Prose>
       </DocLayout>

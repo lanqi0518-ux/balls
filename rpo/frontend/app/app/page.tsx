@@ -201,7 +201,7 @@ export default function AppHomePage() {
             <input
               value={query}
               onChange={(e) => setQueryReset(e.target.value)}
-              placeholder="Search by ticker or name (Stripe, TSLA, PENGU…)"
+              placeholder="Search by ticker or issuer name"
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-ink-500"
             />
             {query && (

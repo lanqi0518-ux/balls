@@ -26,7 +26,7 @@ export default function RiskPage() {
           title: "Risk Disclosure",
           subtitle:
             "Every material risk of interacting with the RPO protocol, disclosed plainly. This is not exhaustive — you must independently assess suitability for your situation.",
-          updated: "March 2026",
+          updated: "Draft",
         }}
         toc={toc}
         breadcrumbs={[

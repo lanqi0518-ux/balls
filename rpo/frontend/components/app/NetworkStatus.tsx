@@ -56,14 +56,14 @@ export function NetworkStatus() {
           </span>
           <div className="flex-1 min-w-0 text-sm leading-snug">
             <span className="font-semibold text-peach-500">
-              Awaiting $RPO launch on Pons
+              Pre-launch
             </span>
             <span className="text-white/70">
               {" "}·{" "}
-              The interface is wired to <strong>{proto.chainName}</strong>.
-              Contracts are audited but no addresses are configured for this
-              chain yet — every write button will wait for a deploy. Point
-              the frontend at a testnet with a{" "}
+              The interface is wired to <strong>{proto.chainName}</strong>,
+              but no RPO contracts have been deployed on that chain yet.
+              Every write button will wait for a real deployment. Point the
+              frontend at a testnet with a{" "}
               <Link
                 href="/faucet"
                 className="underline underline-offset-2 hover:text-white"

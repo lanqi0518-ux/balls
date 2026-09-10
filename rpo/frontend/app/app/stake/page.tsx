@@ -222,7 +222,7 @@ export default function StakePage() {
       {!proto.isLive ? (
         <PendingDeploymentPanel
           title="Stake · pending $RPO deployment"
-          hint="The AllocationBooster contract is audited and ready — as soon as $RPO is deployed on this chain, this page unlocks and every button hits the real contract. No rebuild required."
+          hint="$RPO and AllocationBooster have not been deployed on this chain yet. Once they are, this page unlocks and every button hits the real contract — no rebuild required."
         />
       ) : (
         <div className="grid lg:grid-cols-5 gap-6">
@@ -379,9 +379,10 @@ export default function StakePage() {
               </div>
 
               <div className="mt-6 text-xs text-ink-500 leading-relaxed">
-                Unstake starts a 14-day cooldown. 80% of every 2% platform
-                fee is spent on open-market $RPO buybacks on Pons, streamed
-                back to this contract as protocol accrual.
+                Unstake starts a 14-day cooldown. In the intended fee
+                design, 80% of every 2% platform fee is spent on open-market
+                $RPO buybacks and streamed back to this contract as
+                protocol accrual. Fees only begin once vaults deploy.
               </div>
             </div>
           </div>
@@ -442,11 +443,11 @@ export default function StakePage() {
             <div className="card p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Badge variant="forest">$RPO</Badge>
-                <Badge>Pons LP</Badge>
-                <Badge>SPY-pair</Badge>
+                <Badge variant="peach">Pre-launch</Badge>
               </div>
               <div className="text-sm text-ink-500 leading-relaxed">
-                $RPO launched fair on{" "}
+                The $RPO token has not been launched yet. The intended
+                launch model is a fair launch on{" "}
                 <a
                   href="https://pons.dev"
                   target="_blank"
@@ -455,8 +456,15 @@ export default function StakePage() {
                 >
                   Pons
                 </a>{" "}
-                paired against SPY. No team unlock cliff, no VC allocation,
-                1B fixed supply.
+                against SPY, with no team unlock cliff, no VC allocation,
+                and a fixed 1B supply. Details live under{" "}
+                <a
+                  href="/tokenomics"
+                  className="text-forest-500 hover:underline"
+                >
+                  /tokenomics
+                </a>
+                .
               </div>
             </div>
           </aside>

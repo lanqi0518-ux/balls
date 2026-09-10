@@ -78,15 +78,15 @@ export default function ApiPage() {
 {
   "data": [
     {
-      "ticker": "STRIPE",
-      "name": "Stripe, Inc.",
-      "vault": "0xa1b2…c3d4",
+      "ticker": "EXAMPLE",
+      "name": "Example Issuer",
+      "vault": "0x0000…0000",
       "status": "Subscribing",
-      "subscribedUSD": "2300000",
-      "targetUSD": "5000000",
-      "expectedPrice": "85.20",
-      "subscriptionDeadline": 1741996800,
-      "fulfillmentDeadline": 1742256000,
+      "subscribedUSD": "0",
+      "targetUSD": "0",
+      "expectedPrice": "0",
+      "subscriptionDeadline": 0,
+      "fulfillmentDeadline": 0,
       "boostAppliedToVault": true
     }
   ],

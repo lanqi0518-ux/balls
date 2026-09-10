@@ -20,7 +20,7 @@ const ITEMS = [
   },
   {
     q: "What is the $RPO token for?",
-    a: "$RPO is the allocation boost token. Stake it to multiply your weight in every SubscriptionVault, up to 3×. 80% of the 2% platform fee is spent buying $RPO on Pons and either burning it or streaming it to the AllocationBooster. There is no team unlock cliff; it launched fair through Pons paired against SPY.",
+    a: "$RPO is the allocation boost token. Stake it to multiply your weight in every SubscriptionVault, up to 3×. In the intended fee design, 80% of the 2% platform fee is spent buying $RPO on Pons and streamed back to the AllocationBooster. $RPO has not launched yet — the intended launch is a fair launch through Pons paired against SPY, with no team unlock cliff and no VC allocation.",
   },
   {
     q: "Is this custodial?",

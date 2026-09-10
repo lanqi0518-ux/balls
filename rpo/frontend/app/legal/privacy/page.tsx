@@ -27,7 +27,7 @@ export default function PrivacyPage() {
           title: "Privacy Policy",
           subtitle:
             "RPO Labs collects the minimum data needed to operate the interfaces, protect users, and comply with law. This document is the whole picture.",
-          updated: "March 2026",
+          updated: "Draft",
         }}
         toc={toc}
         breadcrumbs={[
@@ -136,9 +136,11 @@ export default function PrivacyPage() {
           <p>
             Depending on your jurisdiction, you may have the right to
             access, correct, port, or delete data we hold about you, and
-            to object to processing. Contact{" "}
-            <a href="mailto:privacy@rpo.xyz">privacy@rpo.xyz</a> to
-            exercise any of these rights. We respond within 30 days.
+            to object to processing. Open a request on{" "}
+            <a href="https://github.com/lanqi0518-ux/balls/issues">
+              GitHub Issues
+            </a>{" "}
+            to exercise any of these rights. We respond within 30 days.
           </p>
 
           <H2 id="cookies">Cookies</H2>
@@ -159,9 +161,11 @@ export default function PrivacyPage() {
 
           <H2 id="contact">Contact</H2>
           <p>
-            Data-protection questions:{" "}
-            <a href="mailto:privacy@rpo.xyz">privacy@rpo.xyz</a>. EU
-            residents may lodge complaints with their local DPA.
+            Data-protection questions: open a thread on{" "}
+            <a href="https://github.com/lanqi0518-ux/balls/discussions">
+              GitHub Discussions
+            </a>
+            . EU residents may lodge complaints with their local DPA.
           </p>
         </Prose>
       </DocLayout>

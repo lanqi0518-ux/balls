@@ -13,19 +13,19 @@ const DOCS = [
     title: "Terms of Service",
     body: "The contract between you and RPO Labs governing use of the website, API, SDK, and interfaces.",
     href: "/legal/terms",
-    updated: "March 2026",
+    updated: "Draft",
   },
   {
     title: "Privacy Policy",
     body: "What data we collect, what we don't, and who processes it.",
     href: "/legal/privacy",
-    updated: "March 2026",
+    updated: "Draft",
   },
   {
     title: "Risk Disclosure",
     body: "Regulatory, market, custody, technology, and jurisdictional risks of using RPO.",
     href: "/legal/risk",
-    updated: "March 2026",
+    updated: "Draft",
   },
 ];
 

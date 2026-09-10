@@ -15,35 +15,33 @@ export function RPOTokenSection() {
             <span className="italic">early access</span>.
           </h2>
           <p className="text-lg text-ink-500 leading-relaxed max-w-lg mb-8">
-            Stake $RPO to boost your allocation on every IPO — up to 3×. 80%
-            of platform fees flow into open-market $RPO buybacks through Pons,
-            paired against SPY. The more the protocol processes, the tighter
-            the float.
+            Stake $RPO to boost your allocation on every IPO — up to 3×. In
+            the intended fee design, 80% of platform fees flow into open-market
+            $RPO buybacks through Pons. The token has not launched yet.
           </p>
 
           <div className="flex flex-wrap items-center gap-2 mb-10">
             <Badge variant="peach">Pre-launch</Badge>
-            <Badge variant="forest">1B fixed supply</Badge>
-            <Badge>Fair launch on Pons</Badge>
+            <Badge variant="forest">Proposed 1B fixed supply</Badge>
+            <Badge>Intended fair launch on Pons</Badge>
             <Badge>No team unlock cliff</Badge>
           </div>
 
           <div className="flex flex-wrap gap-3">
             <LinkButton
-              href="/app/stake"
+              href="/tokenomics"
               size="md"
               trailingIcon={<ArrowUpRight className="h-4 w-4" />}
             >
-              Stake $RPO
+              Read tokenomics
             </LinkButton>
             <LinkButton
-              href="https://pons.dev"
+              href="/app/stake"
               variant="outline"
               size="md"
-              external
               trailingIcon={<ArrowUpRight className="h-4 w-4" />}
             >
-              Buy on Pons
+              Stake interface
             </LinkButton>
           </div>
         </div>

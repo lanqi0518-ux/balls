@@ -70,8 +70,9 @@ export function Footer() {
             </div>
             <p className="mt-6 text-sm text-ink-500 max-w-sm leading-relaxed">
               The permissionless IPO subscription protocol. Designed for
-              Robinhood Chain. Contracts audited-and-deployed process pending
-              $RPO launch on Pons.
+              Robinhood Chain. Pre-launch: contracts are drafted in{" "}
+              <span className="whitespace-nowrap">rpo/contracts</span> and
+              await third-party audit before mainnet deployment.
             </p>
 
             <div className="mt-8 flex items-center gap-2 flex-wrap">

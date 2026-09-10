@@ -8,19 +8,19 @@ import { RPO_ADDRESSES } from "@/lib/addresses";
 export const metadata = {
   title: "Contract reference",
   description:
-    "Solidity source, storage layout, gas benchmarks, invariants, and deployed addresses.",
+    "Solidity source, storage layout, target invariants, and canonical addresses.",
 };
 
 const toc: TocItem[] = [
+  { id: "status", label: "Status" },
   { id: "registry", label: "IPORegistry" },
   { id: "vault", label: "SubscriptionVault" },
   { id: "booster", label: "AllocationBooster" },
   { id: "rialto", label: "RialtoAdapter" },
   { id: "looper", label: "LeverageLooper" },
   { id: "storage", label: "Storage layout" },
-  { id: "gas", label: "Gas benchmarks" },
-  { id: "invariants", label: "Invariants" },
-  { id: "addresses", label: "Deployed addresses" },
+  { id: "invariants", label: "Target invariants" },
+  { id: "addresses", label: "Canonical addresses" },
 ];
 
 export default function ContractsPage() {
@@ -31,8 +31,8 @@ export default function ContractsPage() {
           eyebrow: "Reference · solidity",
           title: "Contract reference",
           subtitle:
-            "Every RPO contract, its function surface, storage layout, per-call gas, and the formal invariants we test against.",
-          updated: "March 2026",
+            "Every RPO contract, its function surface, storage layout, and the target invariants the release candidate must satisfy.",
+          updated: "Draft",
         }}
         toc={toc}
         breadcrumbs={[
@@ -41,6 +41,25 @@ export default function ContractsPage() {
         ]}
       >
         <Prose>
+          <blockquote>
+            <strong>Pre-launch.</strong> No RPO contract is deployed to
+            mainnet. Every function surface below reflects the reference
+            implementation in <code>rpo/contracts/</code>. Storage layouts,
+            gas costs, and behaviour are subject to change until the
+            release candidate has been audited and tagged.
+          </blockquote>
+
+          <H2 id="status">Status</H2>
+          <p>
+            The Solidity source lives in{" "}
+            <a href="https://github.com/lanqi0518-ux/balls/tree/main/rpo/contracts">
+              rpo/contracts
+            </a>
+            . Nothing here has been audited or deployed to a public
+            testnet, and none of the contracts are upgradeable — what is
+            eventually deployed is what will run forever.
+          </p>
+
           <H2 id="registry">IPORegistry</H2>
           <p>
             Factory + directory for SubscriptionVaults. CREATE2 salt is the
@@ -176,45 +195,12 @@ export default function ContractsPage() {
             you deploy is what runs forever.
           </p>
 
-          <H2 id="gas">Gas benchmarks</H2>
+          <H2 id="invariants">Target invariants</H2>
           <p>
-            <code>forge test --gas-report</code> on the release commit,
-            Sepolia Orbit, London EVM, evm.push0=true.
-          </p>
-          <table>
-            <thead>
-              <tr>
-                <th>Function</th>
-                <th>min</th>
-                <th>avg</th>
-                <th>max</th>
-                <th>calls</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td><code>subscribe</code> (first)</td><td>98,412</td><td>112,904</td><td>127,880</td><td>128</td></tr>
-              <tr><td><code>subscribe</code> (subsequent)</td><td>52,180</td><td>63,441</td><td>71,204</td><td>512</td></tr>
-              <tr><td><code>cancel</code></td><td>71,220</td><td>78,833</td><td>84,110</td><td>96</td></tr>
-              <tr><td><code>fulfill</code></td><td>184,220</td><td>218,650</td><td>288,400</td><td>32</td></tr>
-              <tr><td><code>claim</code></td><td>44,110</td><td>49,880</td><td>52,220</td><td>96</td></tr>
-              <tr><td><code>refund</code></td><td>76,050</td><td>82,110</td><td>87,120</td><td>16</td></tr>
-              <tr><td><code>stake</code></td><td>68,120</td><td>72,320</td><td>76,110</td><td>64</td></tr>
-              <tr><td><code>unstake</code></td><td>62,110</td><td>66,010</td><td>68,880</td><td>64</td></tr>
-              <tr><td><code>boostOf</code> (view)</td><td>3,220</td><td>3,220</td><td>3,220</td><td>—</td></tr>
-              <tr><td><code>loop</code></td><td>318,110</td><td>352,660</td><td>402,220</td><td>32</td></tr>
-            </tbody>
-          </table>
-          <p>
-            At Robinhood Chain gas prices (~0.001 gwei), a{" "}
-            <code>subscribe</code> costs approximately{" "}
-            <strong>$0.002 in ETH</strong>.
-          </p>
-
-          <H2 id="invariants">Invariants</H2>
-          <p>
-            Enforced by the Foundry invariant harness in{" "}
-            <code>test/invariants/</code>. Each runs 25,600 randomized calls
-            per commit.
+            The properties below are what the release candidate must
+            satisfy. They will be enforced via a Foundry invariant harness
+            in <code>rpo/contracts/test/invariants/</code> and re-checked
+            by third-party audit before mainnet deployment.
           </p>
           <table>
             <thead>
@@ -311,12 +297,16 @@ export default function ContractsPage() {
             </tbody>
           </table>
 
-          <H2 id="addresses">Deployed addresses</H2>
+          <H2 id="addresses">Canonical addresses</H2>
           <p>
-            Robinhood Chain (id {RPO_ADDRESSES.chainId}). Machine-readable
-            JSON at{" "}
+            Robinhood Chain (id {RPO_ADDRESSES.chainId}). All RPO contract
+            addresses show the zero address because no RPO contract has
+            been deployed. The one non-zero entry is the canonical USDG
+            token on Robinhood Chain, which is already live and used as
+            the settlement currency. Machine-readable JSON of the
+            canonical Robinhood Chain addresses lives at{" "}
             <a href="https://github.com/lanqi0518-ux/balls/blob/main/rpo/contracts/addresses.robinhood.json">
-              /rpo/contracts/addresses.robinhood.json
+              rpo/contracts/addresses.robinhood.json
             </a>
             .
           </p>

@@ -17,7 +17,7 @@ const LIFECYCLE = [
     tag: "Announce",
     title: "IPORegistry announces the vault",
     body: "A keeper (or the protocol admin) reads Robinhood's upcoming-listing feed and calls announceIPO(ticker, subscriptionWindow, targetUSD). A SubscriptionVault is deployed via CREATE2 so the address is predictable — you can even bridge USDG into it before it exists.",
-    code: "IPORegistry.announceIPO(\n  \"STRIPE\",\n  targetUSD = 5_000_000,\n  subscriptionDeadline = now + 3 days\n);",
+    code: "IPORegistry.announceIPO(\n  \"EXAMPLE\",\n  targetUSD = 5_000_000,\n  subscriptionDeadline = now + 3 days\n);",
   },
   {
     n: "02",
@@ -31,7 +31,7 @@ const LIFECYCLE = [
     tag: "Detect",
     title: "Keeper watches /rhj/assets",
     body: "Our off-chain keeper polls Robinhood's asset feed. The moment the target Stock Token flips to ASSET_STATUS_ACTIVE with a deployment on chain ID 4663, the keeper calls IPORegistry.markLaunched(key, stockToken).",
-    code: "// pseudo:\nassets.filter(a => a.status === \"ACTIVE\" && a.tokenSymbol === \"dSTRIPE\")\n      .forEach(a => registry.markLaunched(key, a.deployments[0]));",
+    code: "// pseudo:\nassets.filter(a => a.status === \"ACTIVE\" && a.tokenSymbol === \"dEXAMPLE\")\n      .forEach(a => registry.markLaunched(key, a.deployments[0]));",
   },
   {
     n: "04",
@@ -44,7 +44,7 @@ const LIFECYCLE = [
     n: "05",
     tag: "Claim",
     title: "Subscribers claim tokens",
-    body: "Once markFulfilled has been called, anyone can call claim(). You receive dSTRIPE proportional to your weight ÷ totalWeight. Any leftover USDG (from an under-filled vault) is refunded pro-rata in the same tx.",
+    body: "Once markFulfilled has been called, anyone can call claim(). You receive dEXAMPLE proportional to your weight ÷ totalWeight. Any leftover USDG (from an under-filled vault) is refunded pro-rata in the same tx.",
     code: "SubscriptionVault.claim();\n// tokens = totalStock * yourWeight / totalWeight\n// refund = totalUnfilled * yourDeposit / totalDeposits",
   },
   {
@@ -52,7 +52,7 @@ const LIFECYCLE = [
     tag: "Loop",
     title: "Loop into the next IPO",
     body: "Approve LeverageLooper for the Stock Token, call loopIntoNextIPO(stockToken, amt, nextVault, borrowUSDG). The looper supplies collateral to Morpho Blue, borrows USDG, and subscribes to the next vault — all atomically.",
-    code: "looper.loopIntoNextIPO({\n  stockToken: dSTRIPE,\n  amount:     5.88e18,\n  nextVault:  vaults.KLARNA,\n  borrowUSDG: 350e6\n});",
+    code: "looper.loopIntoNextIPO({\n  stockToken: dEXAMPLE,\n  amount:     5.88e18,\n  nextVault:  vaults.EXAMPLE2,\n  borrowUSDG: 350e6\n});",
   },
 ];
 
@@ -108,8 +108,8 @@ export default function HowItWorksPage() {
             Want more depth?
           </h2>
           <p className="mt-4 text-fg-muted">
-            The full protocol spec, contract ABIs, and audit history live in
-            the docs.
+            The full protocol spec and contract source live in the docs and
+            on GitHub.
           </p>
           <div className="mt-8 flex justify-center gap-3">
             <LinkButton
@@ -124,7 +124,7 @@ export default function HowItWorksPage() {
               variant="outline"
               size="md"
             >
-              Security & audits
+              Security
             </LinkButton>
           </div>
         </Container>
