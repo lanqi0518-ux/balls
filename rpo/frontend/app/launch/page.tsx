@@ -12,6 +12,8 @@ export const metadata: Metadata = {
     "HOODIPO's primitive 02. A Uniswap V4 hook that enforces a time-decaying per-swap size cap on freshly-minted Robinhood Stock Token pools, exempts PreMintVault claimants, and taxes JIT LPs — all with no admin.",
 };
 
+export const dynamic = "force-dynamic";
+
 const RAILS = [
   {
     n: "01",

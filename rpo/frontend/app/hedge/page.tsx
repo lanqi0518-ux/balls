@@ -14,6 +14,9 @@ export const metadata: Metadata = {
     "HOODIPO's primitive 05. Any d-TICKER holder can deposit their position, arm a Chainlink-strike stop-loss, and let any keeper execute the swap the moment the feed prints below strike. Composable on-chain lockup insurance.",
 };
 
+export const dynamic = "force-dynamic";
+export const revalidate = 60;
+
 const INVARIANTS = [
   "Owner-only disarm and withdraw. Keepers can never move funds when the position is not armed.",
   "Trigger reverts unless the Chainlink feed's latest answer is ≤ strike. Off-strike triggers are impossible.",

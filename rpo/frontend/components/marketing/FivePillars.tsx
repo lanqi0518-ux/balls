@@ -113,9 +113,8 @@ export function FivePillars() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {PILLARS.map((p, i) => (
-          <Link
+          <div
             key={p.n}
-            href={p.href}
             className="card-soft p-8 lg:p-10 relative overflow-hidden hover:shadow-card transition-shadow duration-300 group animate-fade-in-up"
             style={{ animationDelay: `${i * 60}ms` }}
           >
@@ -154,21 +153,23 @@ export function FivePillars() {
             </div>
 
             <div className="flex items-center gap-4 pt-4 border-t border-line">
-              <span className="text-sm font-semibold text-ink-900 inline-flex items-center gap-1 group-hover:gap-2 transition-all">
+              <Link
+                href={p.href}
+                className="text-sm font-semibold text-ink-900 inline-flex items-center gap-1 group-hover:gap-2 transition-all hover:underline"
+              >
                 {p.cta}
                 <ArrowRight className="h-4 w-4" />
-              </span>
+              </Link>
               <a
                 href={p.contractPath}
                 target="_blank"
                 rel="noreferrer"
-                onClick={(e) => e.stopPropagation()}
                 className="ml-auto text-xs text-ink-500 hover:text-ink-900 font-mono"
               >
                 View .sol →
               </a>
             </div>
-          </Link>
+          </div>
         ))}
       </div>
 

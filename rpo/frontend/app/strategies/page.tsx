@@ -12,6 +12,8 @@ export const metadata: Metadata = {
     "HOODIPO's primitive 03. Arm on-chain reactions to Robinhood Stock Token uiMultiplier events — dividends, splits, distributions — and let any keeper execute the swap for you the moment the ratio moves.",
 };
 
+export const dynamic = "force-dynamic";
+
 const STRATEGY_TYPES = [
   {
     kind: "TOP_UP",

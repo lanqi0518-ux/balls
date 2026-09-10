@@ -14,6 +14,9 @@ export const metadata: Metadata = {
     "HOODIPO's primitive 01. Deploy a permissionless CREATE2 vault the moment you spot an IPO rumor. Subscribers deposit USDG; the first keeper to submit an RHJ-signed attestation the block the ticker mints wins the pot fill.",
 };
 
+export const dynamic = "force-dynamic";
+export const revalidate = 60;
+
 const INVARIANTS = [
   "You can cancel() and withdraw 100% of your USDG at any time before the pot is spent — even after the subscription deadline lapses.",
   "If no keeper lands fulfill() before the fulfillment deadline, anyone (not the team) can call activateRefund() and every subscriber recovers USDG 1:1.",

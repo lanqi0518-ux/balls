@@ -16,6 +16,14 @@ const ROUTES = [
   "/ecosystem",
   "/changelog",
   "/explorer",
+  // HOODIPO primitives
+  "/vault",
+  "/launch",
+  "/strategies",
+  "/predict",
+  "/hedge",
+  "/monitor",
+  "/ipos",
   // Docs
   "/docs",
   "/docs/api",

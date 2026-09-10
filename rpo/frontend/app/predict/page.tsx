@@ -13,6 +13,8 @@ export const metadata: Metadata = {
     "HOODIPO's primitive 04. Bet USDG on whether Robinhood mints a specific ticker before a deadline. YES holders redeem for actual d-TICKER; NO holders redeem for USDG 1:1. Nobody else on Robinhood Chain settles physical.",
 };
 
+export const dynamic = "force-dynamic";
+
 const CANDIDATE_MARKETS = [
   {
     ticker: "STRIPE",

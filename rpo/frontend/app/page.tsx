@@ -16,8 +16,14 @@ import { Partners } from "@/components/marketing/Partners";
 import { FAQ } from "@/components/marketing/FAQ";
 import { CTA } from "@/components/marketing/CTA";
 
-// Revalidate live on-chain reads every 60 seconds so first-paint
-// always shows current Chainlink marks without hammering the RPC.
+// Force server-side rendering on every request instead of static
+// generation. The Hero + StatsBar + FeaturedIPOs + GlobalIpoCalendar
+// each hit external services (Robinhood Chain RPC, Nasdaq, SEC EDGAR),
+// which regularly exceed Next.js's default 120s static-generation
+// budget. Runtime SSR + edge caching (via revalidate=60 on the fetch
+// layer inside those components) gives us the same UX with a
+// reliable build.
+export const dynamic = "force-dynamic";
 export const revalidate = 60;
 
 export default function HomePage() {
