@@ -1,141 +1,34 @@
 /**
- * Minimal ABIs the frontend needs. In production, replace with the artifacts
- * emitted by `forge build --extra-output-files abi` to guarantee they stay
- * in sync with the deployed contracts.
+ * ABI barrel. Imports the JSON artifacts emitted by
+ * `forge build --extra-output-files abi` for every contract the
+ * frontend touches. Single source of truth — any Solidity change
+ * flows through the JSON files automatically.
+ *
+ * Legacy exports (REGISTRY_ABI / VAULT_ABI / BOOSTER_ABI / ERC20_ABI)
+ * are kept as aliases so older imports keep working. New code should
+ * prefer the named exports.
  */
 
-export const REGISTRY_ABI = [
-  {
-    type: "function",
-    name: "getActiveIPOs",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [
-      {
-        type: "tuple[]",
-        components: [
-          { name: "ticker", type: "string" },
-          { name: "name", type: "string" },
-          { name: "stockToken", type: "address" },
-          { name: "vault", type: "address" },
-          { name: "subscriptionDeadline", type: "uint256" },
-          { name: "fulfillmentDeadline", type: "uint256" },
-          { name: "status", type: "uint8" },
-        ],
-      },
-    ],
-  },
-] as const;
+import AllocationBoosterJson from "./abi/AllocationBooster.json";
+import AssetDiscoveryJson from "./abi/AssetDiscovery.json";
+import FaucetJson from "./abi/Faucet.json";
+import IPORegistryJson from "./abi/IPORegistry.json";
+import MockERC20Json from "./abi/MockERC20.json";
+import RialtoAdapterJson from "./abi/RialtoAdapter.json";
+import SubscriptionVaultJson from "./abi/SubscriptionVault.json";
 
-export const VAULT_ABI = [
-  {
-    type: "function",
-    name: "subscribe",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "amount", type: "uint256" }],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "cancel",
-    stateMutability: "nonpayable",
-    inputs: [],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "claim",
-    stateMutability: "nonpayable",
-    inputs: [],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "deposits",
-    stateMutability: "view",
-    inputs: [{ name: "user", type: "address" }],
-    outputs: [{ type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "previewAllocation",
-    stateMutability: "view",
-    inputs: [{ name: "user", type: "address" }],
-    outputs: [{ type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "totalUSDG",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "fulfilled",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ type: "bool" }],
-  },
-] as const;
+// ─── Real full ABIs (from forge artifacts) ─────────────────────────
+export const AllocationBoosterABI = AllocationBoosterJson;
+export const AssetDiscoveryABI = AssetDiscoveryJson;
+export const FaucetABI = FaucetJson;
+export const IPORegistryABI = IPORegistryJson;
+export const RialtoAdapterABI = RialtoAdapterJson;
+export const SubscriptionVaultABI = SubscriptionVaultJson;
 
-export const BOOSTER_ABI = [
-  {
-    type: "function",
-    name: "stake",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "amount", type: "uint256" }],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "unstake",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "amount", type: "uint256" }],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "getBoost",
-    stateMutability: "view",
-    inputs: [{ name: "user", type: "address" }],
-    outputs: [{ type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "stakedAmount",
-    stateMutability: "view",
-    inputs: [{ name: "user", type: "address" }],
-    outputs: [{ type: "uint256" }],
-  },
-] as const;
+// Standard ERC-20 subset (MockERC20 exposes it plus `mint`).
+export const ERC20_ABI = MockERC20Json;
 
-export const ERC20_ABI = [
-  {
-    type: "function",
-    name: "approve",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "spender", type: "address" },
-      { name: "amount", type: "uint256" },
-    ],
-    outputs: [{ type: "bool" }],
-  },
-  {
-    type: "function",
-    name: "balanceOf",
-    stateMutability: "view",
-    inputs: [{ name: "owner", type: "address" }],
-    outputs: [{ type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "allowance",
-    stateMutability: "view",
-    inputs: [
-      { name: "owner", type: "address" },
-      { name: "spender", type: "address" },
-    ],
-    outputs: [{ type: "uint256" }],
-  },
-] as const;
+// ─── Legacy aliases ────────────────────────────────────────────────
+export const REGISTRY_ABI = IPORegistryJson;
+export const VAULT_ABI = SubscriptionVaultJson;
+export const BOOSTER_ABI = AllocationBoosterJson;
