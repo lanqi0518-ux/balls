@@ -12,6 +12,17 @@ import { V4_POOLS } from "@/lib/robinhood/v4";
 
 const PAGE_SIZE = 24;
 
+// Featured buy shortcuts — hot / recent IPO / index picks, curated from the
+// registry so the landing has fast paths to the most-searched tickers.
+const HOT_BUY_PICKS = [
+  { ticker: "CRCL", label: "Buy dCRCL", note: "Circle · 2025 IPO" },
+  { ticker: "FIG",  label: "Buy dFIG",  note: "Figma · 2025 IPO" },
+  { ticker: "CRWV", label: "Buy dCRWV", note: "CoreWeave · 2025 IPO" },
+  { ticker: "SPCX", label: "Buy dSPCX", note: "SpaceX · pre-IPO" },
+  { ticker: "NVDA", label: "Buy dNVDA", note: "NVIDIA" },
+  { ticker: "TSLA", label: "Buy dTSLA", note: "Tesla" },
+];
+
 type AssetTab = "All" | "US Equity" | "ETF";
 
 export function AppHomeClient({
@@ -77,40 +88,38 @@ export function AppHomeClient({
     0
   );
 
+  const buyableCount = Object.keys(V4_POOLS).length;
+  const hotPicksInRegistry = HOT_BUY_PICKS.filter(
+    (p) => p.ticker.toUpperCase() in V4_POOLS
+  );
+
   return (
     <div className="p-5 lg:p-10">
       <div className="card p-6 border-l-4 border-forest-500 bg-forest-50/40 mb-8">
         <Badge variant="forest" dot>Live · Uniswap V4</Badge>
         <div className="mt-3 text-ink-900 font-semibold text-lg">
-          Buy dNVDA / dAAPL / dSPY right now — one tx, wallet to wallet.
+          {buyableCount} Robinhood Stock Tokens are buyable right now
+          — one tx, wallet to wallet.
         </div>
         <p className="text-sm text-ink-500 mt-2 leading-relaxed">
-          The buy widget routes{" "}
+          Every token below is a Reg-S debt security issued by
+          Robinhood Assets (Jersey) and paired against USDG on Uniswap
+          V4. The buy widget routes{" "}
           <span className="font-mono">USDG → Permit2 → UniversalRouter → PoolManager</span>{" "}
           on Robinhood Chain (id 4663). No waitlist, no batch window.
         </p>
-        <div className="mt-4 flex flex-wrap gap-3">
-          <Link
-            href="/app/markets/nvda"
-            className="btn-primary text-sm inline-flex items-center gap-2 whitespace-nowrap"
-          >
-            Buy dNVDA
-            <ArrowUpRight className="h-4 w-4" />
-          </Link>
-          <Link
-            href="/app/markets/aapl"
-            className="btn-primary text-sm inline-flex items-center gap-2 whitespace-nowrap"
-          >
-            Buy dAAPL
-            <ArrowUpRight className="h-4 w-4" />
-          </Link>
-          <Link
-            href="/app/markets/spy"
-            className="btn-primary text-sm inline-flex items-center gap-2 whitespace-nowrap"
-          >
-            Buy dSPY
-            <ArrowUpRight className="h-4 w-4" />
-          </Link>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {hotPicksInRegistry.slice(0, 4).map((p) => (
+            <Link
+              key={p.ticker}
+              href={`/app/markets/${p.ticker.toLowerCase()}`}
+              className="btn-primary text-sm inline-flex items-center gap-2 whitespace-nowrap"
+              title={p.note}
+            >
+              {p.label}
+              <ArrowUpRight className="h-4 w-4" />
+            </Link>
+          ))}
           <a
             href="https://app.across.to/?toChain=4663&outputToken=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168"
             target="_blank"
@@ -160,23 +169,26 @@ export function AppHomeClient({
 
       <header className="flex items-end justify-between mb-6 gap-4 flex-wrap">
         <div>
-          <div className="eyebrow mb-3">Aftermarket · Robinhood Stock Tokens on RH Chain</div>
+          <div className="eyebrow mb-3">Robinhood Stock Tokens on RH Chain · live V4 book</div>
           <h1 className="font-display text-4xl lg:text-5xl text-ink-900">
             <span className="text-forest-500 tabular-nums">
-              {liveCount}
+              {buyableCount}
             </span>{" "}
             <span className="text-ink-500 font-normal">
-              already-listed Stock Token{liveCount === 1 ? "" : "s"} on-chain.
+              buyable Stock Token{buyableCount === 1 ? "" : "s"} on Uniswap V4.
             </span>
           </h1>
           <p className="text-sm text-ink-500 mt-3 max-w-2xl">
-            Every row below is a real ERC-20 on Robinhood Chain with a
-            live Chainlink price. These are <strong>not IPOs</strong>
-            — they&apos;re Robinhood&apos;s tokenized secondary market
-            for already-public stocks. The tickers marked{" "}
-            <span className="font-semibold text-forest-500">V4 pool live</span>{" "}
-            can be bought right now with USDG through the swap widget
-            on their detail page.{" "}
+            Every row below is a real ERC-20 on Robinhood Chain with
+            an active USDG pool — recent IPOs like{" "}
+            <strong>CRCL</strong> (Circle), <strong>FIG</strong> (Figma),{" "}
+            <strong>CRWV</strong> (CoreWeave), <strong>FLY</strong>{" "}
+            (Firefly), and <strong>BULL</strong> (Webull) alongside
+            aftermarket for <strong>NVDA</strong>, <strong>TSLA</strong>,{" "}
+            <strong>AAPL</strong>, <strong>SPY</strong>, plus{" "}
+            <strong>SPCX</strong> (pre-IPO SpaceX). All can be bought
+            right now with USDG through the swap widget on their
+            detail page.{" "}
             <Link
               href="/how-it-works"
               className="text-forest-500 hover:underline"
@@ -216,9 +228,9 @@ export function AppHomeClient({
           sub={chainBlockNumber != null ? "RPC live" : "RPC down"}
         />
         <MiniCard
-          label="Stock Tokens"
-          value={`${liveCount} / ${underlyings.length}`}
-          sub="verified onchain"
+          label="Buyable now"
+          value={`${buyableCount}`}
+          sub="via Uniswap V4"
         />
         <MiniCard
           label="Underlying value"
@@ -399,7 +411,7 @@ function UnderlyingCard({
           </div>
           <div className="text-xs text-ink-500 truncate">{token.name}</div>
           <div className="text-[10px] uppercase tracking-[0.14em] text-ink-500 mt-1 font-mono">
-            {token.assetClass} · Aftermarket · Chainlink
+            {token.assetClass} · Robinhood Stock Token
           </div>
         </div>
         <Badge variant={priceUsd != null ? "forest" : "peach"} dot>
@@ -408,7 +420,14 @@ function UnderlyingCard({
       </div>
 
       <div className="space-y-1.5 text-xs">
-        <Row k="Chainlink mark" v={priceUsd != null ? fmtUSD(priceUsd) : "—"} />
+        <Row
+          k={
+            snapshot.priceSource === "chainlink"
+              ? "Chainlink mark"
+              : "V4 pool mid"
+          }
+          v={priceUsd != null ? fmtUSD(priceUsd) : "—"}
+        />
         <Row
           k="On-chain supply"
           v={totalSupply != null ? `${fmtNum(totalSupply, 0)} d${token.ticker}` : "—"}
@@ -426,14 +445,18 @@ function UnderlyingCard({
           }
         />
         <Row
-          k="Feed updated"
+          k={snapshot.priceSource === "chainlink" ? "Feed updated" : "Price source"}
           v={
-            ageSec != null
-              ? ageSec < 60
-                ? `${ageSec}s ago`
-                : ageSec < 3600
-                ? `${Math.floor(ageSec / 60)}m ago`
-                : `${Math.floor(ageSec / 3600)}h ago`
+            snapshot.priceSource === "chainlink"
+              ? ageSec != null
+                ? ageSec < 60
+                  ? `${ageSec}s ago`
+                  : ageSec < 3600
+                  ? `${Math.floor(ageSec / 60)}m ago`
+                  : `${Math.floor(ageSec / 3600)}h ago`
+                : "—"
+              : snapshot.priceSource === "pool-mid"
+              ? "V4 pool"
               : "—"
           }
         />

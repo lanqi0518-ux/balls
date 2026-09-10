@@ -4,6 +4,7 @@ import {
   readNetworkStatus,
 } from "@/lib/robinhood/reads";
 import { readGlobalIpoCalendar } from "@/lib/ipos/aggregate";
+import { V4_POOLS } from "@/lib/robinhood/v4";
 import { fmtNum } from "@/lib/format";
 
 /**
@@ -19,6 +20,7 @@ export async function StatsBar() {
   ]);
 
   const liveTokens = snapshots.filter((s) => s.priceUsd != null).length;
+  const buyable = Object.keys(V4_POOLS).length;
   const ipoPipeline =
     ipoCal.upcoming.length + ipoCal.priced.length + ipoCal.filed.length;
   const ipoOk = ipoCal.sources.nasdaq.ok || ipoCal.sources.edgar.ok;
@@ -41,8 +43,8 @@ export async function StatsBar() {
     },
     {
       label: "Buyable on Uniswap V4",
-      value: `${liveTokens} / ${snapshots.length}`,
-      hint: "USDG → dSTOCK, one tx via UR",
+      value: fmtNum(buyable, 0),
+      hint: `USDG → dSTOCK, one tx (${liveTokens} live prices)`,
     },
     {
       label: "Priced IPOs (last ~60d)",

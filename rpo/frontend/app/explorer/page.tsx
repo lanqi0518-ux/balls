@@ -90,11 +90,11 @@ export default async function ExplorerPage() {
                 <thead>
                   <tr className="text-left text-[11px] uppercase tracking-[0.14em] text-ink-500 bg-paper-100">
                     <th className="px-6 py-3 font-medium">Token</th>
-                    <th className="px-6 py-3 font-medium">Chainlink mark</th>
+                    <th className="px-6 py-3 font-medium">Mark</th>
                     <th className="px-6 py-3 font-medium">On-chain supply</th>
                     <th className="px-6 py-3 font-medium">Market value</th>
                     <th className="px-6 py-3 font-medium">Address</th>
-                    <th className="px-6 py-3 font-medium">Feed</th>
+                    <th className="px-6 py-3 font-medium">Source</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -146,16 +146,26 @@ export default async function ExplorerPage() {
                           </a>
                         </td>
                         <td className="px-6 py-4">
-                          <a
-                            href={`${EXPLORER_BASE}${s.token.priceFeed}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-forest-500 hover:underline font-mono text-xs inline-flex items-center gap-1"
-                          >
-                            {s.token.priceFeed.slice(0, 8)}…
-                            {s.token.priceFeed.slice(-4)}
-                            <ArrowUpRight className="h-3 w-3" />
-                          </a>
+                          {s.token.priceFeed ? (
+                            <a
+                              href={`${EXPLORER_BASE}${s.token.priceFeed}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-forest-500 hover:underline font-mono text-xs inline-flex items-center gap-1"
+                              title="Chainlink AggregatorV3 feed"
+                            >
+                              {s.token.priceFeed.slice(0, 8)}…
+                              {s.token.priceFeed.slice(-4)}
+                              <ArrowUpRight className="h-3 w-3" />
+                            </a>
+                          ) : (
+                            <span
+                              className="font-mono text-xs text-ink-500"
+                              title="Reference price comes from the Uniswap V4 pool mid"
+                            >
+                              V4 pool mid
+                            </span>
+                          )}
                         </td>
                       </tr>
                     );

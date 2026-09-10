@@ -68,19 +68,22 @@ export async function FeaturedIPOs() {
     <Section id="markets">
       <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-8 gap-6">
         <div className="max-w-2xl">
-          <div className="eyebrow mb-5">Aftermarket · already-listed Stock Tokens · buyable now</div>
+          <div className="eyebrow mb-5">Robinhood Stock Tokens · buyable now on Uniswap V4</div>
           <h2 className="font-display text-display-sm text-ink-900">
-            Robinhood&apos;s public equities, tokenized on RH&nbsp;Chain
-            — <span className="text-forest-500">tradeable now on Uniswap V4</span>.
+            {snapshots.length} tokenized equities live on RH&nbsp;Chain
+            — <span className="text-forest-500">buy any of them right now</span>.
           </h2>
           <p className="text-sm text-ink-500 mt-4 max-w-xl">
-            These are <strong>not IPOs</strong> — NVDA has traded since
-            1999, AAPL since 1980, SPY is a 1993 ETF. Robinhood has
-            already minted them onto Robinhood Chain (id 4663) as
-            Reg-S Stock Tokens, and each has a deep Uniswap V4 pool
-            with real liquidity. Click any card to see the buy widget:
+            Recent IPOs — <strong>CRCL</strong> (Circle),{" "}
+            <strong>FIG</strong> (Figma), <strong>CRWV</strong>{" "}
+            (CoreWeave), <strong>FLY</strong> (Firefly),{" "}
+            <strong>BULL</strong> (Webull) — plus pre-IPO{" "}
+            <strong>SPCX</strong> (SpaceX) and aftermarket for every
+            large-cap you&apos;d expect (NVDA, TSLA, AAPL, MSFT, META,
+            SPY, GLD, …). Each has an active USDG pool on Uniswap V4:
             connect wallet → enter USDG → tx fills same block. Marks
-            come from Chainlink; the pool tracks them via arbitrage.
+            come from Chainlink where available, otherwise the pool
+            mid; arbitrage keeps them tight.
           </p>
         </div>
         <LinkButton
@@ -146,6 +149,7 @@ export async function FeaturedIPOs() {
             totalSupply={s.totalSupply!}
             updatedAt={s.updatedAt}
             assetClass={s.token.assetClass}
+            priceSource={s.priceSource}
           />
         ))}
       </div>
@@ -160,6 +164,7 @@ function UnderlyingCard(props: {
   totalSupply: number;
   updatedAt: number | null;
   assetClass: string;
+  priceSource: "chainlink" | "pool-mid" | "unavailable";
 }) {
   const marketCap = props.priceUsd * props.totalSupply;
   const ageSec = props.updatedAt
@@ -180,7 +185,7 @@ function UnderlyingCard(props: {
           </div>
           <div className="text-xs text-ink-500 truncate">{props.name}</div>
           <div className="text-[10px] uppercase tracking-[0.14em] text-ink-500 mt-1 font-mono">
-            {props.assetClass} · Aftermarket · Chainlink
+            {props.assetClass} · {props.priceSource === "chainlink" ? "Chainlink" : "V4 pool mid"}
           </div>
         </div>
         <Badge variant="forest" dot>
@@ -190,7 +195,7 @@ function UnderlyingCard(props: {
 
       <div>
         <div className="flex items-center justify-between text-xs text-ink-500 mb-2">
-          <span>Chainlink mark</span>
+          <span>{props.priceSource === "chainlink" ? "Chainlink mark" : "V4 pool mid"}</span>
           <span className="font-mono text-ink-900 tabular-nums">
             {fmtUSD(props.priceUsd)}
           </span>
@@ -216,16 +221,18 @@ function UnderlyingCard(props: {
       <div className="flex items-center justify-between text-sm border-t border-line pt-5">
         <div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500">
-            Feed updated
+            {props.priceSource === "chainlink" ? "Feed updated" : "Source"}
           </div>
           <div className="font-mono text-ink-900 tabular-nums mt-1">
-            {ageSec != null
-              ? ageSec < 60
-                ? `${ageSec}s ago`
-                : ageSec < 3600
-                ? `${Math.floor(ageSec / 60)}m ago`
-                : `${Math.floor(ageSec / 3600)}h ago`
-              : "—"}
+            {props.priceSource === "chainlink"
+              ? ageSec != null
+                ? ageSec < 60
+                  ? `${ageSec}s ago`
+                  : ageSec < 3600
+                  ? `${Math.floor(ageSec / 60)}m ago`
+                  : `${Math.floor(ageSec / 3600)}h ago`
+                : "—"
+              : "V4 pool mid"}
           </div>
         </div>
         <div className="text-right">

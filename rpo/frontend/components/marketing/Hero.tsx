@@ -66,11 +66,14 @@ export async function Hero() {
           </h1>
 
           <p className="mt-8 text-xl text-ink-500 max-w-2xl leading-relaxed">
-            Buy Robinhood Stock Tokens on-chain today through the live
-            Uniswap V4 pools on Robinhood Chain — real fills in one tx.
-            When Robinhood mints a new IPO ticker onto the chain, RPO&apos;s
-            subscription vault opens the moment its Stock Token address is
-            live, so you can position ahead of the first trade.
+            {snapshots.length} Robinhood Stock Tokens — recent IPOs
+            (Circle, Figma, CoreWeave, Firefly, Webull), aftermarket
+            for NVDA / TSLA / AAPL, plus pre-IPO SpaceX — are already
+            paired against USDG on Uniswap V4 and buyable in one tx.
+            When Robinhood mints a new IPO ticker, RPO&apos;s
+            subscription vault opens the moment its Stock Token
+            address is live, so you can position ahead of the first
+            secondary trade.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center gap-3">
@@ -186,7 +189,11 @@ function HeroPreview({
                   </div>
                   <div className="text-sm text-ink-500 truncate">
                     {featured
-                      ? `d${featured.token.ticker} · ${featured.token.assetClass} · Chainlink-priced`
+                      ? `d${featured.token.ticker} · ${featured.token.assetClass} · ${
+                          featured.priceSource === "chainlink"
+                            ? "Chainlink-priced"
+                            : "V4 pool mid"
+                        }`
                       : "Robinhood Chain RPC unreachable"}
                   </div>
                 </div>
@@ -197,7 +204,11 @@ function HeroPreview({
 
               <div className="rounded-2xl bg-paper-100 border border-line p-6 grid grid-cols-3 gap-4">
                 <MiniStat
-                  label="Chainlink mark"
+                  label={
+                    featured?.priceSource === "chainlink"
+                      ? "Chainlink mark"
+                      : "V4 pool mid"
+                  }
                   value={
                     featured?.priceUsd != null
                       ? fmtUSD(featured.priceUsd)
@@ -213,8 +224,14 @@ function HeroPreview({
                   }
                 />
                 <MiniStat
-                  label="Feed decimals"
-                  value={featured?.priceUsd != null ? "8" : "—"}
+                  label="Price source"
+                  value={
+                    featured?.priceSource === "chainlink"
+                      ? "Chainlink"
+                      : featured?.priceSource === "pool-mid"
+                      ? "Uni V4"
+                      : "—"
+                  }
                 />
               </div>
 
@@ -252,7 +269,7 @@ function HeroPreview({
                     : "—"
                 } tone="forest" />
                 <Row
-                  k="Chainlink mark"
+                  k={featured?.priceSource === "chainlink" ? "Chainlink mark" : "V4 pool mid"}
                   v={
                     featured?.priceUsd != null
                       ? fmtUSD(featured.priceUsd)

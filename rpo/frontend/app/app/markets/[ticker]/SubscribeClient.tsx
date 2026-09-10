@@ -15,11 +15,13 @@ export function SubscribeClient({
   priceUsd,
   totalSupply,
   priceUpdatedAt,
+  priceSource,
 }: {
   token: StockToken;
   priceUsd: number | null;
   totalSupply: number | null;
   priceUpdatedAt: number | null;
+  priceSource: "chainlink" | "pool-mid" | "unavailable";
 }) {
   const ticker = token.ticker;
   const pool = V4_POOLS[ticker.toUpperCase() as keyof typeof V4_POOLS];
@@ -65,7 +67,7 @@ export function SubscribeClient({
 
             <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-6">
               <Stat
-                k="Chainlink mark"
+                k={priceSource === "chainlink" ? "Chainlink mark" : "V4 pool mid"}
                 v={priceUsd != null ? fmtUSD(priceUsd) : "—"}
               />
               <Stat
@@ -89,14 +91,18 @@ export function SubscribeClient({
                 }
               />
               <Stat
-                k="Feed age"
+                k={priceSource === "chainlink" ? "Feed age" : "Price source"}
                 v={
-                  priceAgeSec != null
-                    ? priceAgeSec < 60
-                      ? `${priceAgeSec}s`
-                      : priceAgeSec < 3600
-                      ? `${Math.floor(priceAgeSec / 60)}m`
-                      : `${Math.floor(priceAgeSec / 3600)}h`
+                  priceSource === "chainlink"
+                    ? priceAgeSec != null
+                      ? priceAgeSec < 60
+                        ? `${priceAgeSec}s`
+                        : priceAgeSec < 3600
+                        ? `${Math.floor(priceAgeSec / 60)}m`
+                        : `${Math.floor(priceAgeSec / 3600)}h`
+                      : "—"
+                    : priceSource === "pool-mid"
+                    ? "Uni V4"
                     : "—"
                 }
                 tone="forest"
@@ -118,21 +124,32 @@ export function SubscribeClient({
                   {token.address.slice(0, 10)}…{token.address.slice(-6)}
                 </a>
               </div>
-              <div>
-                <div className="uppercase tracking-[0.14em] text-ink-500 mb-1">
-                  Chainlink feed
+              {token.priceFeed ? (
+                <div>
+                  <div className="uppercase tracking-[0.14em] text-ink-500 mb-1">
+                    Chainlink feed
+                  </div>
+                  <a
+                    href={`${EXPLORER_BASE}${token.priceFeed}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-mono text-forest-500 hover:underline truncate block"
+                    title={token.priceFeed}
+                  >
+                    {token.priceFeed.slice(0, 10)}…
+                    {token.priceFeed.slice(-6)}
+                  </a>
                 </div>
-                <a
-                  href={`${EXPLORER_BASE}${token.priceFeed}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-mono text-forest-500 hover:underline truncate block"
-                  title={token.priceFeed}
-                >
-                  {token.priceFeed.slice(0, 10)}…
-                  {token.priceFeed.slice(-6)}
-                </a>
-              </div>
+              ) : (
+                <div>
+                  <div className="uppercase tracking-[0.14em] text-ink-500 mb-1">
+                    Price source
+                  </div>
+                  <div className="font-mono text-ink-900">
+                    Uniswap V4 pool mid
+                  </div>
+                </div>
+              )}
               {pool && (
                 <>
                   <div>
@@ -186,8 +203,10 @@ export function SubscribeClient({
             <ul className="space-y-3 text-sm text-ink-500">
               {[
                 `A Reg-S debt security issued by Robinhood Assets (Jersey), redeemable 1:1 against 1 share of ${ticker}. Already trading on Robinhood Chain and quoted through the pool above.`,
-                "An ERC-8056 token — dividends and splits are applied automatically via uiMultiplier updates.",
-                "Priced through the on-chain Chainlink feed shown above; the pool tracks that feed via arbitrage.",
+                "Standard 18-decimal ERC-20 — dividends and splits are applied automatically via uiMultiplier updates on the token contract.",
+                token.priceFeed
+                  ? "Priced through the on-chain Chainlink feed shown above; the V4 pool tracks that feed via arbitrage."
+                  : "Reference price comes from the V4 pool mid; arbitrage keeps it aligned with the Chainlink feed Robinhood publishes for the underlying.",
                 "Not available to U.S., Canadian, U.K., Swiss, or U.A.E. residents per RHJ's Reg-S terms.",
               ].map((l) => (
                 <li key={l} className="flex items-start gap-2">
