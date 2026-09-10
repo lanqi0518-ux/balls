@@ -68,19 +68,19 @@ export async function FeaturedIPOs() {
     <Section id="markets">
       <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-8 gap-6">
         <div className="max-w-2xl">
-          <div className="eyebrow mb-5">Aftermarket · already-listed Stock Tokens</div>
+          <div className="eyebrow mb-5">Aftermarket · already-listed Stock Tokens · buyable now</div>
           <h2 className="font-display text-display-sm text-ink-900">
-            Robinhood&apos;s existing public equities, tokenized on&nbsp;RH&nbsp;Chain.
+            Robinhood&apos;s public equities, tokenized on RH&nbsp;Chain
+            — <span className="text-forest-500">tradeable now on Uniswap V4</span>.
           </h2>
           <p className="text-sm text-ink-500 mt-4 max-w-xl">
             These are <strong>not IPOs</strong> — NVDA has traded since
             1999, AAPL since 1980, SPY is a 1993 ETF. Robinhood has
             already minted them onto Robinhood Chain (id 4663) as
-            Reg-S Stock Tokens. RPO&apos;s aftermarket pipeline will
-            fill subscriptions here via Rialto propAMM. Marks below
-            come from the on-chain Chainlink feeds and refresh every
-            60&nbsp;seconds. New IPO listings — when Robinhood mints
-            them — appear separately.
+            Reg-S Stock Tokens, and each has a deep Uniswap V4 pool
+            with real liquidity. Click any card to see the buy widget:
+            connect wallet → enter USDG → tx fills same block. Marks
+            come from Chainlink; the pool tracks them via arbitrage.
           </p>
         </div>
         <LinkButton

@@ -66,11 +66,11 @@ export async function Hero() {
           </h1>
 
           <p className="mt-8 text-xl text-ink-500 max-w-2xl leading-relaxed">
-            Subscribe to Robinhood Stock Tokens on-chain — new IPO listings
-            <em> and </em> the already-live aftermarket book. Priced through
-            Rialto propAMM, allocated pro-rata, settled the moment Robinhood
-            mints. Today the preview below shows a real aftermarket token
-            (Robinhood has not minted any new IPO listings yet).
+            Buy Robinhood Stock Tokens on-chain today through the live
+            Uniswap V4 pools on Robinhood Chain — real fills in one tx.
+            When Robinhood mints a new IPO ticker onto the chain, RPO&apos;s
+            subscription vault opens the moment its Stock Token address is
+            live, so you can position ahead of the first trade.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center gap-3">
@@ -95,7 +95,7 @@ export async function Hero() {
             <MetaBullet
               label={`${
                 snapshots.filter((s) => s.priceUsd != null).length
-              } / ${snapshots.length} aftermarket Stock Tokens live on RH Chain`}
+              } tickers buyable now on Uniswap V4 (RH Chain)`}
             />
             <MetaBullet
               label={
@@ -104,7 +104,7 @@ export async function Hero() {
                   : "IPO feeds unreachable — 0 tracked"
               }
             />
-            <MetaBullet label="RPO subscription vaults pending audit" />
+            <MetaBullet label="RPO primary-issuance vaults pending audit" />
           </div>
         </div>
 
@@ -237,16 +237,20 @@ function HeroPreview({
 
             <div className="lg:col-span-2 rounded-2xl border border-line bg-white p-6 shadow-soft space-y-5">
               <div className="text-xs uppercase tracking-[0.18em] text-ink-500">
-                Aftermarket subscription
+                Buy on Uniswap V4 · live
               </div>
               <div className="rounded-xl bg-paper-100 border border-line p-4 flex items-center justify-between">
-                <span className="text-3xl font-mono text-ink-400 tabular-nums">
-                  0
+                <span className="text-3xl font-mono text-ink-900 tabular-nums">
+                  100
                 </span>
                 <span className="badge">USDG</span>
               </div>
               <div className="space-y-2 text-sm">
-                <Row k="Underlying" v={featured?.token.ticker ?? "—"} />
+                <Row k="You receive" v={
+                  featured?.priceUsd
+                    ? `~${(100 / featured.priceUsd).toFixed(4)} d${featured.token.ticker}`
+                    : "—"
+                } tone="forest" />
                 <Row
                   k="Chainlink mark"
                   v={
@@ -255,22 +259,24 @@ function HeroPreview({
                       : "—"
                   }
                 />
-                <Row k="Boost" v="1.00×" tone="forest" />
-                <Row k="Fee (2%)" v="—" />
-                <Row k="Refund" v="100%" />
+                <Row k="Route" v="USDG → Permit2 → UR" />
+                <Row k="Max slippage" v="1.00%" />
               </div>
-              <button
-                disabled
-                className="btn-primary w-full py-3 text-sm opacity-60 cursor-not-allowed"
+              <a
+                href={`/app/markets/${
+                  featured?.token.ticker?.toLowerCase() ?? "nvda"
+                }`}
+                className="btn-primary w-full py-3 text-sm inline-flex items-center justify-center gap-2"
               >
-                Subscribe · waiting for RPO deploy
-              </button>
+                Open buy widget
+                <ArrowUpRight className="h-4 w-4" />
+              </a>
               <p className="text-[11px] text-ink-500 leading-relaxed">
-                This is Robinhood&apos;s aftermarket Stock Token — an
-                already-listed public equity, live on Robinhood Chain
-                right now. Not a new IPO. The subscribe button
-                activates the moment the RPO AftermarketVault contract
-                is deployed and set in NEXT_PUBLIC_REGISTRY_ADDRESS.
+                This is Robinhood&apos;s Stock Token — an already-listed
+                public equity, minted and trading on Robinhood Chain
+                right now. Deep Uniswap V4 pool: buys route USDG →
+                Permit2 → UniversalRouter → PoolManager. Not available
+                to US/UK/CA/CH/UAE residents (Reg-S).
               </p>
             </div>
           </div>

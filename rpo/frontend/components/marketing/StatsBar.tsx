@@ -40,9 +40,9 @@ export async function StatsBar() {
         : "IPO data sources unreachable",
     },
     {
-      label: "Aftermarket Stock Tokens",
+      label: "Buyable on Uniswap V4",
       value: `${liveTokens} / ${snapshots.length}`,
-      hint: "priced by Chainlink on RH Chain",
+      hint: "USDG → dSTOCK, one tx via UR",
     },
     {
       label: "Priced IPOs (last ~60d)",

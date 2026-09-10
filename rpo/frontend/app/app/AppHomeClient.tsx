@@ -7,8 +7,8 @@ import { ArrowUpRight } from "@/components/ui/Icons";
 import { useActiveIPOs, useBoost } from "@/lib/onchain/reads";
 import { boostToNumber } from "@/lib/onchain/units";
 import { fmtNum, fmtUSD } from "@/lib/format";
-import { PROTOCOL_LIVE } from "@/lib/chain";
 import type { StockSnapshot } from "@/lib/robinhood/reads";
+import { V4_POOLS } from "@/lib/robinhood/v4";
 
 const PAGE_SIZE = 24;
 
@@ -79,22 +79,23 @@ export function AppHomeClient({
 
   return (
     <div className="p-5 lg:p-10">
-      {!PROTOCOL_LIVE && (
-        <div className="card p-6 border-l-4 border-peach-500 bg-peach-50/40 mb-8">
-          <Badge variant="peach">Pre-launch</Badge>
-          <div className="mt-3 text-ink-900 font-semibold">
-            No RPO SubscriptionVault deployed yet.
-          </div>
-          <p className="text-sm text-ink-500 mt-2 leading-relaxed">
-            The subscribe / stake / claim flows are real code, wired to
-            the configured chain. Every aftermarket Stock Token below
-            is live on Robinhood Chain right now — the moment the RPO{" "}
-            <code>NEXT_PUBLIC_REGISTRY_ADDRESS</code> is set, subscribe
-            buttons activate against the real vault. Nothing on this
-            page is simulated.
-          </p>
+      <div className="card p-6 border-l-4 border-forest-500 bg-forest-50/40 mb-8">
+        <Badge variant="forest" dot>Live · Uniswap V4</Badge>
+        <div className="mt-3 text-ink-900 font-semibold">
+          Buy dNVDA / dAAPL / dSPY now — real on-chain fills through
+          Uniswap V4 on Robinhood Chain.
         </div>
-      )}
+        <p className="text-sm text-ink-500 mt-2 leading-relaxed">
+          Every ticker in the deep-pool list below is tradable this
+          moment. Connect your wallet, pick a ticker, enter USDG —
+          the buy widget routes{" "}
+          <span className="font-mono">USDG → Permit2 → UniversalRouter → PoolManager</span>{" "}
+          and delivers the stock token to your wallet in one tx. No
+          batch window, no waitlist. RPO&apos;s primary-issuance vaults
+          are a separate track — see the IPO calendar for what&apos;s
+          in the queue.
+        </p>
+      </div>
 
       <div className="card p-6 border-l-4 border-ink-900 bg-white mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
@@ -136,9 +137,10 @@ export function AppHomeClient({
             Every row below is a real ERC-20 on Robinhood Chain with a
             live Chainlink price. These are <strong>not IPOs</strong>
             — they&apos;re Robinhood&apos;s tokenized secondary market
-            for already-public stocks. Connect a wallet to see your
-            USDG balance and — once RPO AftermarketVaults deploy —
-            subscribe.{" "}
+            for already-public stocks. The tickers marked{" "}
+            <span className="font-semibold text-forest-500">V4 pool live</span>{" "}
+            can be bought right now with USDG through the swap widget
+            on their detail page.{" "}
             <Link
               href="/how-it-works"
               className="text-forest-500 hover:underline"
@@ -321,7 +323,9 @@ export function AppHomeClient({
               <UnderlyingCard
                 key={s.token.ticker}
                 snapshot={s}
-                subscribeLive={PROTOCOL_LIVE}
+                buyLive={
+                  s.token.ticker.toUpperCase() in V4_POOLS
+                }
               />
             ))}
           </div>
@@ -333,10 +337,10 @@ export function AppHomeClient({
 
 function UnderlyingCard({
   snapshot,
-  subscribeLive,
+  buyLive,
 }: {
   snapshot: StockSnapshot;
-  subscribeLive: boolean;
+  buyLive: boolean;
 }) {
   const { token, priceUsd, totalSupply, updatedAt } = snapshot;
   const mktCap =
@@ -400,10 +404,8 @@ function UnderlyingCard({
       </div>
 
       <div className="mt-auto pt-4 border-t border-line flex items-center justify-between text-xs">
-        <span className={subscribeLive ? "text-forest-500" : "text-ink-500"}>
-          {subscribeLive
-            ? "Subscribe vault open →"
-            : "Subscribe activates after RPO deploy"}
+        <span className={buyLive ? "text-forest-500 font-semibold" : "text-ink-500"}>
+          {buyLive ? "V4 pool live · buy now →" : "No V4 pool yet"}
         </span>
         <ArrowUpRight className="h-3.5 w-3.5 text-ink-400 group-hover:text-ink-900 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
       </div>
