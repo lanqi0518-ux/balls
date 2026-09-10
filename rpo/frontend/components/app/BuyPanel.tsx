@@ -16,7 +16,8 @@
  */
 
 import { useMemo, useState } from "react";
-import { useAccount } from "wagmi";
+import { useAccount, useChainId, useSwitchChain } from "wagmi";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ConnectButton } from "@/components/wallet/ConnectButton";
@@ -30,7 +31,7 @@ import {
   useV4PoolMid,
 } from "@/lib/onchain/reads";
 import { useErc20Approve, usePermit2Approve, useV4Swap } from "@/lib/onchain/writes";
-import { CANONICAL_USDG } from "@/lib/chain";
+import { CANONICAL_USDG, robinhoodChain } from "@/lib/chain";
 import { PERMIT2_ADDRESS, V4_POOLS } from "@/lib/robinhood/v4";
 import type { StockToken } from "@/lib/robinhood/tokens";
 
@@ -48,6 +49,10 @@ export function BuyPanel({
   const pool = V4_POOLS[ticker as keyof typeof V4_POOLS];
 
   const { isConnected } = useAccount();
+  const currentChainId = useChainId();
+  const { switchChainAsync, isPending: switchPending } = useSwitchChain();
+  const onCorrectChain =
+    !isConnected || currentChainId === robinhoodChain.id;
 
   const usdgBalance = useUsdgBalance();
   const stockBalance = useErc20Balance(token.address);
@@ -103,6 +108,8 @@ export function BuyPanel({
   const validation = useMemo(() => {
     if (!isConnected)
       return { ok: false, hint: "Connect wallet to buy" };
+    if (!onCorrectChain)
+      return { ok: true, hint: "Switch to Robinhood Chain" };
     if (!pool)
       return { ok: false, hint: `No V4 pool configured for ${ticker}` };
     if (midUsdgPerStock <= 0)
@@ -112,7 +119,10 @@ export function BuyPanel({
     if (amount > balanceUSDG)
       return {
         ok: false,
-        hint: `Insufficient USDG (have ${fmtUSD(balanceUSDG)})`,
+        hint:
+          balanceUSDG <= 0
+            ? "You have 0 USDG on RH Chain — bridge first"
+            : `Insufficient USDG (have ${fmtUSD(balanceUSDG)})`,
       };
     if (needsUsdgApprove) return { ok: true, hint: "Approve USDG → Permit2" };
     if (needsPermit2Approve)
@@ -126,14 +136,30 @@ export function BuyPanel({
     midUsdgPerStock,
     needsPermit2Approve,
     needsUsdgApprove,
+    onCorrectChain,
     pool,
     ticker,
   ]);
 
-  const busy = approveUsdg.pending || approvePermit2.pending || swap.pending;
+  const busy =
+    approveUsdg.pending ||
+    approvePermit2.pending ||
+    swap.pending ||
+    switchPending;
 
   async function handlePrimary() {
     if (!validation.ok || busy) return;
+    if (!onCorrectChain) {
+      try {
+        await switchChainAsync({ chainId: robinhoodChain.id });
+      } catch (e: any) {
+        toast.error(
+          e?.shortMessage ??
+            "Add Robinhood Chain (id 4663) to your wallet first"
+        );
+      }
+      return;
+    }
     if (needsUsdgApprove) {
       await approveUsdg.run((1n << 255n) - 1n, {
         onConfirmed: () => usdgToPermit2.refetch(),
@@ -341,7 +367,9 @@ export function BuyPanel({
           }
         >
           {busy
-            ? approveUsdg.pending
+            ? switchPending
+              ? "Switching network…"
+              : approveUsdg.pending
               ? "Approving USDG…"
               : approvePermit2.pending
               ? "Approving Permit2…"
@@ -373,6 +401,41 @@ export function BuyPanel({
           title="Verifiable"
           body={`Pool ${pool.poolId.slice(0, 6)}…${pool.poolId.slice(-4)} live now.`}
         />
+      </div>
+
+      <div className="pt-3 border-t border-line">
+        <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500 mb-2">
+          Need USDG on Robinhood Chain?
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-[11px]">
+          <a
+            href="https://app.across.to/?toChain=4663&outputToken=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg border border-line bg-white hover:bg-paper-100 px-2 py-1.5 text-center transition-colors"
+          >
+            <div className="font-semibold text-ink-900">Across</div>
+            <div className="text-ink-500">bridge · ~2s</div>
+          </a>
+          <a
+            href="https://buy.moonpay.com/?defaultCurrencyCode=usdg&defaultNetwork=robinhood_chain"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg border border-line bg-white hover:bg-paper-100 px-2 py-1.5 text-center transition-colors"
+          >
+            <div className="font-semibold text-ink-900">MoonPay</div>
+            <div className="text-ink-500">card / bank</div>
+          </a>
+          <a
+            href="https://app.garden.finance/swap?to=robinhoodChain&toAsset=USDG"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg border border-line bg-white hover:bg-paper-100 px-2 py-1.5 text-center transition-colors"
+          >
+            <div className="font-semibold text-ink-900">Garden</div>
+            <div className="text-ink-500">BTC · SOL · ETH</div>
+          </a>
+        </div>
       </div>
 
       <p className="text-[11px] text-ink-500 leading-relaxed">

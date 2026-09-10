@@ -81,19 +81,55 @@ export function AppHomeClient({
     <div className="p-5 lg:p-10">
       <div className="card p-6 border-l-4 border-forest-500 bg-forest-50/40 mb-8">
         <Badge variant="forest" dot>Live · Uniswap V4</Badge>
-        <div className="mt-3 text-ink-900 font-semibold">
-          Buy dNVDA / dAAPL / dSPY now — real on-chain fills through
-          Uniswap V4 on Robinhood Chain.
+        <div className="mt-3 text-ink-900 font-semibold text-lg">
+          Buy dNVDA / dAAPL / dSPY right now — one tx, wallet to wallet.
         </div>
         <p className="text-sm text-ink-500 mt-2 leading-relaxed">
-          Every ticker in the deep-pool list below is tradable this
-          moment. Connect your wallet, pick a ticker, enter USDG —
-          the buy widget routes{" "}
+          The buy widget routes{" "}
           <span className="font-mono">USDG → Permit2 → UniversalRouter → PoolManager</span>{" "}
-          and delivers the stock token to your wallet in one tx. No
-          batch window, no waitlist. RPO&apos;s primary-issuance vaults
-          are a separate track — see the IPO calendar for what&apos;s
-          in the queue.
+          on Robinhood Chain (id 4663). No waitlist, no batch window.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link
+            href="/app/markets/nvda"
+            className="btn-primary text-sm inline-flex items-center gap-2 whitespace-nowrap"
+          >
+            Buy dNVDA
+            <ArrowUpRight className="h-4 w-4" />
+          </Link>
+          <Link
+            href="/app/markets/aapl"
+            className="btn-primary text-sm inline-flex items-center gap-2 whitespace-nowrap"
+          >
+            Buy dAAPL
+            <ArrowUpRight className="h-4 w-4" />
+          </Link>
+          <Link
+            href="/app/markets/spy"
+            className="btn-primary text-sm inline-flex items-center gap-2 whitespace-nowrap"
+          >
+            Buy dSPY
+            <ArrowUpRight className="h-4 w-4" />
+          </Link>
+          <a
+            href="https://app.across.to/?toChain=4663&outputToken=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168"
+            target="_blank"
+            rel="noreferrer"
+            className="btn-outline text-sm inline-flex items-center gap-2 whitespace-nowrap"
+          >
+            Need USDG? Bridge via Across
+            <ArrowUpRight className="h-4 w-4" />
+          </a>
+        </div>
+        <p className="text-[11px] text-ink-500 mt-4 leading-relaxed">
+          RPO&apos;s primary-issuance vaults for new IPO listings are a
+          separate track — see the{" "}
+          <Link href="/ipos" className="text-forest-500 hover:underline">
+            IPO calendar
+          </Link>{" "}
+          for what&apos;s in the queue (nothing tokenized on RH Chain
+          yet — the row flips to <em>Vault open</em> the moment
+          Robinhood mints).
         </p>
       </div>
 
