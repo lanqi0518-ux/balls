@@ -64,6 +64,20 @@ export const CONTRACTS = {
     "0x0000000000000000000000000000000000000000") as `0x${string}`,
   faucet: (process.env.NEXT_PUBLIC_FAUCET_ADDRESS ??
     "0x0000000000000000000000000000000000000000") as `0x${string}`,
+
+  // ── HOODIPO primitives (v0) ─────────────────────────────────────
+  // These are the 5 pillar contracts. Zero-address defaults let the
+  // UI render its "primitive not yet deployed" state without an env.
+  preMintFactory: (process.env.NEXT_PUBLIC_PREMINT_FACTORY ??
+    "0x0000000000000000000000000000000000000000") as `0x${string}`,
+  antiSnipeHook: (process.env.NEXT_PUBLIC_ANTISNIPE_HOOK ??
+    "0x0000000000000000000000000000000000000000") as `0x${string}`,
+  corpActions: (process.env.NEXT_PUBLIC_CORP_ACTIONS ??
+    "0x0000000000000000000000000000000000000000") as `0x${string}`,
+  lockupHedge: (process.env.NEXT_PUBLIC_LOCKUP_HEDGE ??
+    "0x0000000000000000000000000000000000000000") as `0x${string}`,
+  // Prediction markets are per-market; the frontend enumerates them
+  // via a subgraph or event scan, so no single-address config.
 } as const;
 
 export function isDeployed(addr: `0x${string}`): boolean {

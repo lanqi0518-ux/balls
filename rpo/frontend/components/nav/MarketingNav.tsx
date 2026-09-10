@@ -21,6 +21,21 @@ type Menu = {
 
 const MENUS: Menu[] = [
   {
+    label: "Primitives",
+    items: [
+      { label: "Pre-mint vault", href: "/vault", hint: "Primitive 01 · PreMintVault" },
+      { label: "Fair launch", href: "/launch", hint: "Primitive 02 · AntiSnipeHook" },
+      { label: "Corp-action strategies", href: "/strategies", hint: "Primitive 03 · CorpActionsRegistry" },
+      { label: "Predict IPO listings", href: "/predict", hint: "Primitive 04 · PhysicalPredictionMarket" },
+      { label: "Lockup hedging", href: "/hedge", hint: "Primitive 05 · LockupHedgeVault" },
+    ],
+    cta: {
+      label: "Open a pre-mint vault →",
+      href: "/vault",
+      hint: "24h subscription window, refund-safe.",
+    },
+  },
+  {
     label: "Product",
     items: [
       { label: "How it works", href: "/how-it-works", hint: "Protocol tour" },

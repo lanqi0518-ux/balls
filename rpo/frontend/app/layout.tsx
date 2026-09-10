@@ -25,25 +25,31 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL("https://rpo.xyz"),
   title: {
-    default: "RPO — The permissionless IPO subscription protocol",
-    template: "%s · RPO",
+    default: "HOODIPO — The primary-market layer for Robinhood Chain",
+    template: "%s · HOODIPO",
   },
   description:
-    "Subscribe to real IPOs on-chain. No broker. No KYC. In 20 seconds. Built on Robinhood Chain, priced through Rialto propAMM, boosted by $RPO.",
+    "Five permissionless primitives that turn Robinhood Chain into a full primary-market venue: pre-mint subscription vaults, anti-MEV V4 launch hooks, programmable uiMultiplier corporate actions, physical-delivery IPO prediction markets, and lockup-event hedging.",
   keywords: [
+    "HOODIPO",
     "RPO",
     "IPO",
     "Robinhood Chain",
     "Stock Tokens",
-    "Rialto propAMM",
+    "Uniswap V4 hook",
+    "ERC-8056",
+    "uiMultiplier",
     "on-chain IPO",
     "tokenized equities",
+    "PreMintVault",
+    "physical settlement",
   ],
   openGraph: {
-    title: "RPO — The permissionless IPO subscription protocol",
-    description: "Real IPO subscription, on-chain, permissionless.",
+    title: "HOODIPO — The primary-market layer for Robinhood Chain",
+    description:
+      "Pre-mint vaults, anti-snipe V4 hooks, programmable corp actions, physical-delivery IPO markets, lockup hedging. Five primitives. Zero admins.",
     url: "https://rpo.xyz",
-    siteName: "RPO",
+    siteName: "HOODIPO",
     type: "website",
     locale: "en_US",
   },

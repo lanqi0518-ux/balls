@@ -4,33 +4,33 @@ import { Zap, Shield, Layers, Coin, Lock, Globe } from "@/components/ui/Icons";
 const FEATURES = [
   {
     Icon: Zap,
-    title: "Primary-market pricing",
-    body: "Vaults route through Rialto's market-maker propAMM the instant a Stock Token is minted — closer to the true IPO fill than sniping a Uniswap pool ever gets you.",
+    title: "First-block execution",
+    body: "PreMintVault subscribers get filled the block RHJ mints the token — before /rhj/assets updates and before the front-end feed reaches Robinhood.com. The keeper bounty (max 2% of pot) exists solely to guarantee this racelessness.",
   },
   {
     Icon: Coin,
-    title: "Pro-rata allocation",
-    body: "Every subscription is weighted by capital committed × $RPO boost. No first-block races, no MEV auctions — the earliest 20 seconds and the last 20 seconds get the same fill.",
+    title: "Chainlink-bounded slippage",
+    body: "Every routing call — PreMintVault.fulfill, PredictionMarket.resolveYes, LockupHedgeVault.trigger — is capped at Chainlink's mark ± caller-supplied slippage bps. Malicious keepers can't route into an empty pool for a bounty.",
   },
   {
     Icon: Lock,
-    title: "Refund by default",
-    body: "If Robinhood doesn't list the ticker by the fulfillment deadline, anyone can flip the vault into REFUNDED and each subscriber pulls their USDG back 1:1.",
+    title: "Refund is the default",
+    body: "Every vault flips into refund mode after its fulfillment deadline. No keeper ever caught the mint? Anyone can call activateRefund() permissionlessly and every subscriber recovers USDG 1:1. No trust in HOODIPO required.",
   },
   {
     Icon: Shield,
-    title: "Non-custodial",
-    body: "Your USDG sits in a per-IPO SubscriptionVault deployed by CREATE2. Post-fulfillment you claim real ERC-8056 Stock Tokens with live uiMultiplier corporate actions built in.",
+    title: "No admin, no upgradability",
+    body: "PreMintFactory, AntiSnipeHook, CorpActionsRegistry, PhysicalPredictionMarket, LockupHedgeVault — none of them have owners or proxies. What deploys is what runs. The only mutable state is user-controlled positions.",
   },
   {
     Icon: Layers,
-    title: "Loop into the next one",
-    body: "Claim a Stock Token, drop it into Morpho Blue, borrow USDG, subscribe to the next IPO — one transaction through the LeverageLooper.",
+    title: "Composable with the rest of RH Chain",
+    body: "AntiSnipeHook exempts wallets holding PreMintVault receipts. CorpActionsRegistry can auto-swap into the next PreMintVault. LockupHedgeVault settles into USDG that Robinhood Earn will accept as collateral. One stack.",
   },
   {
     Icon: Globe,
-    title: "Global by construction",
-    body: "No KYC on the protocol. Every user in every non-restricted jurisdiction gets the same interface, the same math, and the same fill.",
+    title: "Zero KYC on the protocol",
+    body: "Robinhood already enforces Reg-S eligibility at the wallet layer for Stock Tokens (a single Attester check gates every RHJ mint). HOODIPO adds no new KYC — every non-US, non-restricted wallet gets the same primitives.",
   },
 ];
 
@@ -38,14 +38,14 @@ export function Features() {
   return (
     <Section id="features">
       <SectionHeader
-        eyebrow="What you get"
+        eyebrow="Engineering guarantees"
         title={
           <>
-            The <span className="italic">institutional</span> IPO experience —
-            permissionless.
+            Six invariants that make HOODIPO{" "}
+            <span className="italic">actually trust-minimised</span>.
           </>
         }
-        description="Six primitives that make on-chain IPO subscription genuinely different from a launchpad, an ICO, or a copy-trade bot."
+        description="What you don't see in a launchpad's marketing site: every user-facing promise here is enforced by the constructor, not by a governance vote."
       />
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         {FEATURES.map(({ Icon, title, body }) => (

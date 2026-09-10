@@ -9,10 +9,12 @@ import { readGlobalIpoCalendar } from "@/lib/ipos/aggregate";
 import { fmtNum, fmtUSD } from "@/lib/format";
 
 /**
- * Hero is an async Server Component: it fetches live Robinhood Chain
- * data (Chainlink prices + ERC-20 supply for real deployed Stock
- * Tokens) at render time. No simulation, no preview labels. If the
- * RPC fails, we render an honest "market data unavailable" fallback.
+ * Hero — HOODIPO. The primary-market layer for Robinhood Chain.
+ *
+ * Server Component: pulls live Robinhood Chain reads (Chainlink marks
+ * + ERC-20 supply for every real deployed Stock Token) at render time,
+ * so the hero's numbers never lie. If the RPC fails, an honest
+ * "market data unavailable" state renders instead of fake numbers.
  */
 export async function Hero() {
   const [snapshots, ipoCal] = await Promise.all([
@@ -20,12 +22,15 @@ export async function Hero() {
     readGlobalIpoCalendar(),
   ]);
   const featured =
-    snapshots.find((s) => s.token.ticker === "NVDA" && s.priceUsd != null) ??
+    snapshots.find((s) => s.token.ticker === "CRCL" && s.priceUsd != null) ??
+    snapshots.find((s) => s.token.ticker === "FIG" && s.priceUsd != null) ??
+    snapshots.find((s) => s.token.ticker === "CRWV" && s.priceUsd != null) ??
     snapshots.find((s) => s.priceUsd != null) ??
     snapshots[0] ??
     null;
   const ipoPipeline =
     ipoCal.upcoming.length + ipoCal.priced.length + ipoCal.filed.length;
+  const priceableCount = snapshots.filter((s) => s.priceUsd != null).length;
 
   return (
     <section className="relative overflow-hidden pt-20 lg:pt-32 pb-20 lg:pb-40">
@@ -51,38 +56,39 @@ export async function Hero() {
       <Container className="relative">
         <div className="max-w-4xl">
           <Badge variant="dark" dot className="mb-8">
-            Live on Robinhood Chain (id 4663) · RPO contracts pending audit
+            HOODIPO · Live on Robinhood Chain (id 4663) · Primitive contracts pending audit
           </Badge>
 
           <h1 className="font-display text-display-lg text-ink-900">
-            The permissionless{" "}
+            The{" "}
             <span
               className="italic"
               style={{ fontVariationSettings: "'SOFT' 100, 'opsz' 144" }}
             >
-              IPO&nbsp;subscription
+              primary&nbsp;market
             </span>{" "}
-            protocol.
+            layer for Robinhood Chain.
           </h1>
 
           <p className="mt-8 text-xl text-ink-500 max-w-2xl leading-relaxed">
-            {snapshots.length} Robinhood Stock Tokens — recent IPOs
-            (Circle, Figma, CoreWeave, Firefly, Webull), aftermarket
-            for NVDA / TSLA / AAPL, plus pre-IPO SpaceX — are already
-            paired against USDG on Uniswap V4 and buyable in one tx.
-            When Robinhood mints a new IPO ticker, RPO&apos;s
-            subscription vault opens the moment its Stock Token
-            address is live, so you can position ahead of the first
-            secondary trade.
+            Robinhood ships {snapshots.length} real Stock Tokens on chain 4663
+            — but no listing calendar, no pre-mint subscription, no
+            corporate-action programmability, no fair-launch rails, no
+            lockup hedging. HOODIPO is the five-primitive stack that
+            fills that gap: <b>pre-mint&nbsp;vaults</b>, <b>anti-snipe&nbsp;V4&nbsp;hooks</b>,
+            {" "}<b>programmable&nbsp;uiMultiplier&nbsp;strategies</b>,
+            {" "}<b>physical-delivery IPO markets</b>, and
+            {" "}<b>lockup-event&nbsp;hedges</b>. All permissionless. All native.
+            No bridges, no partnerships.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <LinkButton
-              href="/app"
+              href="/vault"
               size="lg"
               trailingIcon={<ArrowRight className="h-4 w-4" />}
             >
-              Launch app
+              Open a pre-mint vault
             </LinkButton>
             <LinkButton
               href="/how-it-works"
@@ -90,24 +96,22 @@ export async function Hero() {
               size="lg"
               trailingIcon={<ArrowUpRight className="h-4 w-4" />}
             >
-              How it works
+              Read the 5 primitives
             </LinkButton>
           </div>
 
           <div className="mt-12 flex flex-wrap items-center gap-x-8 gap-y-3 text-sm text-ink-500">
             <MetaBullet
-              label={`${
-                snapshots.filter((s) => s.priceUsd != null).length
-              } tickers buyable now on Uniswap V4 (RH Chain)`}
+              label={`${priceableCount} tickers priced live via Chainlink + V4 pool mid`}
             />
             <MetaBullet
               label={
                 ipoPipeline > 0
-                  ? `${ipoPipeline} real IPOs tracked live (Nasdaq + SEC EDGAR)`
+                  ? `${ipoPipeline} real IPOs in the queue (Nasdaq + SEC EDGAR)`
                   : "IPO feeds unreachable — 0 tracked"
               }
             />
-            <MetaBullet label="RPO primary-issuance vaults pending audit" />
+            <MetaBullet label="Every primitive is permissionless — no admin, no upgradability" />
           </div>
         </div>
 
@@ -127,7 +131,7 @@ function MetaBullet({ label }: { label: string }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Hero preview — real Robinhood-Chain Stock Token, priced live               */
+/*  Hero preview — live pre-mint vault card                                   */
 /* -------------------------------------------------------------------------- */
 
 function HeroPreview({
@@ -169,11 +173,10 @@ function HeroPreview({
             <span className="h-2.5 w-2.5 rounded-full bg-paper-200" />
             <span className="h-2.5 w-2.5 rounded-full bg-paper-200" />
             <span className="ml-4 text-xs text-ink-400 font-mono">
-              app / markets /{" "}
-              {featured?.token.ticker.toLowerCase() ?? "—"}
+              hoodipo / vault / new
             </span>
             <span className="ml-auto text-[10px] uppercase tracking-[0.18em] text-ink-400 font-mono">
-              Aftermarket · live on RH Chain
+              PreMintVault · CREATE2
             </span>
           </div>
 
@@ -181,119 +184,99 @@ function HeroPreview({
             <div className="lg:col-span-3 space-y-8">
               <div className="flex items-center gap-4">
                 <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-ink-900 to-ink-700 flex items-center justify-center text-white font-bold text-sm shadow-3d">
-                  {featured?.token.ticker ?? "—"}
+                  HD
                 </div>
                 <div className="min-w-0">
                   <div className="text-2xl font-semibold text-ink-900 truncate">
-                    {featured?.token.name ?? "Awaiting live snapshot"}
+                    Hunt: STRIPE
                   </div>
                   <div className="text-sm text-ink-500 truncate">
-                    {featured
-                      ? `d${featured.token.ticker} · ${featured.token.assetClass} · ${
-                          featured.priceSource === "chainlink"
-                            ? "Chainlink-priced"
-                            : "V4 pool mid"
-                        }`
-                      : "Robinhood Chain RPC unreachable"}
+                    Pre-mint · anyone can call announce(&quot;STRIPE&quot;) → CREATE2
+                    vault opens for 24h subscriptions
                   </div>
                 </div>
                 <Badge variant="forest" className="ml-auto">
-                  Aftermarket · live
+                  Pre-mint · armed
                 </Badge>
               </div>
 
               <div className="rounded-2xl bg-paper-100 border border-line p-6 grid grid-cols-3 gap-4">
                 <MiniStat
-                  label={
-                    featured?.priceSource === "chainlink"
-                      ? "Chainlink mark"
-                      : "V4 pool mid"
-                  }
-                  value={
-                    featured?.priceUsd != null
-                      ? fmtUSD(featured.priceUsd)
-                      : "—"
-                  }
+                  label="Subscription window"
+                  value="24 h"
                 />
                 <MiniStat
-                  label="On-chain supply"
-                  value={
-                    featured?.totalSupply != null
-                      ? fmtNum(featured.totalSupply, 0)
-                      : "—"
-                  }
+                  label="Fulfillment grace"
+                  value="30 d"
                 />
                 <MiniStat
-                  label="Price source"
-                  value={
-                    featured?.priceSource === "chainlink"
-                      ? "Chainlink"
-                      : featured?.priceSource === "pool-mid"
-                      ? "Uni V4"
-                      : "—"
-                  }
+                  label="Keeper bounty"
+                  value="1.00%"
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-3 text-xs text-ink-500">
-                {others.slice(0, 3).map((s) => (
-                  <div
-                    key={s.token.ticker}
-                    className="rounded-xl border border-line bg-white px-3 py-2"
-                  >
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500">
-                      {s.token.ticker}
-                    </div>
-                    <div className="font-mono tabular-nums text-ink-900 mt-0.5">
-                      {s.priceUsd != null ? fmtUSD(s.priceUsd) : "—"}
-                    </div>
-                  </div>
-                ))}
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500 mb-2">
+                  Reference market — freshest IPOs already trading on RH Chain
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-xs text-ink-500">
+                  {[featured, ...others.filter((o) => o !== featured)]
+                    .filter((s): s is StockSnapshot => s !== null)
+                    .slice(0, 3)
+                    .map((s) => (
+                      <div
+                        key={s.token.ticker}
+                        className="rounded-xl border border-line bg-white px-3 py-2"
+                      >
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500">
+                          {s.token.ticker}
+                        </div>
+                        <div className="font-mono tabular-nums text-ink-900 mt-0.5">
+                          {s.priceUsd != null ? fmtUSD(s.priceUsd) : "—"}
+                        </div>
+                      </div>
+                    ))}
+                </div>
               </div>
             </div>
 
             <div className="lg:col-span-2 rounded-2xl border border-line bg-white p-6 shadow-soft space-y-5">
               <div className="text-xs uppercase tracking-[0.18em] text-ink-500">
-                Buy on Uniswap V4 · live
+                Subscribe · USDG
               </div>
               <div className="rounded-xl bg-paper-100 border border-line p-4 flex items-center justify-between">
                 <span className="text-3xl font-mono text-ink-900 tabular-nums">
-                  100
+                  10,000
                 </span>
                 <span className="badge">USDG</span>
               </div>
               <div className="space-y-2 text-sm">
-                <Row k="You receive" v={
-                  featured?.priceUsd
-                    ? `~${(100 / featured.priceUsd).toFixed(4)} d${featured.token.ticker}`
-                    : "—"
-                } tone="forest" />
                 <Row
-                  k={featured?.priceSource === "chainlink" ? "Chainlink mark" : "V4 pool mid"}
+                  k="Pot on fulfillment"
                   v={
-                    featured?.priceUsd != null
-                      ? fmtUSD(featured.priceUsd)
+                    featured?.totalSupply != null
+                      ? `${fmtNum(featured.totalSupply, 0)} d${featured.token.ticker} liquid ref`
                       : "—"
                   }
+                  tone="forest"
                 />
-                <Row k="Route" v="USDG → Permit2 → UR" />
-                <Row k="Max slippage" v="1.00%" />
+                <Row k="Slippage floor" v="Chainlink × pot × 99%" />
+                <Row k="Route" v="USDG → UR → V4 fresh pool" />
+                <Row k="Refund if unlisted" v="USDG 1:1 after grace" />
               </div>
               <a
-                href={`/app/markets/${
-                  featured?.token.ticker?.toLowerCase() ?? "nvda"
-                }`}
+                href="/vault"
                 className="btn-primary w-full py-3 text-sm inline-flex items-center justify-center gap-2"
               >
-                Open buy widget
+                Open PreMintVault
                 <ArrowUpRight className="h-4 w-4" />
               </a>
               <p className="text-[11px] text-ink-500 leading-relaxed">
-                This is Robinhood&apos;s Stock Token — an already-listed
-                public equity, minted and trading on Robinhood Chain
-                right now. Deep Uniswap V4 pool: buys route USDG →
-                Permit2 → UniversalRouter → PoolManager. Not available
-                to US/UK/CA/CH/UAE residents (Reg-S).
+                One CREATE2 vault per (ticker, day). Deposits sit in
+                USDG until Robinhood mints the ticker; any keeper can
+                then verify an RHJ-signed attestation and route the
+                buy through UniversalRouter, capped at a Chainlink
+                slippage floor. Non-custodial. No admin key.
               </p>
             </div>
           </div>

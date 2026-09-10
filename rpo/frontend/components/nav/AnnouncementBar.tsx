@@ -10,7 +10,7 @@ export function AnnouncementBar() {
       <div className="container-wide h-9 flex items-center justify-center gap-3 text-xs">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-peach-500" />
-          <span className="text-white">Pre-launch · contracts + web app live on GitHub, mainnet pending audits</span>
+          <span className="text-white">HOODIPO · 5 primitives shipping · PreMintVault + AntiSnipeHook + CorpActions + PredictionMarket + LockupHedge · audit in flight</span>
         </span>
         <span className="hidden sm:inline text-white/40">·</span>
         <span className="hidden sm:inline text-white/70 group-hover:text-white">

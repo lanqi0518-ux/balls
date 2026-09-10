@@ -3,6 +3,7 @@ import { AnnouncementBar } from "@/components/nav/AnnouncementBar";
 import { Footer } from "@/components/nav/Footer";
 import { Hero } from "@/components/marketing/Hero";
 import { StatsBar } from "@/components/marketing/StatsBar";
+import { FivePillars } from "@/components/marketing/FivePillars";
 import { Features } from "@/components/marketing/Features";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { GlobalIpoCalendar } from "@/components/marketing/GlobalIpoCalendar";
@@ -27,6 +28,7 @@ export default function HomePage() {
       <main>
         <Hero />
         <StatsBar />
+        <FivePillars />
         <GlobalIpoCalendar />
         <FeaturedIPOs />
         <Partners />
