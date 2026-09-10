@@ -3,6 +3,7 @@ import {
   readAllStockSnapshots,
   readNetworkStatus,
 } from "@/lib/robinhood/reads";
+import { readGlobalIpoCalendar } from "@/lib/ipos/aggregate";
 import { fmtNum } from "@/lib/format";
 
 /**
@@ -11,16 +12,16 @@ import { fmtNum } from "@/lib/format";
  * the RPC is unreachable we show an em-dash instead of a fake value.
  */
 export async function StatsBar() {
-  const [snapshots, net] = await Promise.all([
+  const [snapshots, net, ipoCal] = await Promise.all([
     readAllStockSnapshots(),
     readNetworkStatus(),
+    readGlobalIpoCalendar(),
   ]);
 
   const liveTokens = snapshots.filter((s) => s.priceUsd != null).length;
-  const totalUnderlyingUsd = snapshots.reduce((acc, s) => {
-    if (s.priceUsd == null || s.totalSupply == null) return acc;
-    return acc + s.priceUsd * s.totalSupply;
-  }, 0);
+  const ipoPipeline =
+    ipoCal.upcoming.length + ipoCal.priced.length + ipoCal.filed.length;
+  const ipoOk = ipoCal.sources.nasdaq.ok || ipoCal.sources.edgar.ok;
 
   const stats: Array<{ label: string; value: string; hint: string }> = [
     {
@@ -32,31 +33,21 @@ export async function StatsBar() {
       hint: `chain id ${net.chainId} · ${net.chainName}`,
     },
     {
-      label: "USDG on RH Chain",
-      value:
-        net.usdgSupply != null
-          ? net.usdgSupply >= 1_000_000
-            ? `$${(net.usdgSupply / 1_000_000).toFixed(1)}M`
-            : `$${fmtNum(net.usdgSupply, 0)}`
-          : "—",
-      hint: "totalSupply of canonical USDG",
+      label: "Global IPO pipeline",
+      value: ipoOk ? fmtNum(ipoPipeline, 0) : "—",
+      hint: ipoOk
+        ? "live: Nasdaq + SEC EDGAR (S-1 + F-1)"
+        : "IPO data sources unreachable",
     },
     {
-      label: "Stock Tokens live",
+      label: "Aftermarket Stock Tokens",
       value: `${liveTokens} / ${snapshots.length}`,
       hint: "priced by Chainlink on RH Chain",
     },
     {
-      label: "Underlying market value",
-      value:
-        totalUnderlyingUsd > 0
-          ? totalUnderlyingUsd >= 1_000_000
-            ? `$${(totalUnderlyingUsd / 1_000_000).toFixed(2)}M`
-            : totalUnderlyingUsd >= 1_000
-            ? `$${(totalUnderlyingUsd / 1_000).toFixed(1)}k`
-            : `$${fmtNum(totalUnderlyingUsd, 0)}`
-          : "—",
-      hint: "sum(price × supply) for tracked tokens",
+      label: "Priced IPOs (last ~60d)",
+      value: ipoOk ? fmtNum(ipoCal.priced.length, 0) : "—",
+      hint: "shares actually priced and trading",
     },
   ];
 

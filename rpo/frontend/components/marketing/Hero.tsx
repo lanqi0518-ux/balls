@@ -5,6 +5,7 @@ import { Sphere } from "@/components/ui/Sphere";
 import { ArrowRight, ArrowUpRight } from "@/components/ui/Icons";
 import { readAllStockSnapshots } from "@/lib/robinhood/reads";
 import type { StockSnapshot } from "@/lib/robinhood/reads";
+import { readGlobalIpoCalendar } from "@/lib/ipos/aggregate";
 import { fmtNum, fmtUSD } from "@/lib/format";
 
 /**
@@ -14,12 +15,17 @@ import { fmtNum, fmtUSD } from "@/lib/format";
  * RPC fails, we render an honest "market data unavailable" fallback.
  */
 export async function Hero() {
-  const snapshots = await readAllStockSnapshots();
+  const [snapshots, ipoCal] = await Promise.all([
+    readAllStockSnapshots(),
+    readGlobalIpoCalendar(),
+  ]);
   const featured =
     snapshots.find((s) => s.token.ticker === "NVDA" && s.priceUsd != null) ??
     snapshots.find((s) => s.priceUsd != null) ??
     snapshots[0] ??
     null;
+  const ipoPipeline =
+    ipoCal.upcoming.length + ipoCal.priced.length + ipoCal.filed.length;
 
   return (
     <section className="relative overflow-hidden pt-20 lg:pt-32 pb-20 lg:pb-40">
@@ -91,7 +97,13 @@ export async function Hero() {
                 snapshots.filter((s) => s.priceUsd != null).length
               } / ${snapshots.length} aftermarket Stock Tokens live on RH Chain`}
             />
-            <MetaBullet label="0 new IPO listings today" />
+            <MetaBullet
+              label={
+                ipoPipeline > 0
+                  ? `${ipoPipeline} real IPOs tracked live (Nasdaq + SEC EDGAR)`
+                  : "IPO feeds unreachable — 0 tracked"
+              }
+            />
             <MetaBullet label="RPO subscription vaults pending audit" />
           </div>
         </div>

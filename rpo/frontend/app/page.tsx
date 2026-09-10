@@ -5,6 +5,7 @@ import { Hero } from "@/components/marketing/Hero";
 import { StatsBar } from "@/components/marketing/StatsBar";
 import { Features } from "@/components/marketing/Features";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
+import { GlobalIpoCalendar } from "@/components/marketing/GlobalIpoCalendar";
 import { FeaturedIPOs } from "@/components/marketing/FeaturedIPOs";
 import { StackDiagram } from "@/components/marketing/StackDiagram";
 import { RPOTokenSection } from "@/components/marketing/RPOTokenSection";
@@ -26,11 +27,12 @@ export default function HomePage() {
       <main>
         <Hero />
         <StatsBar />
+        <GlobalIpoCalendar />
+        <FeaturedIPOs />
         <Partners />
         <DealFlow />
         <Features />
         <HowItWorks />
-        <FeaturedIPOs />
         <StackDiagram />
         <RPOTokenSection />
         <RoadmapTease />

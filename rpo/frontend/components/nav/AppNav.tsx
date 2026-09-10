@@ -13,12 +13,14 @@ import {
   Trophy,
   Book,
   Bolt,
+  Chart,
   ArrowUpRight,
 } from "@/components/ui/Icons";
 import { cn } from "@/lib/cn";
 
 const NAV = [
-  { label: "Markets", href: "/app", Icon: Calendar },
+  { label: "IPO Calendar", href: "/ipos", Icon: Calendar },
+  { label: "Aftermarket", href: "/app", Icon: Chart },
   { label: "Positions", href: "/app/positions", Icon: Wallet },
   { label: "Stake $RPO", href: "/app/stake", Icon: Coin },
   { label: "Leaderboard", href: "/app/leaderboard", Icon: Trophy },
@@ -149,10 +151,11 @@ function MobileTabs({ pathname }: { pathname: string }) {
 }
 
 function breadcrumb(pathname: string): string {
-  if (pathname === "/app") return "app / markets";
+  if (pathname === "/ipos") return "ipos / global calendar";
+  if (pathname === "/app") return "app / aftermarket";
   if (pathname.startsWith("/app/markets/")) {
     const t = pathname.split("/").pop() ?? "";
-    return `app / markets / ${t.toUpperCase()}`;
+    return `app / aftermarket / ${t.toUpperCase()}`;
   }
   const parts = pathname.split("/").filter(Boolean);
   return parts.join(" / ");

@@ -16,6 +16,7 @@
  * than fake numbers.
  */
 
+import { cache } from "react";
 import { erc20Abi } from "viem";
 import { rhPublicClient } from "./publicClient";
 import { RH_INFRA, STOCK_TOKENS, type StockToken } from "./tokens";
@@ -69,8 +70,11 @@ export type NetworkStatus = {
  * Read every configured stock token in one multicall round trip.
  * Returns as many snapshots as tokens are configured; entries with
  * `priceUsd === null` mean the RPC failed for that specific call.
+ *
+ * Wrapped in `React.cache` so that Hero + StatsBar + FeaturedIPOs
+ * on the same page share a single RPC round trip during render.
  */
-export async function readAllStockSnapshots(): Promise<StockSnapshot[]> {
+export const readAllStockSnapshots = cache(async function readAllStockSnapshotsImpl(): Promise<StockSnapshot[]> {
   if (STOCK_TOKENS.length === 0) return [];
 
   const contracts = STOCK_TOKENS.flatMap((t) => [
@@ -135,9 +139,9 @@ export async function readAllStockSnapshots(): Promise<StockSnapshot[]> {
 
     return { token: t, priceUsd, updatedAt, totalSupply };
   });
-}
+});
 
-export async function readNetworkStatus(): Promise<NetworkStatus> {
+export const readNetworkStatus = cache(async function readNetworkStatusImpl(): Promise<NetworkStatus> {
   const chain = rhPublicClient.chain;
   const rpcUrl = chain.rpcUrls.default.http[0];
   try {
@@ -167,4 +171,4 @@ export async function readNetworkStatus(): Promise<NetworkStatus> {
       rpcUrl,
     };
   }
-}
+});

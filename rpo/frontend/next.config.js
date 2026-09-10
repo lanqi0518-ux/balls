@@ -6,6 +6,11 @@ const nextConfig = {
   output: "standalone",
   poweredByHeader: false,
   compress: true,
+  // Pages fetch live data from Nasdaq / SEC EDGAR / Robinhood RPC at
+  // render time. Each individual fetch has its own AbortSignal timeout,
+  // but the initial static generation still needs a larger window than
+  // the 60s default when multiple slow endpoints are involved.
+  staticPageGenerationTimeout: 120,
   images: {
     domains: ["cdn.robinhood.com"],
   },

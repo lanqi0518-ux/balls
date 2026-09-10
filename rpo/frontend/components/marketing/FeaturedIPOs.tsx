@@ -4,6 +4,7 @@ import { LinkButton } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { ArrowRight, ArrowUpRight } from "@/components/ui/Icons";
 import { readAllStockSnapshots } from "@/lib/robinhood/reads";
+import { readGlobalIpoCalendar } from "@/lib/ipos/aggregate";
 import { fmtNum, fmtUSD } from "@/lib/format";
 
 /**
@@ -19,11 +20,16 @@ import { fmtNum, fmtUSD } from "@/lib/format";
  * the underlying market data below is real either way.
  */
 export async function FeaturedIPOs() {
-  const snapshots = await readAllStockSnapshots();
+  const [snapshots, ipoCal] = await Promise.all([
+    readAllStockSnapshots(),
+    readGlobalIpoCalendar(),
+  ]);
   const rankedByCap = [...snapshots]
     .filter((s) => s.priceUsd != null && s.totalSupply != null)
     .sort((a, b) => (b.priceUsd! * b.totalSupply!) - (a.priceUsd! * a.totalSupply!));
   const featured = rankedByCap.slice(0, 6);
+  const ipoPipeline =
+    ipoCal.upcoming.length + ipoCal.priced.length + ipoCal.filed.length;
 
   if (featured.length === 0) {
     return (
@@ -87,20 +93,47 @@ export async function FeaturedIPOs() {
         </LinkButton>
       </div>
 
-      <div className="mb-10 card p-6 border-l-4 border-peach-500 bg-peach-50/40 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <Badge variant="peach">Primary listings · IPO calendar</Badge>
+      <div className="mb-10 card p-6 border-l-4 border-ink-900 bg-white flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <Badge variant="dark">Primary listings · global IPO calendar</Badge>
           <div className="mt-3 text-ink-900 font-semibold">
-            No new IPO Stock Tokens today.
+            {ipoPipeline > 0
+              ? `${ipoPipeline} real IPOs in the US listings pipeline right now.`
+              : "IPO data sources unreachable — showing 0 tracked."}
           </div>
           <p className="text-sm text-ink-500 mt-2 max-w-2xl leading-relaxed">
-            RPO&apos;s RHJ Reg-S pipeline opens a subscription vault
-            the block a new Robinhood-minted ticker appears in the
-            Jersey Reg-S catalog. Right now, no unseen ticker is
-            queued — the only live inventory on Robinhood Chain is
-            the aftermarket below.
+            Every one of them is a real public filing from{" "}
+            <a
+              className="text-forest-500 hover:underline"
+              href="https://www.nasdaq.com/market-activity/ipos"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Nasdaq
+            </a>{" "}
+            /{" "}
+            <a
+              className="text-forest-500 hover:underline"
+              href="https://efts.sec.gov/LATEST/search-index?q=%22initial+public+offering%22&forms=S-1%2CF-1"
+              target="_blank"
+              rel="noreferrer"
+            >
+              SEC EDGAR
+            </a>
+            . Robinhood hasn&apos;t minted any of these as Stock Tokens
+            yet — the moment they do, the row in the global calendar
+            flips to <em>Vault open</em>. Aftermarket for
+            already-listed tickers is below.
           </p>
         </div>
+        <LinkButton
+          href="/ipos"
+          variant="outline"
+          size="md"
+          trailingIcon={<ArrowRight className="h-4 w-4" />}
+        >
+          Open global IPO calendar
+        </LinkButton>
       </div>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">

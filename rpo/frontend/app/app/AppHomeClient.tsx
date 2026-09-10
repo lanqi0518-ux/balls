@@ -17,10 +17,13 @@ type AssetTab = "All" | "US Equity" | "ETF";
 export function AppHomeClient({
   underlyings,
   chainBlockNumber,
+  ipoPipelineCount,
 }: {
   underlyings: StockSnapshot[];
   chainBlockNumber: number | null;
+  ipoPipelineCount: number;
 }) {
+  const ipoPipeline = ipoPipelineCount;
   const boostRead = useBoost();
   const boost = boostToNumber(boostRead.data);
   const onchain = useActiveIPOs();
@@ -93,19 +96,29 @@ export function AppHomeClient({
         </div>
       )}
 
-      <div className="card p-6 border-l-4 border-ink-900 bg-white mb-6">
-        <Badge variant="dark">Primary listings · IPO calendar</Badge>
-        <div className="mt-3 text-ink-900 font-semibold">
-          No new IPO Stock Tokens today.
+      <div className="card p-6 border-l-4 border-ink-900 bg-white mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <Badge variant="dark">Primary listings · global IPO calendar</Badge>
+          <div className="mt-3 text-ink-900 font-semibold">
+            {ipoPipeline > 0
+              ? `${ipoPipeline} real IPOs currently tracked (Nasdaq + SEC EDGAR).`
+              : "IPO data sources unreachable — showing 0 tracked."}
+          </div>
+          <p className="text-sm text-ink-500 mt-2 leading-relaxed max-w-3xl">
+            Every one is a real public filing. None have been minted
+            onto Robinhood Chain yet — the second Robinhood does,
+            RPO&apos;s keeper opens a subscription vault for that
+            ticker and its row here flips to <em>Vault open</em>.
+            Until then the on-chain inventory is the aftermarket book
+            below (AAPL, NVDA, SPY, …).
+          </p>
         </div>
-        <p className="text-sm text-ink-500 mt-2 leading-relaxed max-w-3xl">
-          Robinhood has not minted a new Reg-S IPO ticker in the
-          current window. RPO&apos;s keeper watches the Jersey Reg-S
-          catalog and opens a fresh subscription vault the block a
-          new listing appears. Until then, the live inventory on
-          Robinhood Chain is the aftermarket book below — already-
-          listed public equities (AAPL, NVDA, SPY, …).
-        </p>
+        <Link
+          href="/ipos"
+          className="btn-primary text-sm inline-flex whitespace-nowrap"
+        >
+          Open global IPO calendar →
+        </Link>
       </div>
 
       <header className="flex items-end justify-between mb-6 gap-4 flex-wrap">

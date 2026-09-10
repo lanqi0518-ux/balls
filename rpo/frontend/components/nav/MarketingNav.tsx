@@ -24,7 +24,8 @@ const MENUS: Menu[] = [
     label: "Product",
     items: [
       { label: "How it works", href: "/how-it-works", hint: "Protocol tour" },
-      { label: "IPO Calendar", href: "/app", hint: "Vault browser" },
+      { label: "Global IPO calendar", href: "/ipos", hint: "Live from Nasdaq + SEC EDGAR" },
+      { label: "Aftermarket · Markets", href: "/app", hint: "RH Chain Stock Tokens" },
       { label: "Stake $RPO", href: "/app/stake", hint: "Boost your allocation" },
       { label: "Positions", href: "/app/positions", hint: "Onchain reads" },
       { label: "Testnet Faucet", href: "/faucet", hint: "Try it end-to-end" },
