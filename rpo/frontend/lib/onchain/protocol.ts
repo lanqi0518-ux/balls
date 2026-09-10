@@ -3,7 +3,7 @@
 /**
  * Top-level hook that describes the *state of the protocol* on the
  * currently-selected chain. Consumed by NetworkStatus, /app/stake,
- * /app/ipo/[ticker], /faucet, etc.
+ * /app/markets/[ticker], /faucet, etc.
  *
  * Design goal: every screen makes exactly one decision — "is the
  * protocol live on this chain, or is it still pending deployment?"

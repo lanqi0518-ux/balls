@@ -48,7 +48,7 @@ export function CommandPalette() {
 
   const commands: Command[] = useMemo(() => {
     const nav: Command[] = [
-      { id: "nav-calendar", label: "IPO calendar", section: "Navigate", Icon: Calendar, action: () => router.push("/app") },
+      { id: "nav-calendar", label: "Markets · aftermarket Stock Tokens", section: "Navigate", Icon: Calendar, action: () => router.push("/app") },
       { id: "nav-pos", label: "Positions", section: "Navigate", Icon: Wallet, action: () => router.push("/app/positions") },
       { id: "nav-stake", label: "Stake $RPO", section: "Navigate", Icon: Coin, action: () => router.push("/app/stake") },
       { id: "nav-lb", label: "Leaderboard", section: "Navigate", Icon: Trophy, action: () => router.push("/app/leaderboard") },
@@ -67,11 +67,11 @@ export function CommandPalette() {
       { id: "nav-faucet", label: "Testnet Faucet", section: "Navigate", Icon: Bolt, action: () => router.push("/faucet") },
     ];
     const ipos: Command[] = STOCK_TOKENS.map((t) => ({
-      id: `ipo-${t.ticker}`,
+      id: `market-${t.ticker}`,
       label: `${t.ticker} — ${t.name}`,
-      hint: "Live on RH Chain",
-      section: "Underlying markets",
-      action: () => router.push(`/app/ipo/${t.ticker.toLowerCase()}`),
+      hint: "Aftermarket · live on RH Chain",
+      section: "Aftermarket · Stock Tokens",
+      action: () => router.push(`/app/markets/${t.ticker.toLowerCase()}`),
     }));
     return [...nav, ...ipos];
   }, [router]);
@@ -139,7 +139,7 @@ export function CommandPalette() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onKeyDown={onKey}
-              placeholder="Search pages, IPOs, addresses..."
+              placeholder="Search pages, tickers, addresses..."
               className="flex-1 bg-transparent outline-none text-ink-900 text-sm placeholder:text-ink-400"
             />
             <span className="text-[10px] text-ink-500 font-mono">ESC</span>

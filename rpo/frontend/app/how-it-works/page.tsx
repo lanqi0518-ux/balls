@@ -11,13 +11,19 @@ export const metadata: Metadata = {
     "The full RPO subscription lifecycle — from announcement to allocation.",
 };
 
+// Illustrative ticker for a hypothetical future Robinhood-minted
+// IPO Stock Token. NVDA / AAPL / SPY are already-listed public
+// equities, so using them as IPO examples would be misleading —
+// they belong to the aftermarket pipeline, not this new-listing
+// flow. `NEWCO` here stands in for any new ticker Robinhood mints
+// into its Reg-S catalog.
 const LIFECYCLE = [
   {
     n: "01",
     tag: "Announce",
     title: "IPORegistry announces the vault",
     body: "A keeper (or the protocol admin) reads Robinhood's upcoming-listing feed and calls announceIPO(ticker, subscriptionWindow, targetUSD). A SubscriptionVault is deployed via CREATE2 so the address is predictable — you can even bridge USDG into it before it exists.",
-    code: "IPORegistry.announceIPO(\n  \"NVDA\",\n  targetUSD = 5_000_000,\n  subscriptionDeadline = now + 3 days\n);",
+    code: "IPORegistry.announceIPO(\n  \"NEWCO\",              // hypothetical new listing\n  targetUSD = 5_000_000,\n  subscriptionDeadline = now + 3 days\n);",
   },
   {
     n: "02",
@@ -31,7 +37,7 @@ const LIFECYCLE = [
     tag: "Detect",
     title: "Keeper watches /rhj/assets",
     body: "Our off-chain keeper polls Robinhood's asset feed. The moment the target Stock Token flips to ASSET_STATUS_ACTIVE with a deployment on chain ID 4663, the keeper calls IPORegistry.markLaunched(key, stockToken).",
-    code: "// pseudo:\nassets.filter(a => a.status === \"ACTIVE\" && a.tokenSymbol === \"dNVDA\")\n      .forEach(a => registry.markLaunched(key, a.deployments[0]));",
+    code: "// pseudo:\nassets.filter(a => a.status === \"ACTIVE\" && a.tokenSymbol === \"dNEWCO\")\n      .forEach(a => registry.markLaunched(key, a.deployments[0]));",
   },
   {
     n: "04",
@@ -44,15 +50,15 @@ const LIFECYCLE = [
     n: "05",
     tag: "Claim",
     title: "Subscribers claim tokens",
-    body: "Once markFulfilled has been called, anyone can call claim(). You receive dNVDA proportional to your weight ÷ totalWeight. Any leftover USDG (from an under-filled vault) is refunded pro-rata in the same tx.",
+    body: "Once markFulfilled has been called, anyone can call claim(). You receive dNEWCO proportional to your weight ÷ totalWeight. Any leftover USDG (from an under-filled vault) is refunded pro-rata in the same tx.",
     code: "SubscriptionVault.claim();\n// tokens = totalStock * yourWeight / totalWeight\n// refund = totalUnfilled * yourDeposit / totalDeposits",
   },
   {
     n: "06",
     tag: "Loop",
-    title: "Loop into the next IPO",
-    body: "Approve LeverageLooper for the Stock Token, call loopIntoNextIPO(stockToken, amt, nextVault, borrowUSDG). The looper supplies collateral to Morpho Blue, borrows USDG, and subscribes to the next vault — all atomically.",
-    code: "looper.loopIntoNextIPO({\n  stockToken: dNVDA,\n  amount:     5.88e18,\n  nextVault:  vaults.SPY,\n  borrowUSDG: 350e6\n});",
+    title: "Loop into the next IPO or aftermarket vault",
+    body: "Approve LeverageLooper for the Stock Token, call loopIntoNextIPO(stockToken, amt, nextVault, borrowUSDG). The looper supplies collateral to Morpho Blue, borrows USDG, and subscribes to the next vault — new IPO or already-live aftermarket ticker (e.g. dNVDA, dAAPL) — all atomically.",
+    code: "looper.loopIntoNextIPO({\n  stockToken: dNEWCO,\n  amount:     5.88e18,\n  nextVault:  vaults.dNVDA,   // aftermarket vault for an\n                              // already-listed ticker\n  borrowUSDG: 350e6\n});",
   },
 ];
 
@@ -63,12 +69,12 @@ export default function HowItWorksPage() {
         eyebrow="Product"
         title={
           <>
-            One contract per IPO. Six calls from{" "}
+            One contract per vault. Six calls from{" "}
             <span className="italic text-forest-500">deposit</span> to{" "}
             <span className="italic text-forest-500">exit</span>.
           </>
         }
-        description="Everything RPO does happens on public contracts on Robinhood Chain. There is no off-chain matching engine, no proprietary order book, and no admin key that can seize your allocation."
+        description="Everything RPO does happens on public contracts on Robinhood Chain. There is no off-chain matching engine, no proprietary order book, and no admin key that can seize your allocation. The example below walks a hypothetical new IPO (Robinhood-minted ticker) end-to-end; the aftermarket flow for already-listed tickers (dNVDA, dAAPL, dSPY) uses the same primitives."
       />
 
       <Section>

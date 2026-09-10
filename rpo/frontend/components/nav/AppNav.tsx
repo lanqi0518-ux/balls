@@ -18,7 +18,7 @@ import {
 import { cn } from "@/lib/cn";
 
 const NAV = [
-  { label: "IPO Calendar", href: "/app", Icon: Calendar },
+  { label: "Markets", href: "/app", Icon: Calendar },
   { label: "Positions", href: "/app/positions", Icon: Wallet },
   { label: "Stake $RPO", href: "/app/stake", Icon: Coin },
   { label: "Leaderboard", href: "/app/leaderboard", Icon: Trophy },
@@ -149,10 +149,10 @@ function MobileTabs({ pathname }: { pathname: string }) {
 }
 
 function breadcrumb(pathname: string): string {
-  if (pathname === "/app") return "app / calendar";
-  if (pathname.startsWith("/app/ipo/")) {
+  if (pathname === "/app") return "app / markets";
+  if (pathname.startsWith("/app/markets/")) {
     const t = pathname.split("/").pop() ?? "";
-    return `app / ipo / ${t.toUpperCase()}`;
+    return `app / markets / ${t.toUpperCase()}`;
   }
   const parts = pathname.split("/").filter(Boolean);
   return parts.join(" / ");

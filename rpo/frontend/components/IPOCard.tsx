@@ -57,7 +57,7 @@ export function IPOCard({
 
   return (
     <Link
-      href={`/app/ipo/${ticker.toLowerCase()}`}
+      href={`/app/markets/${ticker.toLowerCase()}`}
       className="card-hover p-7 flex flex-col gap-5 group"
     >
       <div className="flex items-center gap-4">

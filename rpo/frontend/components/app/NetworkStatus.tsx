@@ -150,7 +150,7 @@ export function NetworkStatus() {
 /* ─────────────────────────────────────────────────────────────────
  * PendingDeploymentPanel — a full-card replacement for any /app
  * write surface when the protocol isn't live on the active chain.
- * Used by /app/stake and /app/ipo/[ticker] to avoid ever showing
+ * Used by /app/stake and /app/markets/[ticker] to avoid ever showing
  * fake write buttons.
  * ─────────────────────────────────────────────────────────────── */
 export function PendingDeploymentPanel({

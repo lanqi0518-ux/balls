@@ -84,30 +84,48 @@ export function AppHomeClient({
           </div>
           <p className="text-sm text-ink-500 mt-2 leading-relaxed">
             The subscribe / stake / claim flows are real code, wired to
-            the configured chain. Every underlying market below is live
-            on Robinhood Chain right now — the moment the RPO{" "}
+            the configured chain. Every aftermarket Stock Token below
+            is live on Robinhood Chain right now — the moment the RPO{" "}
             <code>NEXT_PUBLIC_REGISTRY_ADDRESS</code> is set, subscribe
-            buttons activate against the real vault. Nothing on this page
-            is simulated.
+            buttons activate against the real vault. Nothing on this
+            page is simulated.
           </p>
         </div>
       )}
 
+      <div className="card p-6 border-l-4 border-ink-900 bg-white mb-6">
+        <Badge variant="dark">Primary listings · IPO calendar</Badge>
+        <div className="mt-3 text-ink-900 font-semibold">
+          No new IPO Stock Tokens today.
+        </div>
+        <p className="text-sm text-ink-500 mt-2 leading-relaxed max-w-3xl">
+          Robinhood has not minted a new Reg-S IPO ticker in the
+          current window. RPO&apos;s keeper watches the Jersey Reg-S
+          catalog and opens a fresh subscription vault the block a
+          new listing appears. Until then, the live inventory on
+          Robinhood Chain is the aftermarket book below — already-
+          listed public equities (AAPL, NVDA, SPY, …).
+        </p>
+      </div>
+
       <header className="flex items-end justify-between mb-6 gap-4 flex-wrap">
         <div>
-          <div className="eyebrow mb-3">Underlying markets · live</div>
+          <div className="eyebrow mb-3">Aftermarket · Robinhood Stock Tokens on RH Chain</div>
           <h1 className="font-display text-4xl lg:text-5xl text-ink-900">
             <span className="text-forest-500 tabular-nums">
               {liveCount}
             </span>{" "}
             <span className="text-ink-500 font-normal">
-              Robinhood Stock Token{liveCount === 1 ? "" : "s"} on-chain.
+              already-listed Stock Token{liveCount === 1 ? "" : "s"} on-chain.
             </span>
           </h1>
           <p className="text-sm text-ink-500 mt-3 max-w-2xl">
             Every row below is a real ERC-20 on Robinhood Chain with a
-            live Chainlink price. Connect a wallet to see your USDG
-            balance and — once RPO vaults deploy — subscribe.{" "}
+            live Chainlink price. These are <strong>not IPOs</strong>
+            — they&apos;re Robinhood&apos;s tokenized secondary market
+            for already-public stocks. Connect a wallet to see your
+            USDG balance and — once RPO AftermarketVaults deploy —
+            subscribe.{" "}
             <Link
               href="/how-it-works"
               className="text-forest-500 hover:underline"
@@ -315,7 +333,7 @@ function UnderlyingCard({
     : null;
   return (
     <Link
-      href={`/app/ipo/${token.ticker.toLowerCase()}`}
+      href={`/app/markets/${token.ticker.toLowerCase()}`}
       className="card-hover p-6 flex flex-col gap-5 group"
     >
       <div className="flex items-center gap-4">
@@ -328,7 +346,7 @@ function UnderlyingCard({
           </div>
           <div className="text-xs text-ink-500 truncate">{token.name}</div>
           <div className="text-[10px] uppercase tracking-[0.14em] text-ink-500 mt-1 font-mono">
-            {token.assetClass} · Chainlink
+            {token.assetClass} · Aftermarket · Chainlink
           </div>
         </div>
         <Badge variant={priceUsd != null ? "forest" : "peach"} dot>

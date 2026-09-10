@@ -8,7 +8,7 @@ import { ArrowUpRight } from "@/components/ui/Icons";
 export const metadata = {
   title: "Explorer",
   description:
-    "Live index of Robinhood Chain Stock Tokens (the underlying assets an RPO SubscriptionVault buys) plus the RPO contract registry.",
+    "Live index of already-listed Robinhood Chain Stock Tokens (aftermarket underlying an RPO AftermarketVault fills against) plus the RPO contract registry.",
 };
 
 const REPO_URL = "https://github.com/lanqi0518-ux/balls";
@@ -29,8 +29,8 @@ export default async function ExplorerPage() {
     <MarketingShell>
       <PageHero
         eyebrow="Explorer · live"
-        title="Every Robinhood-Chain Stock Token, priced by Chainlink."
-        description="This page reads Robinhood Chain directly. The Stock Tokens listed here are the underlying assets an RPO SubscriptionVault will buy through Rialto propAMM. RPO subscription vaults themselves are not yet deployed — their section stays honest and empty until they are."
+        title="Every already-listed Robinhood-Chain Stock Token, priced by Chainlink."
+        description="This page reads Robinhood Chain directly. The Stock Tokens listed here are aftermarket underlying — already-public stocks and ETFs Robinhood has minted onto RH Chain as Reg-S tokens, not new IPOs. An RPO AftermarketVault will fill subscriptions against them through Rialto propAMM. RPO vaults themselves are not yet deployed — their section stays honest and empty until they are."
       />
 
       <section className="section">
@@ -73,10 +73,11 @@ export default async function ExplorerPage() {
           <div className="card p-0 overflow-hidden">
             <div className="px-6 py-5 border-b border-line flex items-center justify-between">
               <div>
-                <div className="eyebrow">Robinhood Chain · Stock Tokens</div>
+                <div className="eyebrow">Robinhood Chain · Aftermarket Stock Tokens</div>
                 <div className="text-ink-500 text-sm mt-1">
                   Every entry below is a real ERC-20 with a real Chainlink
-                  price feed. Data refreshes every 60 seconds.
+                  price feed — an already-listed public equity Robinhood
+                  has minted onto RH Chain. Data refreshes every 60 seconds.
                 </div>
               </div>
               <Badge variant="forest" dot>

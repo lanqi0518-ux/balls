@@ -7,11 +7,16 @@ import { readAllStockSnapshots } from "@/lib/robinhood/reads";
 import { fmtNum, fmtUSD } from "@/lib/format";
 
 /**
- * Featured section — real, live Robinhood-Chain Stock Tokens sourced
- * from the RPC on every ISR revalidation. These are the underlying
- * assets an RPO SubscriptionVault will buy when the protocol goes
- * live. The subscribe surface is gated on the RPO vault being
- * deployed; the underlying market data is real either way.
+ * Aftermarket section — real, live Robinhood-Chain Stock Tokens sourced
+ * from the RPC on every ISR revalidation. NVDA / AAPL / SPY are
+ * already-listed public equities (NVDA IPO'd in 1999, AAPL in 1980,
+ * SPY is a 1993 ETF); Robinhood has minted them onto Robinhood Chain
+ * as Reg-S Stock Tokens. These are the aftermarket underlying — the
+ * assets an RPO AftermarketVault will fill against via Rialto propAMM
+ * once the vault contract ships. New IPO listings appear separately
+ * when Robinhood mints them and get their own subscription vault.
+ * The subscribe surface is gated on the RPO vault being deployed;
+ * the underlying market data below is real either way.
  */
 export async function FeaturedIPOs() {
   const snapshots = await readAllStockSnapshots();
@@ -22,9 +27,9 @@ export async function FeaturedIPOs() {
 
   if (featured.length === 0) {
     return (
-      <Section id="ipos">
+      <Section id="markets">
         <div className="max-w-2xl">
-          <div className="eyebrow mb-5">Underlying markets</div>
+          <div className="eyebrow mb-5">Aftermarket</div>
           <h2 className="font-display text-display-sm text-ink-900">
             Robinhood Chain RPC unreachable.
           </h2>
@@ -34,8 +39,9 @@ export async function FeaturedIPOs() {
               rpc.mainnet.chain.robinhood.com
             </code>
             . Once the RPC is reachable, this section surfaces every
-            deployed Robinhood Stock Token with its live mark and
-            on-chain supply — no fake data will ever be displayed.
+            deployed Robinhood Stock Token (aftermarket underlying)
+            with its live mark and on-chain supply — no fake data will
+            ever be displayed.
           </p>
           <div className="mt-8">
             <LinkButton
@@ -53,19 +59,22 @@ export async function FeaturedIPOs() {
   }
 
   return (
-    <Section id="ipos">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-16 gap-6">
+    <Section id="markets">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-8 gap-6">
         <div className="max-w-2xl">
-          <div className="eyebrow mb-5">Underlying markets · live</div>
+          <div className="eyebrow mb-5">Aftermarket · already-listed Stock Tokens</div>
           <h2 className="font-display text-display-sm text-ink-900">
-            Real Robinhood-Chain Stock Tokens, priced by Chainlink.
+            Robinhood&apos;s existing public equities, tokenized on&nbsp;RH&nbsp;Chain.
           </h2>
           <p className="text-sm text-ink-500 mt-4 max-w-xl">
-            These are already deployed on Robinhood Chain (id 4663).
-            When an RPO SubscriptionVault ships, its fill leg buys the
-            underlying token directly from Rialto propAMM. Marks below
-            come from the on-chain Chainlink feeds and refresh every 60
-            seconds.
+            These are <strong>not IPOs</strong> — NVDA has traded since
+            1999, AAPL since 1980, SPY is a 1993 ETF. Robinhood has
+            already minted them onto Robinhood Chain (id 4663) as
+            Reg-S Stock Tokens. RPO&apos;s aftermarket pipeline will
+            fill subscriptions here via Rialto propAMM. Marks below
+            come from the on-chain Chainlink feeds and refresh every
+            60&nbsp;seconds. New IPO listings — when Robinhood mints
+            them — appear separately.
           </p>
         </div>
         <LinkButton
@@ -76,6 +85,22 @@ export async function FeaturedIPOs() {
         >
           Full onchain explorer
         </LinkButton>
+      </div>
+
+      <div className="mb-10 card p-6 border-l-4 border-peach-500 bg-peach-50/40 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <Badge variant="peach">Primary listings · IPO calendar</Badge>
+          <div className="mt-3 text-ink-900 font-semibold">
+            No new IPO Stock Tokens today.
+          </div>
+          <p className="text-sm text-ink-500 mt-2 max-w-2xl leading-relaxed">
+            RPO&apos;s RHJ Reg-S pipeline opens a subscription vault
+            the block a new Robinhood-minted ticker appears in the
+            Jersey Reg-S catalog. Right now, no unseen ticker is
+            queued — the only live inventory on Robinhood Chain is
+            the aftermarket below.
+          </p>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -109,7 +134,7 @@ function UnderlyingCard(props: {
     : null;
   return (
     <Link
-      href={`/app/ipo/${props.ticker.toLowerCase()}`}
+      href={`/app/markets/${props.ticker.toLowerCase()}`}
       className="card-hover p-8 flex flex-col gap-6 group"
     >
       <div className="flex items-center gap-4">
@@ -122,7 +147,7 @@ function UnderlyingCard(props: {
           </div>
           <div className="text-xs text-ink-500 truncate">{props.name}</div>
           <div className="text-[10px] uppercase tracking-[0.14em] text-ink-500 mt-1 font-mono">
-            {props.assetClass} · Chainlink
+            {props.assetClass} · Aftermarket · Chainlink
           </div>
         </div>
         <Badge variant="forest" dot>

@@ -87,7 +87,7 @@ export default async function SubscribePage({
     }
   } catch (err) {
     console.warn(
-      "[rh-chain] /app/ipo/%s: RPC read failed",
+      "[rh-chain] /app/markets/%s: RPC read failed",
       token.ticker,
       err
     );

@@ -134,7 +134,7 @@ export default function PositionsPage() {
                   No active subscriptions yet.
                 </div>
                 <Link href="/app" className="btn-primary text-sm">
-                  Browse IPO calendar
+                  Browse markets
                 </Link>
               </div>
             ) : (

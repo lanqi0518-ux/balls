@@ -60,10 +60,11 @@ export async function Hero() {
           </h1>
 
           <p className="mt-8 text-xl text-ink-500 max-w-2xl leading-relaxed">
-            Subscribe to real IPOs on-chain. Priced through Rialto propAMM,
-            allocated pro-rata, settled the moment Robinhood mints a
-            Stock Token. Robinhood Chain and its Stock Tokens are already
-            live — this page renders their real on-chain state.
+            Subscribe to Robinhood Stock Tokens on-chain — new IPO listings
+            <em> and </em> the already-live aftermarket book. Priced through
+            Rialto propAMM, allocated pro-rata, settled the moment Robinhood
+            mints. Today the preview below shows a real aftermarket token
+            (Robinhood has not minted any new IPO listings yet).
           </p>
 
           <div className="mt-10 flex flex-wrap items-center gap-3">
@@ -88,9 +89,9 @@ export async function Hero() {
             <MetaBullet
               label={`${
                 snapshots.filter((s) => s.priceUsd != null).length
-              } / ${snapshots.length} Stock Tokens live on RH Chain`}
+              } / ${snapshots.length} aftermarket Stock Tokens live on RH Chain`}
             />
-            <MetaBullet label="Contracts on GitHub" />
+            <MetaBullet label="0 new IPO listings today" />
             <MetaBullet label="RPO subscription vaults pending audit" />
           </div>
         </div>
@@ -153,11 +154,11 @@ function HeroPreview({
             <span className="h-2.5 w-2.5 rounded-full bg-paper-200" />
             <span className="h-2.5 w-2.5 rounded-full bg-paper-200" />
             <span className="ml-4 text-xs text-ink-400 font-mono">
-              app / underlying /{" "}
+              app / markets /{" "}
               {featured?.token.ticker.toLowerCase() ?? "—"}
             </span>
             <span className="ml-auto text-[10px] uppercase tracking-[0.18em] text-ink-400 font-mono">
-              Robinhood Chain · live
+              Aftermarket · live on RH Chain
             </span>
           </div>
 
@@ -178,7 +179,7 @@ function HeroPreview({
                   </div>
                 </div>
                 <Badge variant="forest" className="ml-auto">
-                  Deployed
+                  Aftermarket · live
                 </Badge>
               </div>
 
@@ -224,7 +225,7 @@ function HeroPreview({
 
             <div className="lg:col-span-2 rounded-2xl border border-line bg-white p-6 shadow-soft space-y-5">
               <div className="text-xs uppercase tracking-[0.18em] text-ink-500">
-                RPO subscription
+                Aftermarket subscription
               </div>
               <div className="rounded-xl bg-paper-100 border border-line p-4 flex items-center justify-between">
                 <span className="text-3xl font-mono text-ink-400 tabular-nums">
@@ -253,10 +254,11 @@ function HeroPreview({
                 Subscribe · waiting for RPO deploy
               </button>
               <p className="text-[11px] text-ink-500 leading-relaxed">
-                Underlying Stock Token is live on Robinhood Chain right
-                now. The subscribe button activates as soon as the RPO
-                SubscriptionVault contract is deployed and its address
-                is set in NEXT_PUBLIC_REGISTRY_ADDRESS.
+                This is Robinhood&apos;s aftermarket Stock Token — an
+                already-listed public equity, live on Robinhood Chain
+                right now. Not a new IPO. The subscribe button
+                activates the moment the RPO AftermarketVault contract
+                is deployed and set in NEXT_PUBLIC_REGISTRY_ADDRESS.
               </p>
             </div>
           </div>

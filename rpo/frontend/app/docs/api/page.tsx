@@ -5,7 +5,7 @@ import { H2, H3 } from "@/components/ui/H";
 
 export const metadata = {
   title: "REST API",
-  description: "Public REST endpoints for reading IPOs, subscriptions and boost state.",
+  description: "Public REST endpoints for reading RPO subscription vaults (IPO listings and aftermarket), user subscriptions and boost state.",
 };
 
 const toc: TocItem[] = [
@@ -65,27 +65,39 @@ export default function ApiPage() {
             <code>Authorization: Bearer rpo_live_xxx</code> header.
           </p>
 
-          <H2 id="ipos">IPOs</H2>
+          <H2 id="ipos">IPOs &amp; aftermarket vaults</H2>
+          <p>
+            In the RPO protocol, <em>IPORegistry</em> is the umbrella
+            contract that indexes every subscription vault — including
+            both new-listing (RHJ&nbsp;Reg-S) vaults and always-on
+            aftermarket vaults for already-listed Stock Tokens. The
+            <code>kind</code> field distinguishes them; the URL keeps
+            the historical <code>/ipos</code> path for symmetry with
+            the on-chain contract naming.
+          </p>
 
           <H3 id="list">GET /ipos</H3>
           <p>
-            Returns paginated IPOs, most-recent first. Filter with{" "}
-            <code>?status=Subscribing|Announced|Fulfilled|Refunded</code>.
+            Returns paginated subscription vaults, most-recent first.
+            Filter with <code>?status=Subscribing|Announced|Fulfilled|Refunded</code>{" "}
+            and <code>?kind=RhjIpo|Aftermarket|PonsGraduation|Direct</code>.
           </p>
           <pre>
-            <code>{`curl https://api.rpo.xyz/v1/ipos?status=Subscribing
+            <code>{`curl https://api.rpo.xyz/v1/ipos?status=PendingRpoDeploy&kind=Aftermarket
 
 {
   "data": [
     {
       "ticker": "NVDA",
       "name": "NVIDIA · Robinhood Token",
+      "kind": "Aftermarket",
       "underlying": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
       "priceFeed": "0x379EC4f7C378F34a1B47E4F3cbeBCbAC3E8E9F15",
       "vault": null,
       "status": "PendingRpoDeploy",
       "chainlinkMark": "221.13",
-      "boostAppliedToVault": true
+      "boostAppliedToVault": true,
+      "note": "NVDA is an already-listed public equity, not a new IPO"
     }
   ],
   "next_cursor": null

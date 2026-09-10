@@ -174,7 +174,7 @@ export function SubscribeClient({
         href="/app"
         className="text-sm text-ink-500 hover:text-ink-900 inline-flex items-center gap-1 mb-8"
       >
-        ← Back to calendar
+        ← Back to markets
       </Link>
 
       <div className="grid lg:grid-cols-5 gap-8">
@@ -321,9 +321,17 @@ export function SubscribeClient({
             <h2 className="text-lg font-semibold text-ink-900 mb-4">
               What you&apos;re actually buying
             </h2>
+            <p className="text-xs text-ink-500 mb-4 leading-relaxed">
+              {ticker} is not a new IPO — it&apos;s an already-listed
+              public {token.assetClass === "ETF" ? "ETF" : "stock"}
+              {" "}Robinhood has already minted onto Robinhood Chain as
+              an aftermarket Stock Token. You&apos;re buying exposure
+              to that existing security through the aftermarket
+              subscription vault:
+            </p>
             <ul className="space-y-3 text-sm text-ink-500">
               {[
-                `A Reg-S debt security issued by Robinhood Assets (Jersey), redeemable 1:1 against 1 share of ${ticker}.`,
+                `A Reg-S debt security issued by Robinhood Assets (Jersey), redeemable 1:1 against 1 share of ${ticker}. Already trading on Robinhood Chain — the RPO vault batches fills at oracle-bound prices.`,
                 "An ERC-8056 token — dividends and splits are applied automatically via uiMultiplier updates.",
                 "Priced through the on-chain Chainlink feed shown above and quoted on Rialto propAMM + Uniswap V4.",
                 "Not available to U.S., Canadian, U.K., Swiss, or U.A.E. residents per RHJ's Reg-S terms.",
@@ -361,13 +369,13 @@ export function SubscribeClient({
               <PendingDeploymentPanel
                 title={
                   !proto.isLive
-                    ? "Subscribe · pending RPO deployment"
-                    : `Subscribe · no live ${ticker} vault yet`
+                    ? "Aftermarket subscribe · pending RPO deployment"
+                    : `Aftermarket subscribe · no live ${ticker} vault yet`
                 }
                 hint={
                   !proto.isLive
-                    ? "The underlying Stock Token above is real and live on Robinhood Chain right now. This subscribe surface activates as soon as the RPO SubscriptionVault contract is deployed and its address is set in NEXT_PUBLIC_REGISTRY_ADDRESS — no rebuild required."
-                    : `RPO is deployed on this chain but no SubscriptionVault is currently open for ${ticker}. AssetDiscovery opens a vault the moment a new listing lands in Robinhood's feed.`
+                    ? `The ${ticker} Stock Token above is a real, already-listed aftermarket security, live on Robinhood Chain right now. This aftermarket-subscribe surface activates the moment the RPO AftermarketVault contract is deployed and its address is set in NEXT_PUBLIC_REGISTRY_ADDRESS — no rebuild required.`
+                    : `RPO is deployed on this chain but no AftermarketVault is currently open for ${ticker}. AssetDiscovery.openAftermarket(${ticker}) can be called permissionlessly to spin one up.`
                 }
               />
             </div>
@@ -485,10 +493,11 @@ export function SubscribeClient({
               )}
 
               <div className="text-[11px] text-ink-500 leading-relaxed">
-                By subscribing you deposit USDG into a per-IPO CREATE2
-                vault. You can cancel any time until the subscription
-                deadline. Full refund if the IPO doesn&apos;t launch by
-                the fulfillment deadline.
+                By subscribing you deposit USDG into the per-ticker
+                CREATE2 aftermarket vault. You can cancel any time
+                until the batch fill window closes. Full refund if
+                the vault cannot source enough underlying by the
+                fulfillment deadline.
               </div>
             </div>
           )}
