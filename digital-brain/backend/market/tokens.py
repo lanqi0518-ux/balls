@@ -1,13 +1,12 @@
 """Fresh-launch Solana token candidate pool.
 
 Every ``refresh_interval`` seconds:
-    1. Pull freshly-minted coins from pump.fun (the real 'gmgn.ai fresh
-       launches' upstream — gmgn's own JSON is Cloudflare-blocked for
-       bare HTTPS, but pump.fun's ``frontend-api-v3`` is not, and it
-       carries every SOL meme from the moment of birth, well before any
-       tracker picks it up).
-    2. Also pull DexScreener's "boosted" list (people actively paying to
-       promote) and "latest token profiles" as additional signal.
+    1. Pull freshly-minted coins from **every** Solana launchpad we can
+       reach without auth: pump.fun, LetsBonk / bonk.fun, Believe /
+       Clanker, Moonshot, Jupiter Studio, and Raydium LaunchLab. See
+       ``launchpads.MultiLaunchpadWatcher``.
+    2. Also pull DexScreener's boosted list + latest token profiles as
+       additional signal.
     3. Batch-hydrate all candidate mints via DexScreener's tokens()
        endpoint to get proper pair snapshots (price, liquidity, volume).
     4. Filter out anything that's already a mega-cap so the brain
@@ -19,9 +18,11 @@ Every ``refresh_interval`` seconds:
 
 Consumers get:
     * ``snapshot()``               — the ranked ``PairSnapshot`` list
-    * ``fresh_launches_public()``  — the raw pump.fun feed (for the UI)
-    * ``is_fresh_launch(mint)``    — was this mint born on pump.fun in
-                                     the last few hours?
+    * ``fresh_launches_public()``  — every fresh launch across every
+                                     launchpad (for the UI)
+    * ``is_fresh_launch(mint)``    — was this mint born on any of the
+                                     launchpads in the last few hours?
+    * ``launchpad_for(mint)``      — pump.fun / letsbonk / moonshot / …
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ from typing import Dict, List, Optional, Set
 
 from .dexscreener import DexScreenerClient, PairSnapshot
 from .pump_fun import FreshCoin, PumpFunClient
+from .launchpads import MultiLaunchpadWatcher, launchpad_of
 
 
 LOG = logging.getLogger("market.tokens")
@@ -66,14 +68,18 @@ class TrendingTokenWatcher:
     def __init__(self,
                  client: Optional[DexScreenerClient] = None,
                  pumpfun: Optional[PumpFunClient] = None,
+                 launchpads: Optional[MultiLaunchpadWatcher] = None,
                  chain: str = "solana",
                  top_n: int = 30,
                  refresh_interval: float = 45.0,
                  seed_addresses: Optional[List[str]] = None,
                  max_fdv_usd: float = DEFAULT_MAX_FDV_USD,
-                 fresh_pool_size: int = 40):
+                 fresh_pool_size: int = 60):
         self.client = client or DexScreenerClient()
         self.pumpfun = pumpfun or PumpFunClient()
+        self.launchpads = launchpads or MultiLaunchpadWatcher(
+            dex=self.client, pumpfun=self.pumpfun,
+        )
         self.chain = chain
         self.top_n = top_n
         self.refresh_interval = refresh_interval
@@ -86,6 +92,7 @@ class TrendingTokenWatcher:
         self._fresh_by_mint: Dict[str, FreshCoin] = {}
         self._last_refresh_at: float = 0.0
         self._last_source_counts: Dict[str, int] = {}
+        self._launchpad_counts: Dict[str, int] = {}
         self._task: Optional[asyncio.Task] = None
         self._stop = asyncio.Event()
 
@@ -117,9 +124,11 @@ class TrendingTokenWatcher:
             if fresh is not None:
                 d["is_fresh_launch"] = True
                 d["fresh_age_minutes"] = round(fresh.age_minutes, 1)
-                d["source"] = "pump.fun"
+                d["launchpad"] = launchpad_of(fresh)
+                d["source"] = d["launchpad"]
             else:
                 d["is_fresh_launch"] = False
+                d["launchpad"] = "unknown"
                 d["source"] = "dexscreener"
             out.append(d)
         return out
@@ -133,6 +142,10 @@ class TrendingTokenWatcher:
     def fresh_launch_meta(self, mint: str) -> Optional[FreshCoin]:
         return self._fresh_by_mint.get(mint)
 
+    def launchpad_for(self, mint: str) -> Optional[str]:
+        c = self._fresh_by_mint.get(mint)
+        return launchpad_of(c) if c else None
+
     def status(self) -> dict:
         return {
             "chain": self.chain,
@@ -142,6 +155,7 @@ class TrendingTokenWatcher:
             "refresh_interval": self.refresh_interval,
             "max_fdv_usd": self.max_fdv_usd,
             "source_counts": dict(self._last_source_counts),
+            "launchpad_counts": dict(self._launchpad_counts),
         }
 
     # ------------------------------------------------------------------
@@ -161,43 +175,27 @@ class TrendingTokenWatcher:
         addrs: Set[str] = set(self.seed_addresses)
         source_counts: Dict[str, int] = {"seed": len(self.seed_addresses)}
 
-        # (1) Freshest pump.fun launches — the real "new project" upstream.
-        fresh = await self.pumpfun.fresh_coins(limit=self.fresh_pool_size)
-        # Keep only sanely-aged coins and de-dup by mint.
-        fresh = [c for c in fresh if c.age_minutes * 60.0 >= MIN_AGE_SECONDS]
+        # (1) Ask every launchpad we can reach at once.
+        fresh, per_source = await self.launchpads.all_fresh(
+            per_source_limit=max(self.fresh_pool_size // 3, 15),
+        )
+        fresh = [c for c in fresh if c.age_minutes * 60.0 >= MIN_AGE_SECONDS or c.age_minutes == 0.0]
         self._fresh_launches = fresh
         self._fresh_by_mint = {c.mint: c for c in fresh}
         for c in fresh:
             addrs.add(c.mint)
-        source_counts["pump_fun_fresh"] = len(fresh)
+        source_counts.update({f"launchpad::{k}": v for k, v in per_source.items()})
 
-        # (2) DexScreener boosted — people actively promoting.
-        boosted_added = 0
-        try:
-            boosted = await self.client.token_boosts_top()
-            for t in boosted:
-                if t.get("chainId") == self.chain and t.get("tokenAddress"):
-                    addrs.add(t["tokenAddress"])
-                    boosted_added += 1
-        except Exception:
-            pass
-        source_counts["dex_boosted"] = boosted_added
-
-        # (3) DexScreener latest token profiles — freshly-added listings.
-        profiles_added = 0
-        try:
-            profiles = await self.client.token_profiles_latest()
-            for t in profiles:
-                if t.get("chainId") == self.chain and t.get("tokenAddress"):
-                    addrs.add(t["tokenAddress"])
-                    profiles_added += 1
-        except Exception:
-            pass
-        source_counts["dex_profiles"] = profiles_added
+        # Per-launchpad tally (across the deduped final set).
+        pad_counts: Dict[str, int] = {}
+        for c in fresh:
+            pad = launchpad_of(c)
+            pad_counts[pad] = pad_counts.get(pad, 0) + 1
+        self._launchpad_counts = pad_counts
 
         # DexScreener token endpoint accepts up to 30 comma-separated addresses.
         addrs_list = list(addrs)[:30]
-        pairs = await self.client.tokens(self.chain, addrs_list)
+        pairs = await self.client.tokens(self.chain, addrs_list) if addrs_list else []
 
         # Deduplicate: same base token can have multiple pools.
         best_per_base: Dict[str, PairSnapshot] = {}
@@ -244,9 +242,7 @@ class TrendingTokenWatcher:
         self._last_refresh_at = time.time()
         self._last_source_counts = source_counts
         LOG.info("fresh-tokens: kept %d Solana pairs from %d addrs "
-                 "(fresh=%d, boosted=%d, profiles=%d, rejected_megacap=%d)",
+                 "(launchpads=%s, rejected_megacap=%d)",
                  len(self._pairs), len(addrs_list),
-                 source_counts.get("pump_fun_fresh", 0),
-                 source_counts.get("dex_boosted", 0),
-                 source_counts.get("dex_profiles", 0),
+                 pad_counts,
                  source_counts.get("rejected_megacap", 0))

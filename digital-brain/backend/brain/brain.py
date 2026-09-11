@@ -46,7 +46,11 @@ from .regions import (
     ACTION_NAMES,
     ACTION_NAMES_ZH,
 )
-from ..knowledge import all_concepts_with_embeddings
+from ..knowledge import (
+    CATEGORIES as KNOWLEDGE_CATEGORIES,
+    all_concepts_with_embeddings,
+    concept_embedding_for_text,
+)
 from ..market import MARKET_FEATURE_DIM
 
 
@@ -168,7 +172,17 @@ class Brain:
         self._concept_lit_until_step: int = -1
 
         # --- Seed permanent knowledge memories ---
+        # `_concepts_by_id` covers BOTH seed and learned concepts so the
+        # associate-thought code can look up either kind uniformly. The
+        # seed set is regenerated deterministically every boot; the
+        # learned set is loaded from disk (see load_state_dict_safe).
         self._concepts_by_id: Dict[str, "Concept"] = {}
+        # Learned concepts the brain has added at runtime. Each dict has
+        # {id, category, zh, en, desc_zh, desc_en, learned_at_step}.
+        # Persisted separately from seed concepts.
+        self.learned_concepts: List[dict] = []
+        # Cap so the knowledge bank doesn't explode after months of running.
+        self.max_learned_concepts = 400
         if self.config.knowledge_enabled:
             for concept, emb in all_concepts_with_embeddings(dim=feature_dim):
                 self.hippocampus.store_knowledge(
@@ -183,6 +197,81 @@ class Brain:
         self.thoughts.append(Thought(
             self.step_count, region, text, text_zh, kind, extra=extra,
         ))
+
+    # ------------------------------------------------------------------
+    # Runtime knowledge growth
+    # ------------------------------------------------------------------
+    def learn_concept(self, *, concept_id: str, category: str,
+                      zh: str, en: str,
+                      desc_zh: str = "", desc_en: str = "",
+                      quiet: bool = False) -> bool:
+        """Add a new permanent knowledge concept the brain has just
+        encountered in the wild (a fresh token, a new market pattern,
+        an event it wants to remember).
+
+        Idempotent — if ``concept_id`` is already known (seed OR learned)
+        this is a no-op. Emits a "learn" thought unless ``quiet=True``.
+
+        Returns True if a new concept was added, False otherwise.
+        """
+        if not concept_id or concept_id in self._concepts_by_id:
+            return False
+        if category not in KNOWLEDGE_CATEGORIES:
+            category = "learned_pattern"
+
+        emb = concept_embedding_for_text(concept_id, category=category,
+                                         dim=self.config.feature_dim)
+        self.hippocampus.store_knowledge(
+            features=emb, label=concept_id, category=category,
+        )
+
+        # Register a lightweight Concept-shaped object so the rest of
+        # the brain (associate thoughts, snapshot) can treat it like a
+        # seed. We avoid importing Concept here to keep this module
+        # standalone; a SimpleNamespace works equivalently.
+        from types import SimpleNamespace
+        c = SimpleNamespace(
+            id=concept_id, category=category,
+            zh=zh or concept_id, en=en or concept_id,
+            desc_zh=desc_zh, desc_en=desc_en,
+        )
+        self._concepts_by_id[concept_id] = c
+
+        # Persist the learned concept so it survives restarts.
+        self.learned_concepts.append({
+            "id": concept_id,
+            "category": category,
+            "zh": c.zh,
+            "en": c.en,
+            "desc_zh": desc_zh,
+            "desc_en": desc_en,
+            "learned_at_step": self.lifetime_step_count,
+            "learned_at_s": time.time(),
+        })
+        if len(self.learned_concepts) > self.max_learned_concepts:
+            # FIFO evict oldest learned entries so the bank stays bounded.
+            drop = self.learned_concepts[:len(self.learned_concepts) - self.max_learned_concepts]
+            self.learned_concepts = self.learned_concepts[-self.max_learned_concepts:]
+            drop_ids = {d["id"] for d in drop}
+            # Also drop from _concepts_by_id and hippocampus.
+            for dropped_id in drop_ids:
+                self._concepts_by_id.pop(dropped_id, None)
+            self.hippocampus.knowledge = [
+                ep for ep in self.hippocampus.knowledge
+                if ep.label not in drop_ids
+            ]
+
+        if not quiet:
+            snippet_en = (desc_en or en or concept_id)[:80]
+            snippet_zh = (desc_zh or zh or concept_id)[:40]
+            self._add_thought(
+                "hippocampus",
+                f"learned: {en} — {snippet_en}",
+                f"新学到：「{zh}」——{snippet_zh}",
+                kind="learn",
+                extra={"concept_id": concept_id, "category": category},
+            )
+        return True
 
     def step(self, observation: dict) -> Dict:
         """Run one perception→action cycle.
@@ -498,6 +587,12 @@ class Brain:
             "motor_stats": self.motor_cortex.stats(),
             "central_complex_stats": self.central_complex.stats(),
             "active_concept": self.active_concept,
+            "learned_concepts_count": len(self.learned_concepts),
+            "learned_concepts": [
+                {**c, "category_meta": KNOWLEDGE_CATEGORIES.get(c["category"], {}),
+                 "learned": True}
+                for c in self.learned_concepts[-80:]
+            ],
         }
 
     # ------------------------------------------------------------------
@@ -517,7 +612,7 @@ class Brain:
         now = time.time()
         proc_uptime = max(0.0, now - self.process_started_at_s)
         return {
-            "version": 1,
+            "version": 2,
             "step_count": self.step_count,
             "lifetime_step_count": self.lifetime_step_count,
             "first_boot_at_s": self.first_boot_at_s,
@@ -528,6 +623,7 @@ class Brain:
             "hippocampus": self.hippocampus.state_dict_serializable(),
             "amygdala": self.amygdala.state_dict_serializable(),
             "nucleus_accumbens": self.nucleus_accumbens.state_dict_serializable(),
+            "learned_concepts": list(self.learned_concepts),
         }
 
     def load_state_dict_safe(self, sd: dict) -> None:
@@ -548,5 +644,30 @@ class Brain:
                 self.amygdala.load_state_dict_safe(sd["amygdala"])
             if "nucleus_accumbens" in sd:
                 self.nucleus_accumbens.load_state_dict_safe(sd["nucleus_accumbens"])
+            # Restore learned concepts (added at runtime, e.g. fresh tokens
+            # the brain has seen). Each entry becomes a permanent knowledge
+            # memory again so associations continue to work.
+            self.learned_concepts = []
+            for entry in sd.get("learned_concepts", []) or []:
+                if not isinstance(entry, dict):
+                    continue
+                cid = entry.get("id")
+                if not cid or cid in self._concepts_by_id:
+                    continue
+                self.learn_concept(
+                    concept_id=cid,
+                    category=entry.get("category", "learned_pattern"),
+                    zh=entry.get("zh", cid),
+                    en=entry.get("en", cid),
+                    desc_zh=entry.get("desc_zh", ""),
+                    desc_en=entry.get("desc_en", ""),
+                    quiet=True,
+                )
+                # Preserve the original learned_at_step/s if provided.
+                if self.learned_concepts and self.learned_concepts[-1]["id"] == cid:
+                    if "learned_at_step" in entry:
+                        self.learned_concepts[-1]["learned_at_step"] = int(entry["learned_at_step"])
+                    if "learned_at_s" in entry:
+                        self.learned_concepts[-1]["learned_at_s"] = float(entry["learned_at_s"])
         except Exception:  # noqa: BLE001
             pass

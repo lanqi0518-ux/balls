@@ -7,9 +7,10 @@
 import { BrainScene } from "/static/js/brain3d.js";
 import { EnvironmentView, renderEnvStats } from "/static/js/environment.js";
 import { ThoughtStream } from "/static/js/thoughtstream.js";
-import { loadKnowledge, setActiveConcept, categoryColor } from "/static/js/knowledge.js";
+import { loadKnowledge, setActiveConcept, categoryColor, mergeLearnedConcepts } from "/static/js/knowledge.js";
 import { initTrading, updateTrading } from "/static/js/trading.js";
 import { initWebView, updateWebView, updateWebTopbarStrip } from "/static/js/web_view.js";
+import { AmbientMesh } from "/static/js/ambient.js";
 
 // ---------- DOM refs ----------
 const brainContainer = document.getElementById("brain3d");
@@ -102,6 +103,19 @@ function renderUptime() {
 
 setInterval(renderUptime, 1000);
 
+// Ambient neural-mesh backdrop. Pulses with every incoming WS frame so the
+// UI viscerally feels the tick. Purely decorative — safe to skip if the
+// canvas isn't in the DOM (e.g. reduced-motion or an older cached shell).
+let ambient = null;
+const ambientCanvas = document.getElementById("ambient-canvas");
+if (ambientCanvas) {
+  try {
+    ambient = new AmbientMesh(ambientCanvas);
+  } catch (e) {
+    console.warn("Ambient mesh failed to init", e);
+  }
+}
+
 // ---------- Init subsystems ----------
 let selectedRegionName = null;
 
@@ -189,6 +203,8 @@ function handlePayload(data) {
   const env = data.env;
   latestBrain = brain;
 
+  if (ambient) ambient.onBrainTick();
+
   tickLabel.textContent = `t = ${brain.step}`;
   const cum = brain.reward_stats?.cumulative_reward ?? 0;
   rewardLabel.textContent = `Σreward ${cum.toFixed(2)}`;
@@ -201,7 +217,14 @@ function handlePayload(data) {
   }
   const knowN = brain.hippocampus_stats?.knowledge ?? 0;
   const memN = brain.hippocampus_stats?.memories ?? 0;
-  footerKnowledge.textContent = `Memory: ${memN} eps + ${knowN} knowledge`;
+  const learnedN = brain.learned_concepts_count ?? 0;
+  footerKnowledge.textContent = learnedN
+    ? `Memory: ${memN} eps + ${knowN} knowledge (${learnedN} self-learned)`
+    : `Memory: ${memN} eps + ${knowN} knowledge`;
+
+  if (brain.learned_concepts) {
+    mergeLearnedConcepts(brain.learned_concepts);
+  }
 
   // Capture lifetime state for the uptime strip. The clock updates
   // every second between frames, so we snapshot the moment the frame

@@ -7,7 +7,7 @@
   <meta name="description" content="A live digital human brain — 10 anatomical regions, nine deep-learning cortices plus one real LIF spiking ring-attractor, cooperating in real time." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css" />
   <script type="importmap">
     {
@@ -19,52 +19,118 @@
   </script>
 </head>
 <body>
+  <!-- Ambient neural mesh: a low-density constellation that lives behind
+       every panel and pulses in time with the WebSocket tick. Purely
+       decorative; hits < 1% CPU. -->
+  <canvas id="ambient-canvas" aria-hidden="true"></canvas>
+  <div class="grain-overlay" aria-hidden="true"></div>
+
+  <!-- Global SVG icon sprite. Referenced by <svg><use href="#icon-x"/></svg>
+       so we can theme with `currentColor` and never ship emoji into the UI. -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="icon-brain" viewBox="0 0 24 24">
+        <path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+              d="M9 4.5a2.5 2.5 0 00-2.5 2.5v.4A2.6 2.6 0 004 10a2.6 2.6 0 001.5 2.35A2.6 2.6 0 004 14.6 2.6 2.6 0 006.5 17v.5A2.5 2.5 0 009 20h1.5V4.5H9zm6 0h-1.5v15.5H15a2.5 2.5 0 002.5-2.5V17A2.6 2.6 0 0020 14.6a2.6 2.6 0 00-1.5-2.25A2.6 2.6 0 0020 10a2.6 2.6 0 00-2.5-2.6V7A2.5 2.5 0 0015 4.5z"/>
+      </symbol>
+      <symbol id="icon-bolt" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/>
+      </symbol>
+      <symbol id="icon-clock" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/>
+        <path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M12 7v5l3.2 2"/>
+      </symbol>
+      <symbol id="icon-globe" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/>
+        <path fill="none" stroke="currentColor" stroke-width="1.4" d="M3.5 12h17M12 3a13 13 0 010 18M12 3a13 13 0 000 18"/>
+      </symbol>
+      <symbol id="icon-paper" viewBox="0 0 24 24">
+        <path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"
+              d="M6 3h8l4 4v14a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z"/>
+        <path fill="none" stroke="currentColor" stroke-width="1.6" d="M14 3v5h4M8 12h8M8 16h8M8 20h5"/>
+      </symbol>
+      <symbol id="icon-pulse" viewBox="0 0 24 24">
+        <path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+              d="M3 12h4l2-6 4 12 2-6h6"/>
+      </symbol>
+      <symbol id="icon-refresh" viewBox="0 0 24 24">
+        <path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+              d="M4 4v6h6M20 20v-6h-6M5 15a8 8 0 0014-4M19 9a8 8 0 00-14 4"/>
+      </symbol>
+      <symbol id="icon-spark" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M12 2l1.6 5.6L19 9l-5.4 1.4L12 16l-1.6-5.6L5 9l5.4-1.4L12 2z"/>
+      </symbol>
+    </defs>
+  </svg>
+
   <header class="topbar">
     <div class="brand">
       <div class="brand-mark">
-        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2C7.03 2 3 6.03 3 11c0 3.5 2 6.5 5 8v3h8v-3c3-1.5 5-4.5 5-8 0-4.97-4.03-9-9-9zm-3 8a2 2 0 100-4 2 2 0 000 4zm6 0a2 2 0 100-4 2 2 0 000 4z"/></svg>
+        <svg class="brand-mark-icon" viewBox="0 0 40 40" aria-hidden="true">
+          <defs>
+            <radialGradient id="brainCore" cx="50%" cy="50%" r="60%">
+              <stop offset="0%" stop-color="#F0ABFC" stop-opacity="0.9"/>
+              <stop offset="55%" stop-color="#6EE7FF" stop-opacity="0.4"/>
+              <stop offset="100%" stop-color="#0A0F1E" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <circle cx="20" cy="20" r="18" fill="url(#brainCore)"/>
+          <circle cx="20" cy="20" r="12" fill="none" stroke="#6EE7FF" stroke-width="0.7" opacity="0.5"/>
+          <circle cx="20" cy="20" r="7"  fill="none" stroke="#F0ABFC" stroke-width="0.8" opacity="0.75"/>
+          <circle cx="20" cy="20" r="2.4" fill="#F0ABFC"/>
+        </svg>
+        <span class="brand-mark-ring"></span>
       </div>
       <div class="brand-text">
-        <div class="brand-title">Digital Human Brain</div>
-        <div class="brand-sub">9 deep-learning cortices + 1 real spiking ring-attractor</div>
+        <div class="brand-title">Digital Human Brain<span class="brand-cursor"></span></div>
+        <div class="brand-sub">
+          <span class="mono">v1.0</span>
+          <span class="sep">·</span>
+          9 deep-learning cortices + 1 real LIF spiking ring-attractor
+        </div>
       </div>
     </div>
 
     <nav class="topbar-status">
-      <div class="status-item">
+      <div class="status-item conn">
         <span class="status-dot" id="conn-dot"></span>
         <span id="conn-label">connecting…</span>
       </div>
       <div class="status-item">
-        <span class="mono" id="tick-label">t = 0</span>
+        <span class="mono num" id="tick-label">t = 0</span>
       </div>
       <div class="status-item">
-        <span class="mono" id="reward-label">Σreward 0.00</span>
+        <span class="mono num" id="reward-label">Σreward 0.00</span>
       </div>
-      <div class="status-item paper-strip" id="paper-strip" title="Paper trading equity">
-        <span class="paper-label">📄 PAPER</span>
-        <span class="mono" id="paper-equity">—</span>
-        <span class="mono" id="paper-pnl">—</span>
+      <div class="status-item badge badge-paper" id="paper-strip" title="Paper trading equity">
+        <svg class="badge-icon"><use href="#icon-paper"/></svg>
+        <span class="badge-label">PAPER</span>
+        <span class="mono num" id="paper-equity">—</span>
+        <span class="mono num" id="paper-pnl">—</span>
       </div>
-      <div class="status-item mode-badge" id="mode-badge" title="Brain mode">
+      <div class="status-item badge badge-mode" id="mode-badge" title="Brain mode">
         <span class="mode-dot"></span><span id="mode-label">BOOT</span>
       </div>
-      <div class="status-item always-learning" title="Brain never stops. No pause, no reset.">
-        <span class="always-dot"></span><span>ALWAYS LEARNING</span>
+      <div class="status-item badge badge-learning" title="Brain never stops. No pause, no reset.">
+        <span class="always-dot"></span>
+        <span>ALWAYS LEARNING</span>
       </div>
-      <div class="status-item uptime-strip" id="uptime-strip"
+      <div class="status-item badge badge-uptime" id="uptime-strip"
            title="Continuous learning since first boot. Persisted across every VM restart.">
-        <span class="uptime-icon">⏱</span>
-        <span class="mono" id="uptime-label">uptime —</span>
+        <svg class="badge-icon"><use href="#icon-clock"/></svg>
+        <span class="mono num" id="uptime-label">uptime —</span>
       </div>
-      <div class="status-item browser-strip" id="browser-strip" title="Real headless Chromium roaming Solana sites">
-        <span class="browser-icon">🌐</span>
-        <span class="mono" id="browser-strip-label">browser idle</span>
+      <div class="status-item badge badge-browser" id="browser-strip" title="Real headless Chromium roaming Solana sites">
+        <svg class="badge-icon"><use href="#icon-globe"/></svg>
+        <span class="mono num" id="browser-strip-label">browser idle</span>
       </div>
     </nav>
 
     <div class="topbar-actions">
-      <button class="btn btn-ghost" id="btn-reset-env" title="Spawn a fresh gridworld. Does NOT reset the brain — it keeps everything it has learned.">↻ New gridworld</button>
+      <button class="btn btn-ghost" id="btn-reset-env" title="Spawn a fresh gridworld. Does NOT reset the brain — it keeps everything it has learned.">
+        <svg class="btn-icon"><use href="#icon-refresh"/></svg>
+        <span>New gridworld</span>
+      </button>
     </div>
   </header>
 
@@ -73,7 +139,7 @@
     <!-- LEFT-TOP: 3D BRAIN + REGIONS -->
     <section class="panel panel-brain">
       <div class="panel-title">
-        <h2>3D brain</h2>
+        <h2><span class="panel-title-idx">01</span>3D brain</h2>
         <span class="hint">drag · scroll · hover</span>
       </div>
       <div id="brain3d"></div>
@@ -84,17 +150,18 @@
     <section class="panel panel-hero">
       <div class="hero-block hero-thinking" id="hero-thinking" data-empty="true">
         <div class="hero-label">
-          <span class="hero-icon">🧠</span>
+          <svg class="hero-icon"><use href="#icon-brain"/></svg>
           <span>NOW THINKING</span>
           <span class="hero-src mono" id="hero-thinking-src"></span>
         </div>
-        <div class="hero-headline" id="hero-thinking-headline">brain is warming up…</div>
+        <div class="hero-headline" id="hero-thinking-headline">brain is warming up<span class="ellipsis-dots"></span></div>
         <div class="hero-detail" id="hero-thinking-detail"></div>
+        <div class="hero-underline"><span></span></div>
       </div>
 
       <div class="hero-block hero-intent" id="hero-intent">
         <div class="hero-label">
-          <span class="hero-icon">⚡</span>
+          <svg class="hero-icon"><use href="#icon-bolt"/></svg>
           <span>ABOUT TO DO</span>
         </div>
 
@@ -122,8 +189,11 @@
     <!-- RIGHT: THOUGHT STREAM -->
     <section class="panel panel-thoughts">
       <div class="panel-title">
-        <h2>Thought stream</h2>
-        <span class="hint mono">live from the cortex</span>
+        <h2><span class="panel-title-idx">03</span>Thought stream</h2>
+        <span class="hint mono">
+          <svg class="hint-icon"><use href="#icon-pulse"/></svg>
+          live from the cortex
+        </span>
       </div>
       <div id="thought-stream" class="thought-stream"></div>
     </section>
@@ -131,7 +201,7 @@
     <!-- LEFT-BOTTOM: ENVIRONMENT (small) -->
     <section class="panel panel-env">
       <div class="panel-title">
-        <h2>Body · gridworld</h2>
+        <h2><span class="panel-title-idx">02</span>Body · gridworld</h2>
         <div class="hint">
           <span class="tag tag-food">food +1</span>
           <span class="tag tag-hazard">hazard −1</span>
@@ -178,16 +248,16 @@
   <footer class="footer">
     <div class="footer-l">
       <span class="mono">Brain: 10 regions · 1 LIF spiking</span>
-      <span class="mono">·</span>
+      <span class="mono sep">·</span>
       <span class="mono" id="footer-knowledge">Memory: — eps + — knowledge</span>
-      <span class="mono">·</span>
+      <span class="mono sep">·</span>
       <span class="mono" id="footer-trader">Trader: 0 BC / 0 RL updates</span>
-      <span class="mono">·</span>
+      <span class="mono sep">·</span>
       <span class="mono" id="footer-lifetime" title="Cumulative learning across every VM restart">
         Lifetime: — ticks · boot #—
       </span>
-      <span class="mono">·</span>
-      <span class="mono" style="color: var(--accent)">No LLM · Paper only</span>
+      <span class="mono sep">·</span>
+      <span class="mono footer-guard">No LLM · Paper only</span>
     </div>
     <div class="footer-r">
       <label class="mono">

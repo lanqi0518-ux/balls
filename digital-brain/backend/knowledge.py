@@ -63,6 +63,25 @@ CATEGORIES: dict = {
         "en": "Einstein · Life & thought",
         "color": "#a3e635",
     },
+    # Categories the brain grows into at runtime as it encounters new
+    # tokens / patterns / launchpads it has never seen before. These are
+    # persisted to disk (unlike the seed concepts above, which are
+    # deterministically regenerated at boot).
+    "learned_token": {
+        "zh": "自学 · 新代币",
+        "en": "Learned · Fresh tokens",
+        "color": "#6EE7FF",
+    },
+    "learned_pattern": {
+        "zh": "自学 · 市场模式",
+        "en": "Learned · Market patterns",
+        "color": "#F0ABFC",
+    },
+    "learned_event": {
+        "zh": "自学 · 事件",
+        "en": "Learned · Events",
+        "color": "#FDE68A",
+    },
 }
 
 
@@ -310,7 +329,9 @@ def all_concepts_with_embeddings(dim: int = DEFAULT_DIM) -> Iterable[Tuple[Conce
 
 
 def concepts_public() -> List[dict]:
-    """Serializable view of every concept — used by the frontend knowledge panel."""
+    """Serializable view of every SEED concept — used by the frontend
+    knowledge panel. Learned-at-runtime concepts are added by the brain
+    on top of these; see ``Brain.snapshot()``'s ``learned_concepts``."""
     return [
         {
             **asdict(c),
@@ -322,3 +343,19 @@ def concepts_public() -> List[dict]:
 
 def categories_public() -> dict:
     return CATEGORIES
+
+
+def concept_embedding_for_text(text: str, category: str = "learned_token",
+                               dim: int = DEFAULT_DIM) -> torch.Tensor:
+    """Deterministic embedding for an arbitrary string, category-anchored.
+
+    Used when the brain encounters a novel token / pattern / event at
+    runtime: we drop it into the right category cluster (so associations
+    still make semantic sense) and add per-string noise to keep it
+    distinct. Same trick as ``concept_embedding`` — just keyed on a free
+    string rather than a preset id.
+    """
+    center = _category_center(category, dim)
+    g = _seeded_generator(f"learned::{category}::{text}")
+    noise = torch.randn(dim, generator=g) * 0.45
+    return torch.tanh(center + noise)

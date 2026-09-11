@@ -110,6 +110,15 @@ class FreshCoin:
         """< 6h old counts as 'fresh alpha'."""
         return self.age_minutes < 360
 
+    @property
+    def launchpad(self) -> str:
+        """Best-effort launchpad tag (pump.fun / letsbonk / moonshot / …)."""
+        if isinstance(self.raw, dict):
+            src = self.raw.get("launchpad_source")
+            if src:
+                return src
+        return "pump.fun"
+
     def to_public(self) -> dict:
         return {
             "mint": self.mint,
@@ -124,6 +133,7 @@ class FreshCoin:
             "telegram": self.telegram,
             "website": self.website,
             "image_uri": self.image_uri,
+            "launchpad": self.launchpad,
         }
 
 

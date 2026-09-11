@@ -475,32 +475,40 @@ class TradingService:
             action_name = TRADER_ACTION_NAMES[action]
             action_name_zh = TRADER_ACTION_NAMES_ZH[action]
 
-            # First time we look at a fresh pump.fun launch → emit an
-            # "explore" thought so the user sees the brain scanning new
-            # projects (not just reasoning about the same old memes).
+            # First time we look at a fresh launch → emit an "explore"
+            # thought so the user sees the brain scanning new projects
+            # (not just reasoning about the same old memes) AND grow the
+            # brain's knowledge bank so it has a permanent memory of this
+            # token from the moment it first sees it.
             if is_fresh and p.base_address not in self._explored_fresh_mints:
                 self._explored_fresh_mints.add(p.base_address)
                 meta = self.tokens.fresh_launch_meta(p.base_address)
                 age_min = meta.age_minutes if meta else 0.0
                 mcap = meta.usd_market_cap if meta else (p.market_cap or 0.0)
+                pad = (self.tokens.launchpad_for(p.base_address) or "pump.fun")
                 short_mint = p.base_address[:4] + "…"
                 sym_display = p.base_symbol if p.base_symbol.startswith("$") else f"${p.base_symbol}"
                 self._push_event(
                     "explore",
                     f"scanning fresh launch {sym_display} "
-                    f"({age_min:.0f}m old, ${mcap:,.0f} mcap, {short_mint}) → "
+                    f"[{pad}] ({age_min:.0f}m old, ${mcap:,.0f} mcap, {short_mint}) → "
                     f"initial read: {action_name.upper()} ({conf * 100:.0f}%)",
                     f"扫描新盘 {sym_display}"
-                    f"（{age_min:.0f} 分钟前发射，市值 ${mcap:,.0f}，{short_mint}）"
+                    f"【{pad}】（{age_min:.0f} 分钟前发射，市值 ${mcap:,.0f}，{short_mint}）"
                     f" → 初判：{action_name_zh}（{conf * 100:.0f}%）",
                     extra={
                         "symbol": p.base_symbol, "mint": p.base_address,
                         "age_minutes": round(age_min, 1),
                         "mcap_usd": round(mcap, 2),
                         "action": action_name, "confidence": round(conf, 3),
-                        "source": "pump.fun",
+                        "launchpad": pad,
                     },
                 )
+                # ---- Continuous knowledge learning ----
+                # Add the token itself to the knowledge bank so the brain
+                # can associate to it forever after. This is where the
+                # knowledge library grows on its own.
+                self._learn_token_concept(p, meta, pad)
             # Track the strongest non-HOLD intent this cycle for the hero card.
             candidate_intent = {
                 "symbol": p.base_symbol,
@@ -700,6 +708,86 @@ class TradingService:
             feats = torch.tensor(closed.features_at_entry, dtype=torch.float32)
             hints = torch.tensor(closed.hints_at_entry or [0.0] * 6, dtype=torch.float32)
             self.brain.trader_cortex.reinforce_from_pnl(feats, hints, closed.action_taken, pnl_frac)
+        # Big-outcome trades become permanent knowledge — the brain learns
+        # the concept "this token earned/lost me X%" so future associations
+        # to a similar market context can retrieve that lesson.
+        if abs(pnl_frac) >= 0.15:
+            self._learn_outcome_concept(closed, pnl_frac)
+
+    # ------------------------------------------------------------------
+    # Continuous knowledge growth
+    # ------------------------------------------------------------------
+
+    def _learn_token_concept(self, pair, meta, launchpad: str) -> None:
+        """Add a fresh-launch token to the brain's permanent knowledge bank.
+
+        The brain has never seen this mint before — after learning it, any
+        future market context that "smells like" this one will surface a
+        cortex-generated association to it, exactly like the seed BTC /
+        Einstein concepts do.
+        """
+        sym = (pair.base_symbol or "?").strip() or "?"
+        sym_display = sym if sym.startswith("$") else f"${sym}"
+        age_min = meta.age_minutes if meta else 0.0
+        mcap = meta.usd_market_cap if meta else (pair.market_cap or 0.0)
+        cid = f"tok::{pair.base_address}"
+        added = self.brain.learn_concept(
+            concept_id=cid,
+            category="learned_token",
+            zh=f"{sym_display} · 新盘",
+            en=f"{sym_display} · fresh launch",
+            desc_zh=f"在 {launchpad} 发射时首次遇到；"
+                    f"发射 {age_min:.0f} 分钟，市值 ${mcap:,.0f}。"
+                    f"合约 {pair.base_address[:4]}…{pair.base_address[-4:]}",
+            desc_en=f"First seen on {launchpad} at launch; "
+                    f"{age_min:.0f} min old, ${mcap:,.0f} mcap. "
+                    f"mint {pair.base_address[:4]}…{pair.base_address[-4:]}",
+            quiet=True,
+        )
+        if added:
+            # Also learn the launchpad itself as a pattern the first time
+            # we see it (once per launchpad, forever).
+            self._maybe_learn_launchpad(launchpad)
+
+    def _maybe_learn_launchpad(self, launchpad: str) -> None:
+        if not launchpad or launchpad in ("unknown", "dexscreener"):
+            return
+        cid = f"pad::{launchpad}"
+        added = self.brain.learn_concept(
+            concept_id=cid,
+            category="learned_pattern",
+            zh=f"发射台 · {launchpad}",
+            en=f"Launchpad · {launchpad}",
+            desc_zh=f"一个 Solana 发射台。大脑在这里第一次发现新代币。",
+            desc_en=f"A Solana launchpad — the brain has begun watching it "
+                    f"for fresh mints.",
+            quiet=False,
+        )
+        if added:
+            self._push_event(
+                "learn",
+                f"registered new launchpad in knowledge bank: {launchpad}",
+                f"知识库新增发射台：{launchpad}",
+                extra={"launchpad": launchpad},
+            )
+
+    def _learn_outcome_concept(self, closed, pnl_frac: float) -> None:
+        """Record a big win/loss as a market-pattern concept."""
+        sym = closed.token_symbol or "?"
+        cid = f"outcome::{sym}::{int(closed.entry_at_s)}"
+        win = pnl_frac > 0
+        pct = int(round(pnl_frac * 100))
+        self.brain.learn_concept(
+            concept_id=cid,
+            category="learned_event",
+            zh=f"{'盈利' if win else '亏损'} {pct:+d}% · {sym}",
+            en=f"{'Win' if win else 'Loss'} {pct:+d}% · {sym}",
+            desc_zh=f"在 {sym} 上{'赚' if win else '亏'}了 {pct:+d}%（"
+                    f"退出原因 {closed.reason}）。大脑把它作为一个模式记住。",
+            desc_en=f"{'Made' if win else 'Lost'} {pct:+d}% on {sym} "
+                    f"(exit reason {closed.reason}). Kept as a pattern.",
+            quiet=False,
+        )
 
     # ------------------------------------------------------------------
 

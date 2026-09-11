@@ -1,14 +1,19 @@
 /**
  * knowledge.js — the "knowledge bank" panel.
  *
- * Loads the full concept list from /api/knowledge (crypto + Einstein), renders
- * it grouped by category, and lights up the chip the brain is currently
- * associating to whenever `active_concept` changes.
+ * Loads the seed concept list from /api/knowledge (crypto + Einstein + Einstein),
+ * then GROWS itself in real time as the brain LEARNS new concepts at runtime
+ * (fresh tokens it has just seen, new launchpads it just registered, big
+ * outcomes it wants to remember). Learned concepts arrive via the WS stream
+ * on `brain.learned_concepts` and are pushed in via `mergeLearnedConcepts()`.
  */
 
-let CONCEPTS = [];
+let CONCEPTS = [];              // seed + learned, merged and rendered
+let SEEN_IDS = new Set();       // for de-dup during merge
 let CATEGORIES = {};
-let CHIPS = new Map();   // id -> DOM element
+let CHIPS = new Map();          // id -> DOM element
+let CAT_ELS = new Map();        // cat -> {catEl, gridEl, countEl}
+let PANEL_EL = null;
 let currentLitId = null;
 
 const CATEGORY_ORDER = [
@@ -19,15 +24,21 @@ const CATEGORY_ORDER = [
   "einstein_physics",
   "einstein_math",
   "einstein_life",
+  // Learned-at-runtime categories always render at the bottom, in this order.
+  "learned_token",
+  "learned_pattern",
+  "learned_event",
 ];
 
 export async function loadKnowledge(panelEl) {
+  PANEL_EL = panelEl;
   try {
     const res = await fetch("/api/knowledge", { cache: "no-store" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     CONCEPTS = data.concepts || [];
     CATEGORIES = data.categories || {};
+    for (const c of CONCEPTS) SEEN_IDS.add(c.id);
     renderPanel(panelEl, data);
     return data;
   } catch (e) {
@@ -36,59 +47,120 @@ export async function loadKnowledge(panelEl) {
   }
 }
 
+/** Called every WS frame with `brain.learned_concepts` — a running list of
+ * concepts the brain has added at runtime. Idempotent: already-seen ids
+ * are skipped. New ones become permanent chips in the correct category. */
+export function mergeLearnedConcepts(learned) {
+  if (!Array.isArray(learned) || !PANEL_EL) return;
+  let anyAdded = false;
+  for (const c of learned) {
+    if (!c || !c.id || SEEN_IDS.has(c.id)) continue;
+    SEEN_IDS.add(c.id);
+    CONCEPTS.push({ ...c, __learned: true });
+    addChipForConcept(c, /*learned=*/true);
+    anyAdded = true;
+  }
+  if (anyAdded) refreshIntroCount();
+}
+
 function renderPanel(panelEl, data) {
   const mode = (data.mode || "").toUpperCase();
-  const total = CONCEPTS.length;
 
   const intro = document.createElement("div");
   intro.className = "knowledge-intro";
-  intro.innerHTML = `
-    Not "understanding" — these are <strong>${total} semantic seeds</strong> loaded
-    into the hippocampus at boot. While the brain thinks, it occasionally
-    <strong>associates</strong> to one of them (the lit chip below is the one it's
-    on right now). Current mode: <strong>${escapeHtml(mode)}</strong>.
-    Association uses no LLM.
-  `;
+  intro.id = "knowledge-intro";
+  intro.innerHTML = introHtml(CONCEPTS.length, 0, mode);
   panelEl.innerHTML = "";
   panelEl.appendChild(intro);
 
   CHIPS = new Map();
+  CAT_ELS = new Map();
   const grouped = groupByCategory(CONCEPTS);
-  const ordered = orderCategories(Object.keys(grouped));
+  const ordered = orderCategories(Object.keys(grouped).concat(
+    // Ensure learned categories always have containers, even if empty at boot.
+    ["learned_token", "learned_pattern", "learned_event"],
+  ));
 
   for (const cat of ordered) {
     const items = grouped[cat] || [];
-    if (!items.length) continue;
-    const meta = CATEGORIES[cat] || {};
-    const color = meta.color || "#7dd3fc";
-
-    const catEl = document.createElement("div");
-    catEl.className = "knowledge-cat";
-    catEl.style.setProperty("--cat-color", color);
-
-    const title = document.createElement("div");
-    title.className = "knowledge-cat-title";
-    title.innerHTML = `
-      <span class="swatch"></span>
-      <span>${escapeHtml(meta.en || cat)}</span>
-      <span class="count">· ${items.length}</span>
-    `;
-    catEl.appendChild(title);
-
-    const grid = document.createElement("div");
-    grid.className = "knowledge-grid";
+    ensureCategoryContainer(cat);
+    // Populate initial items
     for (const c of items) {
-      const chip = document.createElement("div");
-      chip.className = "knowledge-chip";
-      chip.style.setProperty("--chip-color", color);
-      chip.title = `${c.en}\n${c.desc_en}`;
-      chip.innerHTML = `<span>${escapeHtml(c.en)}</span>`;
-      grid.appendChild(chip);
-      CHIPS.set(c.id, chip);
+      addChipForConcept(c, /*learned=*/Boolean(c.__learned));
     }
-    catEl.appendChild(grid);
-    panelEl.appendChild(catEl);
   }
+  refreshIntroCount();
+}
+
+function introHtml(seedTotal, learnedTotal, mode) {
+  return `
+    A live knowledge bank. <strong>${seedTotal}</strong> semantic seeds were
+    loaded at boot; the brain then <strong>grows this bank on its own</strong>
+    as it encounters new tokens, launchpads and outcomes in the wild
+    (dashed chips = learned at runtime, currently <strong>${learnedTotal}</strong>).
+    While the brain thinks it occasionally <strong>associates</strong> to one
+    of them — the lit chip is the one it's on right now.
+    Current mode: <strong>${escapeHtml(mode || "—")}</strong>. Association uses no LLM.
+  `;
+}
+
+function refreshIntroCount() {
+  const intro = document.getElementById("knowledge-intro");
+  if (!intro) return;
+  const learned = CONCEPTS.filter((c) => c.__learned).length;
+  const seed = CONCEPTS.length - learned;
+  const mode = intro.dataset.mode || "";
+  intro.innerHTML = introHtml(seed, learned, mode);
+}
+
+function ensureCategoryContainer(cat) {
+  if (CAT_ELS.has(cat)) return CAT_ELS.get(cat);
+  const meta = CATEGORIES[cat] || {};
+  const color = meta.color || "var(--accent)";
+
+  const catEl = document.createElement("div");
+  catEl.className = "knowledge-cat";
+  catEl.style.setProperty("--cat-color", color);
+
+  const title = document.createElement("div");
+  title.className = "knowledge-cat-title";
+  const countEl = document.createElement("span");
+  countEl.className = "count";
+  countEl.textContent = "· 0";
+  title.innerHTML = `
+    <span class="swatch"></span>
+    <span>${escapeHtml(meta.en || cat)}</span>
+  `;
+  title.appendChild(countEl);
+  catEl.appendChild(title);
+
+  const grid = document.createElement("div");
+  grid.className = "knowledge-grid";
+  catEl.appendChild(grid);
+
+  PANEL_EL.appendChild(catEl);
+  const rec = { catEl, gridEl: grid, countEl };
+  CAT_ELS.set(cat, rec);
+  return rec;
+}
+
+function addChipForConcept(c, learned) {
+  const cat = c.category || "learned_pattern";
+  const rec = ensureCategoryContainer(cat);
+  const meta = CATEGORIES[cat] || {};
+  const color = meta.color || "var(--accent)";
+
+  const chip = document.createElement("div");
+  chip.className = "knowledge-chip" + (learned ? " learned" : "");
+  chip.style.setProperty("--chip-color", color);
+  chip.title = `${c.en || c.id}\n${c.desc_en || ""}${learned ? "\n\n(learned at runtime)" : ""}`;
+  chip.innerHTML = `<span>${escapeHtml(c.en || c.id)}</span>`;
+  rec.gridEl.appendChild(chip);
+  CHIPS.set(c.id, chip);
+
+  // Update category count
+  const total = rec.gridEl.children.length;
+  rec.countEl.textContent = `· ${total}`;
 }
 
 function groupByCategory(concepts) {
@@ -100,15 +172,24 @@ function groupByCategory(concepts) {
 }
 
 function orderCategories(cats) {
-  const known = CATEGORY_ORDER.filter((c) => cats.includes(c));
-  const unknown = cats.filter((c) => !CATEGORY_ORDER.includes(c));
-  return [...known, ...unknown];
+  const seen = new Set();
+  const out = [];
+  for (const c of CATEGORY_ORDER) {
+    if (cats.includes(c) && !seen.has(c)) {
+      out.push(c);
+      seen.add(c);
+    }
+  }
+  for (const c of cats) {
+    if (!seen.has(c)) {
+      out.push(c);
+      seen.add(c);
+    }
+  }
+  return out;
 }
 
-/**
- * Called every frame with the brain's active_concept (or null).
- * Lights the corresponding chip and scrolls it into view (once per new id).
- */
+/** Lights the chip the brain is currently associating to. */
 export function setActiveConcept(activeConcept) {
   const newId = activeConcept ? activeConcept.id : null;
   if (newId === currentLitId) return;
@@ -131,7 +212,7 @@ export function getConceptById(id) {
 }
 
 export function categoryColor(cat) {
-  return (CATEGORIES[cat] && CATEGORIES[cat].color) || "#7dd3fc";
+  return (CATEGORIES[cat] && CATEGORIES[cat].color) || "var(--accent)";
 }
 
 function escapeHtml(s) {
