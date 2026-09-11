@@ -179,6 +179,10 @@ async def _extract_visible_symbols(page, max_out: int = 40) -> List[WebToken]:
         'GMGN','GRAPHQL','SWAP','TRADE','PRICE','VOLUME','MARKET','CAP',
         'CHART','WATCH','LIST','ITEMS','PAGE','NEXT','PREV','LOAD',
         'MORE','ALL','FILTER','SORT','ASC','DESC',
+        // Corporate / legal / abbreviation noise.
+        'LLC','INC','CORP','LTD','LP','LLP','PLC','GMBH','SA','AG','BV',
+        'ETC','AKA','FAQ','FYI','ROI','CPU','GPU','RAM','ROM','HTTP',
+        'HTML','JSON','XML','CSS','SDK','MCP','FFF',
       ]);
       const nodes = document.querySelectorAll(
         'td, span, div, a, li, h2, h3, h4, p, strong, b'
