@@ -58,6 +58,44 @@ FEATURE_DIM = 32
 NUM_ACTIONS = 5
 
 
+# Any string a learned-concept description might carry that names a
+# specific launchpad brand. We scrub these on load so historical concepts
+# recorded before the "no brand names in text" refactor stop leaking into
+# the associate-thought stream. The launchpad tag is still preserved
+# elsewhere (e.g. `active_concept.category` is `learned_token`), just not
+# in free-form text.
+_LAUNCHPAD_BRAND_TOKENS = (
+    "pump.fun", "pumpfun", "letsbonk", "bonk.fun", "bonkfun",
+    "moonshot", "believe", "clanker",
+    "jup.studio", "jup-studio", "jupiter studio",
+    "raydium-launchlab", "raydium launchlab", "launchlab", "raydium",
+    "dexscreener",
+)
+
+
+def _scrub_launchpad_brands(text: str) -> str:
+    if not text:
+        return ""
+    out = text
+    for brand in _LAUNCHPAD_BRAND_TOKENS:
+        # Case-insensitive replacement — the source has both "pump.fun"
+        # and "Pump.fun" style variants in older snapshots.
+        idx = 0
+        low_brand = brand.lower()
+        while True:
+            low_out = out.lower()
+            pos = low_out.find(low_brand, idx)
+            if pos < 0:
+                break
+            out = out[:pos] + "a launchpad" + out[pos + len(brand):]
+            idx = pos + len("a launchpad")
+    # Also normalise phrases like "on a launchpad at launch" that pop out
+    # of the above substitutions so the sentence still reads cleanly.
+    out = out.replace("on a launchpad at launch", "at launch")
+    out = out.replace("在 a launchpad 发射时", "在发射时")
+    return out
+
+
 class Thought:
     """One entry in the brain's stream of consciousness."""
 
@@ -218,6 +256,13 @@ class Brain:
             return False
         if category not in KNOWLEDGE_CATEGORIES:
             category = "learned_pattern"
+
+        # Always scrub launchpad brand names — anything that ends up as
+        # a permanent knowledge memory will eventually surface in the
+        # associate-thought stream, and we don't want that stream to
+        # shout brand names.
+        desc_en = _scrub_launchpad_brands(desc_en)
+        desc_zh = _scrub_launchpad_brands(desc_zh)
 
         emb = concept_embedding_for_text(concept_id, category=category,
                                          dim=self.config.feature_dim)
@@ -491,10 +536,19 @@ class Brain:
         }
         # Concept stays 'lit' for ~4 steps so the frontend has time to show it.
         self._concept_lit_until_step = self.step_count + 4
+        # Learned concepts (fresh tokens, patterns the brain grew into on
+        # its own) get a bare "associates with X" line — their descriptions
+        # contain factual metadata (mint addresses, timestamps) that reads
+        # like noise in the thought stream. Curated seed concepts (BTC,
+        # Einstein, …) keep a short desc so the stream remains educational.
+        is_learned = (getattr(concept, "category", "") or "").startswith("learned_")
+        desc_en = "" if is_learned else (concept.desc_en or "")[:80]
+        desc_zh = "" if is_learned else (concept.desc_zh or "")[:40]
+        text_en = f"💭 associates with {concept.en}" + (f" — {desc_en}" if desc_en else "")
+        text_zh = f"💭 联想到「{concept.zh}」" + (f"——{desc_zh}" if desc_zh else "")
         self._add_thought(
             "prefrontal_cortex",
-            f"💭 associates with {concept.en} — {concept.desc_en[:80]}",
-            f"💭 联想到「{concept.zh}」——{concept.desc_zh[:40]}",
+            text_en, text_zh,
             kind="associate",
             extra={"concept_id": concept.id, "category": concept.category,
                    "similarity": round(float(sim), 3)},
@@ -647,6 +701,11 @@ class Brain:
             # Restore learned concepts (added at runtime, e.g. fresh tokens
             # the brain has seen). Each entry becomes a permanent knowledge
             # memory again so associations continue to work.
+            # We ALSO sanitize any launchpad brand names out of the
+            # descriptions on load — older snapshots recorded strings like
+            # "First seen on pump.fun at launch" which then leaked into the
+            # associate-thought template. New entries are already neutral;
+            # this rewrite fixes historical ones without losing data.
             self.learned_concepts = []
             for entry in sd.get("learned_concepts", []) or []:
                 if not isinstance(entry, dict):
@@ -654,13 +713,15 @@ class Brain:
                 cid = entry.get("id")
                 if not cid or cid in self._concepts_by_id:
                     continue
+                desc_en_clean = _scrub_launchpad_brands(entry.get("desc_en", ""))
+                desc_zh_clean = _scrub_launchpad_brands(entry.get("desc_zh", ""))
                 self.learn_concept(
                     concept_id=cid,
                     category=entry.get("category", "learned_pattern"),
                     zh=entry.get("zh", cid),
                     en=entry.get("en", cid),
-                    desc_zh=entry.get("desc_zh", ""),
-                    desc_en=entry.get("desc_en", ""),
+                    desc_zh=desc_zh_clean,
+                    desc_en=desc_en_clean,
                     quiet=True,
                 )
                 # Preserve the original learned_at_step/s if provided.
