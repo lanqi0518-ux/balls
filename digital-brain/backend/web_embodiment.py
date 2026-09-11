@@ -186,6 +186,11 @@ async def _extract_visible_symbols(page, max_out: int = 40) -> List[WebToken]:
         if (skip.has(sym) || seen.has(sym)) continue;
         // Symbol must look like a real ticker — 3-6 chars is the sweet spot.
         if (sym.length < 3 || sym.length > 8) continue;
+        // Reject id-shaped strings like "KMC5RP", "KMC73AHTB", "P1P2P3" —
+        // real tokens with digits (ETH2, WBTC1, X2Y2) are almost always
+        // <=4 chars. Longer symbols with digits are overwhelmingly
+        // pagination/routing ids or hash fragments.
+        if (sym.length >= 5 && /[0-9]/.test(sym)) continue;
         seen.add(sym);
         out.push({{ symbol: sym, text: text.slice(0, 200) }});
         if (out.length >= {max_out}) break;
