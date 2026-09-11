@@ -171,6 +171,14 @@ async def _extract_visible_symbols(page, max_out: int = 40) -> List[WebToken]:
         'DOGE','LTC','SHIB','LINK','DAI','PYUSD','USDS','WSOL','BUSD',
         'API','APR','APY','TVL','LP','CEX','DEX','NFT','KYC','GM','GN',
         'CEO','CTO','CFO','IPO','FAQ','TOS','EULA',
+        // Robinhood footer / regulator noise.
+        'SIPC','FDIC','FINRA','SEC','NYSE','NASDAQ','ETF','ETFS','MSA',
+        'CFP','CFA','AML','ATM','FINANCE','LEGAL','TERMS','PRIVACY',
+        'DISCLOSURE','DISCLOSURES','SUPPORT','LOGIN','SIGNUP','ROBINHOOD',
+        // gmgn / launchpad UI noise.
+        'GMGN','GRAPHQL','SWAP','TRADE','PRICE','VOLUME','MARKET','CAP',
+        'CHART','WATCH','LIST','ITEMS','PAGE','NEXT','PREV','LOAD',
+        'MORE','ALL','FILTER','SORT','ASC','DESC',
       ]);
       const nodes = document.querySelectorAll(
         'td, span, div, a, li, h2, h3, h4, p, strong, b'
@@ -186,11 +194,15 @@ async def _extract_visible_symbols(page, max_out: int = 40) -> List[WebToken]:
         if (skip.has(sym) || seen.has(sym)) continue;
         // Symbol must look like a real ticker — 3-6 chars is the sweet spot.
         if (sym.length < 3 || sym.length > 8) continue;
-        // Reject id-shaped strings like "KMC5RP", "KMC73AHTB", "P1P2P3" —
-        // real tokens with digits (ETH2, WBTC1, X2Y2) are almost always
-        // <=4 chars. Longer symbols with digits are overwhelmingly
-        // pagination/routing ids or hash fragments.
+        // Reject id-shaped strings.
+        // 1. Length 5+ with any digit: overwhelmingly pagination/routing
+        //    ids or hash fragments (KMC5RP, KMC73AHTB, P1P2P3).
+        // 2. Length 4 with trailing digit and leading letters: same
+        //    paginator pattern (KMC4, KMC6, KMC8, ABC1).
+        //    Real 4-char tokens with a trailing digit are essentially
+        //    nonexistent among live meme tokens.
         if (sym.length >= 5 && /[0-9]/.test(sym)) continue;
+        if (sym.length === 4 && /^[A-Z]{3}[0-9]$/.test(sym)) continue;
         seen.add(sym);
         out.push({{ symbol: sym, text: text.slice(0, 200) }});
         if (out.length >= {max_out}) break;
@@ -523,17 +535,25 @@ class WebEmbodiment:
             # Give SPAs a longer beat to finish hydrating — Robinhood
             # and gmgn are heavy React shells that need this.
             await asyncio.sleep(4.5)
-            screenshot_bytes = await self._page.screenshot(
-                type="jpeg", quality=62, full_page=False,
-            )
-            b64 = self._downsample_jpeg(screenshot_bytes)
-            # Extraction is best-effort — if the page navigated under us,
-            # skip and move on.
+            # Extract tokens BEFORE the screenshot. Robinhood's very
+            # heavy React shell frequently times out on
+            # Page.screenshot() (30s default) — historically that
+            # bailed the whole visit and we got 0 tokens. Extract
+            # first, screenshot second, and never let the screenshot
+            # failure kill the token yield.
             try:
                 tokens = await extractor(self._page)
             except Exception as e:
                 LOG.debug("extraction skipped [%s]: %s", url, e)
                 tokens = []
+            b64 = ""
+            try:
+                screenshot_bytes = await self._page.screenshot(
+                    type="jpeg", quality=62, full_page=False, timeout=15_000,
+                )
+                b64 = self._downsample_jpeg(screenshot_bytes)
+            except Exception as e:
+                LOG.debug("screenshot skipped [%s]: %s", url, e)
             # Trust anything the extractor emitted. Href-based hits give us
             # on-chain mints (25-44 chars, base58) or slugs like 'bonk'
             # (3-15 chars). The visible-symbol fallback gives us tokens
