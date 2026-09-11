@@ -38,6 +38,7 @@ from .market import (
     TrendingTokenWatcher,
     WalletWatcher,
     Leaderboard,
+    WalletDiscovery,
     market_features_from_pair,
 )
 from .paper_trader import PaperTrader
@@ -82,6 +83,8 @@ class TradingService:
                  decision_interval: float = 20.0,
                  trending_interval: float = 60.0,
                  wallet_poll_interval: float = 25.0,
+                 discovery_interval: float = 180.0,
+                 target_tracked_wallets: int = 20,
                  persistence_dir: Optional[str] = None):
         self.brain = brain
         self.dexscreener = DexScreenerClient()
@@ -91,10 +94,16 @@ class TradingService:
         )
         self.wallets = WalletWatcher(poll_interval=wallet_poll_interval)
         self.leaderboard = Leaderboard()
+        self.discovery = WalletDiscovery(
+            scan_interval=discovery_interval,
+            target_tracked=target_tracked_wallets,
+        )
+        self.target_tracked_wallets = target_tracked_wallets
         self.paper = PaperTrader(start_usd=start_usd)
         self.persistence = Persistence(persistence_dir or os.getenv("DATA_DIR", "./data"))
 
         self.decision_interval = decision_interval
+        self.discovery_interval = discovery_interval
         self.take_profit_pct = 0.35     # +35% take profit
         self.stop_loss_pct = -0.18      # -18% stop loss
         self.max_hold_hours = 12.0
@@ -103,10 +112,13 @@ class TradingService:
         self._tasks: List[asyncio.Task] = []
         self._stop = asyncio.Event()
         self._last_save = 0.0
+        # Anti-flapping: don't re-add a wallet we already pruned inside this
+        # process for 24h.
+        self._pruned_until: Dict[str, float] = {}
 
-        # Seed wallets (default + env-configured)
+        # Seed wallets (default + env-configured) — always source=env
         for addr, label in DEFAULT_SEED_WALLETS + _parse_env_wallets():
-            self.wallets.track(addr, label)
+            self.wallets.track(addr, label, source="env")
             self.leaderboard.set_label(addr, label)
 
         # Restore any prior state
@@ -132,6 +144,7 @@ class TradingService:
         self._tasks = [
             asyncio.create_task(self._decision_loop(), name="td-decisions"),
             asyncio.create_task(self._sol_price_loop(), name="td-solprice"),
+            asyncio.create_task(self._discovery_loop(), name="td-discovery"),
         ]
 
     async def stop(self) -> None:
@@ -147,6 +160,121 @@ class TradingService:
                 pass
         self._tasks = []
         self._save_now()
+
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Auto-discovery: pull smart-money candidates from pumping tokens on-chain.
+    # ------------------------------------------------------------------
+
+    async def _discovery_loop(self) -> None:
+        """Every ``discovery_interval`` seconds, look at pumping hot tokens,
+        find their top on-chain holders, and start tracking new candidates.
+        Also prunes ``auto``-sourced wallets that have been dead weight for
+        a while (protects ``user`` / ``env`` wallets from ever getting
+        removed automatically)."""
+        # Wait a bit so the trending watcher has data.
+        try:
+            await asyncio.wait_for(self._stop.wait(), timeout=25.0)
+        except asyncio.TimeoutError:
+            pass
+        while not self._stop.is_set():
+            try:
+                await self._discovery_tick()
+            except Exception as e:  # noqa: BLE001
+                LOG.warning("discovery tick failed: %s", e)
+            try:
+                await asyncio.wait_for(self._stop.wait(),
+                                       timeout=self.discovery_interval)
+            except asyncio.TimeoutError:
+                pass
+
+    async def _discovery_tick(self) -> None:
+        # 1) Prune before we discover more, so freshly-freed slots can be filled.
+        pruned = self._prune_dead_weight()
+
+        # 2) Only discover if we're below the target.
+        current = self.wallets.wallets_with_meta()
+        current_addrs = set(current.keys())
+        if len(current_addrs) >= self.target_tracked_wallets:
+            LOG.debug("discovery: at target (%d), skipping scan", len(current_addrs))
+            return
+        need = self.target_tracked_wallets - len(current_addrs)
+
+        # 3) Scan the top hot tokens for new candidates.
+        hot = self.tokens.snapshot()
+        if not hot:
+            return
+        skip_set = current_addrs | {w for w, until in self._pruned_until.items()
+                                    if until > time.time()}
+        discovered = await self.discovery.scan(hot, skip_set)
+        if not discovered:
+            return
+
+        # 4) Add up to ``need`` of them.
+        added = 0
+        for d in discovered:
+            if added >= need:
+                break
+            label = f"early on ${d.source_token_symbol}"
+            if self.wallets.track(d.wallet, label, source="auto", extra={
+                "source_token_symbol": d.source_token_symbol,
+                "source_token_mint": d.source_token_mint,
+                "source_token_pump_pct_24h": d.source_token_pump_pct_24h,
+                "discovered_at_s": d.discovered_at_s,
+            }):
+                self.leaderboard.set_label(d.wallet, label)
+                self._push_event(
+                    "discover",
+                    f"auto-discovered wallet {d.wallet[:4]}…{d.wallet[-4:]} — "
+                    f"top holder of ${d.source_token_symbol} "
+                    f"({d.source_token_pump_pct_24h:+.0f}% 24h)",
+                    f"自动挖到钱包 {d.wallet[:4]}…{d.wallet[-4:]} — "
+                    f"${d.source_token_symbol} 早期大户"
+                    f"（24h {d.source_token_pump_pct_24h:+.0f}%）",
+                    extra={"wallet": d.wallet,
+                           "symbol": d.source_token_symbol,
+                           "pump_pct_24h": d.source_token_pump_pct_24h},
+                )
+                added += 1
+        if added:
+            LOG.info("discovery added %d new wallets (pruned=%d, tracked=%d/%d)",
+                     added, pruned, len(self.wallets.wallets()),
+                     self.target_tracked_wallets)
+
+    def _prune_dead_weight(self) -> int:
+        """Remove ``auto``-sourced wallets that are proving to be junk.
+
+        A wallet is dead weight if:
+            - source == "auto", AND
+            - has been tracked > 90 minutes, AND
+            - (has produced 0 observed trades OR has realized_pnl_usd < -50)
+        """
+        now = time.time()
+        pruned = 0
+        for wallet, meta in list(self.wallets.wallets_with_meta().items()):
+            if meta.get("source") != "auto":
+                continue
+            age_min = (now - float(meta.get("added_at", now))) / 60.0
+            if age_min < 90:
+                continue
+            trades = self.wallets.trades_of(wallet, limit=50)
+            board = self.leaderboard.get(wallet)
+            no_activity = len(trades) == 0
+            deep_loss = board.realized_pnl_usd < -50.0
+            if not (no_activity or deep_loss):
+                continue
+            self.wallets.untrack(wallet)
+            self._pruned_until[wallet] = now + 24 * 3600  # cool-down 24h
+            reason = "no trades" if no_activity else f"PnL {board.realized_pnl_usd:.0f}"
+            self._push_event(
+                "prune",
+                f"pruned {wallet[:4]}…{wallet[-4:]} ({reason})",
+                f"淘汰 {wallet[:4]}…{wallet[-4:]}（{reason}）",
+                extra={"wallet": wallet, "reason": reason},
+            )
+            pruned += 1
+        return pruned
 
     # ------------------------------------------------------------------
 
@@ -377,7 +505,11 @@ class TradingService:
         wallet = (wallet or "").strip()
         if not wallet or len(wallet) < 32:
             return False
-        self.wallets.track(wallet, label)
+        added = self.wallets.track(wallet, label, source="user")
+        if not added:
+            return False
+        # User-added wallets are exempt from cool-down; clear any prior ban.
+        self._pruned_until.pop(wallet, None)
         self.leaderboard.set_label(wallet, label or "custom")
         self._push_event(
             "wallet_add",
@@ -405,6 +537,7 @@ class TradingService:
             "mode": "paper",
             "tokens_status": self.tokens.status(),
             "wallets_status": self.wallets.status(),
+            "discovery_status": self.discovery.status(),
             "hot_tokens": self.tokens.snapshot_public(),
             "tracked_wallets": self.wallets.wallets_public(),
             "recent_wallet_trades": self.wallets.recent_trades_public(limit=30),
@@ -414,6 +547,8 @@ class TradingService:
             "events": list(self._trader_events[-60:]),
             "tuning": {
                 "decision_interval": self.decision_interval,
+                "discovery_interval": self.discovery_interval,
+                "target_tracked_wallets": self.target_tracked_wallets,
                 "take_profit_pct": self.take_profit_pct,
                 "stop_loss_pct": self.stop_loss_pct,
                 "max_hold_hours": self.max_hold_hours,

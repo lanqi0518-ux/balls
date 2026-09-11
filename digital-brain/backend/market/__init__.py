@@ -18,6 +18,7 @@ from .dexscreener import DexScreenerClient, PairSnapshot
 from .tokens import TrendingTokenWatcher
 from .wallets import WalletWatcher, TrackedTrade
 from .leaderboard import Leaderboard
+from .discovery import WalletDiscovery, DiscoveredWallet
 from .features import (
     MARKET_FEATURE_DIM,
     market_features_from_pair,
@@ -31,6 +32,8 @@ __all__ = [
     "WalletWatcher",
     "TrackedTrade",
     "Leaderboard",
+    "WalletDiscovery",
+    "DiscoveredWallet",
     "MARKET_FEATURE_DIM",
     "market_features_from_pair",
     "empty_market_features",

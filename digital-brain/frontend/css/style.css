@@ -796,6 +796,42 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   gap: 6px;
 }
 .trading-block-title .count { font-weight: 400; }
+.trading-block-title .trading-block-note {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.src-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  border: 1px solid transparent;
+}
+.src-tag.src-auto {
+  background: rgba(52, 211, 153, 0.14);
+  border-color: rgba(52, 211, 153, 0.4);
+  color: #34d399;
+}
+.src-tag.src-user {
+  background: rgba(125, 211, 252, 0.14);
+  border-color: rgba(125, 211, 252, 0.4);
+  color: var(--accent);
+}
+.src-tag.src-env {
+  background: rgba(250, 204, 21, 0.14);
+  border-color: rgba(250, 204, 21, 0.4);
+  color: #facc15;
+}
 
 .trading-table {
   width: 100%;

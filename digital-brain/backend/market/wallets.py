@@ -79,26 +79,47 @@ class WalletWatcher:
 
     # ------------------------------------------------------------------
 
-    def track(self, wallet: str, label: Optional[str] = None) -> None:
+    def track(self, wallet: str, label: Optional[str] = None,
+              source: str = "user", extra: Optional[dict] = None) -> bool:
+        """Start tracking a wallet. Returns True if it was newly added.
+
+        ``source`` is a free-form tag ("user", "env", "auto") that
+        downstream loops use to decide whether the wallet is protected
+        (user-added) or eligible for auto-eviction (auto).
+        ``extra`` is a small dict of provenance data (e.g. the token
+        symbol the wallet was discovered from).
+        """
         wallet = (wallet or "").strip()
         if not wallet or len(wallet) < 32:
-            return
+            return False
         if wallet in self._wallets:
-            return
+            return False
         self._wallets[wallet] = {
             "last_signatures": set(),
             "added_at": time.time(),
             "label": label or "",
             "primed": False,
+            "source": source,
+            "extra": dict(extra or {}),
         }
         self._trades_by_wallet.setdefault(wallet, [])
-        LOG.info("wallet tracked: %s (%s)", wallet[:6] + "…", label or "-")
+        LOG.info("wallet tracked: %s (%s, source=%s)",
+                 wallet[:6] + "…", label or "-", source)
+        return True
 
     def untrack(self, wallet: str) -> None:
         self._wallets.pop(wallet, None)
 
     def wallets(self) -> List[str]:
         return list(self._wallets.keys())
+
+    def wallets_with_meta(self) -> Dict[str, dict]:
+        """Return a shallow copy so callers can inspect source/label/etc."""
+        return {w: dict(meta) for w, meta in self._wallets.items()}
+
+    def wallet_meta(self, wallet: str) -> Optional[dict]:
+        meta = self._wallets.get(wallet)
+        return dict(meta) if meta else None
 
     def wallets_public(self) -> List[dict]:
         out = []
@@ -107,6 +128,8 @@ class WalletWatcher:
             out.append({
                 "wallet": w,
                 "label": meta.get("label") or "",
+                "source": meta.get("source") or "user",
+                "extra": dict(meta.get("extra") or {}),
                 "added_at_ms": int(meta.get("added_at", 0) * 1000),
                 "recent_trade_count": len(recent),
                 "last_trade_time": (max(t.block_time for t in recent) if recent else 0),

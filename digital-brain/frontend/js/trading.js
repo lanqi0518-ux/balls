@@ -55,7 +55,9 @@ export function initTrading(panelEl, opts = {}) {
 
     <div class="trading-block">
       <div class="trading-block-title">
-        <span>👁 Tracked wallets</span><span class="count" id="w-count">0</span>
+        <span>👁 Tracked wallets</span>
+        <span class="count" id="w-count">0</span>
+        <span class="trading-block-note" id="w-auto-note">auto-discovering…</span>
       </div>
       <div id="wallets-body"></div>
       <div class="trading-add-wallet">
@@ -109,7 +111,8 @@ export function updateTrading(trading) {
   updatePositions(trading.paper.positions || []);
   updateHot(trading.hot_tokens || []);
   updateLeaderboard(trading.leaderboard || []);
-  updateWallets(trading.tracked_wallets || []);
+  updateWallets(trading.tracked_wallets || [], trading.discovery_status || {},
+                trading.tuning || {});
   updateClosed(trading.paper.closed_recent || []);
 }
 
@@ -236,24 +239,53 @@ function updateLeaderboard(rows) {
     </tbody></table>`;
 }
 
-function updateWallets(wallets) {
+function updateWallets(wallets, discoveryStatus, tuning) {
   document.getElementById("w-count").textContent = wallets.length;
+  const target = tuning.target_tracked_wallets || 20;
+  const note = document.getElementById("w-auto-note");
+  const scanSecs = tuning.discovery_interval || 180;
+  const lastScanMs = discoveryStatus.last_scan_ms || 0;
+  const lastScanAgo = lastScanMs
+    ? fmtAgo(lastScanMs / 1000) : "never";
+  note.textContent =
+    `auto-discovery: target ${target} · scan every ${Math.round(scanSecs)}s · ` +
+    `last scan ${lastScanAgo} · ${discoveryStatus.seen_wallet_count || 0} candidates seen so far`;
+
   const el = document.getElementById("wallets-body");
   if (!wallets.length) {
-    el.innerHTML = `<div class="trading-empty">no wallets tracked yet — add one below</div>`;
+    el.innerHTML = `<div class="trading-empty">
+      no wallets tracked yet — the brain is scanning pumping tokens on-chain
+      for their most active traders. Or add one manually below.
+    </div>`;
     return;
   }
   el.innerHTML = `<table class="trading-table"><thead><tr>
-      <th>WALLET</th><th>LABEL</th><th>OBSERVED TRADES</th><th>LAST</th>
+      <th>WALLET</th><th>SOURCE</th><th>LABEL</th><th>OBS TRADES</th><th>LAST</th>
     </tr></thead><tbody>
-    ${wallets.map((w) => `
+    ${wallets.map((w) => {
+      const src = w.source || "user";
+      let sym = "";
+      let pump = "";
+      if (w.extra && w.extra.source_token_symbol) {
+        sym = w.extra.source_token_symbol;
+        pump = w.extra.source_token_pump_pct_24h != null
+          ? ` ${fmtPct(w.extra.source_token_pump_pct_24h)}` : "";
+      }
+      const srcCell = src === "auto"
+        ? `<span class="src-tag src-auto" title="Discovered on-chain from $${sym}${pump}">AUTO · $${escapeHtml(sym)}</span>`
+        : (src === "env"
+            ? `<span class="src-tag src-env">ENV</span>`
+            : `<span class="src-tag src-user">USER</span>`);
+      return `
       <tr>
         <td class="mono-sm">${escapeHtml(short(w.wallet))}</td>
+        <td class="mono-sm">${srcCell}</td>
         <td class="mono-sm">${escapeHtml(w.label || "—")}</td>
         <td>${w.recent_trade_count}</td>
         <td class="mono-sm">${w.last_trade_time ? fmtAgo(w.last_trade_time) : "—"}</td>
       </tr>
-    `).join("")}
+      `;
+    }).join("")}
     </tbody></table>`;
 }
 
