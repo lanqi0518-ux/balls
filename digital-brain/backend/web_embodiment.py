@@ -185,23 +185,28 @@ Extractor = Callable[[Any], Awaitable[List[WebToken]]]
 # init script — worst case a visit fails and we log it in the errors
 # rail and move on. CoinGecko's Solana-meme-only page is kept as a
 # single sanity anchor to prove the browser can reach the wider web.
+# Site display names are intentionally launchpad-agnostic (e.g.
+# "fresh Solana launches" instead of "pump.fun · new launches"). The
+# actual URL still targets a specific launchpad, but the topbar's
+# browser strip and the thought stream refer only to what the brain is
+# LOOKING AT semantically, not to which brand hosts the page.
 DEFAULT_TOUR: List[Tuple[str, str, Extractor]] = [
-    ("pump.fun · new launches",
+    ("fresh Solana launches",
      "https://pump.fun/board?sort=creation_time&order=DESC",
      _pumpfun_extractor),
-    ("pump.fun · about to graduate",
+    ("about-to-graduate tokens",
      "https://pump.fun/board?sort=market_cap&order=DESC",
      _pumpfun_extractor),
-    ("pump.fun · king of the hill",
+    ("king of the hill",
      "https://pump.fun/advanced",
      _pumpfun_extractor),
-    ("gmgn.ai · new pairs (SOL)",
+    ("new Solana pairs",
      "https://gmgn.ai/sol/discover?tab=new_pool",
      _gmgn_extractor),
-    ("gmgn.ai · trending SOL",
+    ("trending Solana",
      "https://gmgn.ai/sol",
      _gmgn_extractor),
-    ("coingecko · Solana meme coins",
+    ("Solana meme category",
      "https://www.coingecko.com/en/categories/solana-meme-coins",
      _coingecko_extractor),
 ]

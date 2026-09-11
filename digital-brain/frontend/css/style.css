@@ -1408,29 +1408,6 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   color: var(--good);
 }
 
-/* Per-launchpad badge — small pill next to the symbol. */
-.pad-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-size: 8.5px;
-  letter-spacing: 0.06em;
-  font-weight: 700;
-  text-transform: uppercase;
-  font-family: var(--font-mono);
-  border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-muted);
-  vertical-align: middle;
-}
-.pad-badge.pad-pumpfun    { color: #34D399; border-color: rgba(52, 211, 153, 0.35); background: rgba(52, 211, 153, 0.1); }
-.pad-badge.pad-letsbonk   { color: #FB923C; border-color: rgba(251, 146, 60, 0.4);  background: rgba(251, 146, 60, 0.1); }
-.pad-badge.pad-moonshot   { color: #A78BFA; border-color: rgba(167, 139, 250, 0.4); background: rgba(167, 139, 250, 0.1); }
-.pad-badge.pad-believe    { color: #6EE7FF; border-color: rgba(110, 231, 255, 0.4); background: rgba(110, 231, 255, 0.1); }
-.pad-badge.pad-jup-studio { color: #F0ABFC; border-color: rgba(240, 171, 252, 0.4); background: rgba(240, 171, 252, 0.1); }
-.pad-badge.pad-raydium    { color: #FBBF24; border-color: rgba(251, 191, 36, 0.4);  background: rgba(251, 191, 36, 0.1); }
-
 .trading-table {
   width: 100%;
   border-collapse: collapse;

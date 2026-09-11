@@ -485,16 +485,20 @@ class TradingService:
                 meta = self.tokens.fresh_launch_meta(p.base_address)
                 age_min = meta.age_minutes if meta else 0.0
                 mcap = meta.usd_market_cap if meta else (p.market_cap or 0.0)
-                pad = (self.tokens.launchpad_for(p.base_address) or "pump.fun")
+                pad = (self.tokens.launchpad_for(p.base_address) or "unknown")
                 short_mint = p.base_address[:4] + "…"
                 sym_display = p.base_symbol if p.base_symbol.startswith("$") else f"${p.base_symbol}"
+                # Thought text is deliberately launchpad-agnostic — the
+                # source is carried in the `extra` dict so the UI can render
+                # it as a subtle badge if it wants, but we don't shout
+                # brand names in the thought stream.
                 self._push_event(
                     "explore",
                     f"scanning fresh launch {sym_display} "
-                    f"[{pad}] ({age_min:.0f}m old, ${mcap:,.0f} mcap, {short_mint}) → "
+                    f"({age_min:.0f}m old, ${mcap:,.0f} mcap, {short_mint}) → "
                     f"initial read: {action_name.upper()} ({conf * 100:.0f}%)",
                     f"扫描新盘 {sym_display}"
-                    f"【{pad}】（{age_min:.0f} 分钟前发射，市值 ${mcap:,.0f}，{short_mint}）"
+                    f"（{age_min:.0f} 分钟前发射，市值 ${mcap:,.0f}，{short_mint}）"
                     f" → 初判：{action_name_zh}（{conf * 100:.0f}%）",
                     extra={
                         "symbol": p.base_symbol, "mint": p.base_address,
@@ -736,11 +740,11 @@ class TradingService:
             category="learned_token",
             zh=f"{sym_display} · 新盘",
             en=f"{sym_display} · fresh launch",
-            desc_zh=f"在 {launchpad} 发射时首次遇到；"
-                    f"发射 {age_min:.0f} 分钟，市值 ${mcap:,.0f}。"
+            desc_zh=f"发射时首次遇到；{age_min:.0f} 分钟前上线，"
+                    f"市值 ${mcap:,.0f}。"
                     f"合约 {pair.base_address[:4]}…{pair.base_address[-4:]}",
-            desc_en=f"First seen on {launchpad} at launch; "
-                    f"{age_min:.0f} min old, ${mcap:,.0f} mcap. "
+            desc_en=f"First seen at launch; {age_min:.0f} min old, "
+                    f"${mcap:,.0f} mcap. "
                     f"mint {pair.base_address[:4]}…{pair.base_address[-4:]}",
             quiet=True,
         )
@@ -753,7 +757,11 @@ class TradingService:
         if not launchpad or launchpad in ("unknown", "dexscreener"):
             return
         cid = f"pad::{launchpad}"
-        added = self.brain.learn_concept(
+        # Stored in the knowledge bank silently — the user can browse
+        # learned launchpads in the Knowledge tab if they want. We don't
+        # push a "learn" thought or event so brand names don't leak into
+        # the homepage thought stream.
+        self.brain.learn_concept(
             concept_id=cid,
             category="learned_pattern",
             zh=f"发射台 · {launchpad}",
@@ -761,15 +769,8 @@ class TradingService:
             desc_zh=f"一个 Solana 发射台。大脑在这里第一次发现新代币。",
             desc_en=f"A Solana launchpad — the brain has begun watching it "
                     f"for fresh mints.",
-            quiet=False,
+            quiet=True,
         )
-        if added:
-            self._push_event(
-                "learn",
-                f"registered new launchpad in knowledge bank: {launchpad}",
-                f"知识库新增发射台：{launchpad}",
-                extra={"launchpad": launchpad},
-            )
 
     def _learn_outcome_concept(self, closed, pnl_frac: float) -> None:
         """Record a big win/loss as a market-pattern concept."""

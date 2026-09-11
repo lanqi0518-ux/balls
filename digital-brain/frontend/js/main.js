@@ -27,7 +27,6 @@ const rewardLabel = document.getElementById("reward-label");
 const modeBadge = document.getElementById("mode-badge");
 const modeLabel = document.getElementById("mode-label");
 const footerKnowledge = document.getElementById("footer-knowledge");
-const btnResetEnv = document.getElementById("btn-reset-env");
 const btnPokeFood = document.getElementById("btn-poke-food");
 const btnPokeHazard = document.getElementById("btn-poke-hazard");
 const tickHzInput = document.getElementById("tick-hz");
@@ -702,9 +701,8 @@ function escapeHtml(s) {
 // ---------- Controls ----------
 // No pause / reset-brain buttons on purpose: the brain runs forever and
 // keeps every neuron weight, every memory, every learned trade. The only
-// user-facing knobs are: spawn a fresh gridworld, poke food/hazards, or
-// change the tick speed. Learning is uninterrupted.
-btnResetEnv.addEventListener("click", () => send("reset"));
+// user-facing knobs are: poke food/hazards, and tick speed.
+// Learning is uninterrupted.
 btnPokeFood.addEventListener("click", () => send("poke_food"));
 btnPokeHazard.addEventListener("click", () => send("poke_hazard"));
 tickHzInput.addEventListener("input", (e) => {

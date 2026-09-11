@@ -14,16 +14,14 @@ export function initTrading(panelEl, opts = {}) {
   panelEl.innerHTML = `
     <div class="trading-intro">
       <strong>Paper trading only — no real money.</strong>
-      The brain hunts <strong>fresh launches across every Solana launchpad</strong>
-      it can reach — pump.fun, LetsBonk, Believe, Moonshot, Jupiter Studio,
-      Raydium LaunchLab — while filtering out established mega-caps
-      (SOL/WIF/BONK/PEPE) so its attention stays on new opportunities.
-      It forms its own opinion on every candidate, and only borrows from
-      smart-money wallets when it's genuinely uncertain. Closed-trade PnL
-      is back-propagated, wallet-copied trades are annealed toward zero,
-      and independent convictions are respected.
-      <span class="warn">⚠ Phase 4 (real on-chain execution) is <strong>disabled</strong>
-      — enabling it requires you to plug in a Solana private key and hard limits.</span>
+      The brain hunts <strong>fresh Solana launches</strong> across every
+      launchpad it can reach, while filtering out established mega-caps so
+      its attention stays on new opportunities. It forms its own opinion on
+      every candidate and only borrows from smart-money wallets when it is
+      genuinely uncertain. Closed-trade PnL is back-propagated, wallet-copied
+      trades are annealed toward zero, and independent convictions are respected.
+      <span class="warn">Real on-chain execution is <strong>disabled</strong>
+      — enabling it requires a Solana private key and hard limits.</span>
     </div>
 
     <div class="trading-summary" id="trading-summary"></div>
@@ -47,7 +45,6 @@ export function initTrading(panelEl, opts = {}) {
       <div class="trading-block-title">
         <span>Fresh launches · every Solana launchpad</span>
         <span class="count" id="fresh-count">0</span>
-        <span class="trading-block-note">pump.fun · letsbonk · moonshot · believe · jup-studio · raydium</span>
       </div>
       <div id="fresh-body"></div>
     </div>
@@ -226,7 +223,6 @@ function updateHot(hot) {
         <td class="sym">
           <a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.base_symbol || "?")}</a>
           ${p.is_fresh_launch ? `<span class="fresh-badge" title="fresh launch, ${p.fresh_age_minutes}m old">NEW</span>` : ""}
-          ${p.launchpad && p.launchpad !== "unknown" ? padBadge(p.launchpad) : ""}
         </td>
         <td>${fmtUsd(p.price_usd)}</td>
         <td class="${clsSign(p.price_change_h1)}">${fmtPct(p.price_change_h1)}</td>
@@ -239,21 +235,9 @@ function updateHot(hot) {
     </tbody></table>`;
 }
 
-function padBadge(pad) {
-  const key = String(pad || "").toLowerCase().replace(/\./g, "").replace(/[^a-z0-9_-]/g, "-");
-  const cls = "pad-badge pad-" + key;
-  return `<span class="${cls}" title="Launchpad: ${escapeHtml(pad)}">${escapeHtml(pad)}</span>`;
-}
-
-function launchpadUrl(mint, launchpad) {
-  const pad = (launchpad || "").toLowerCase();
-  if (pad === "letsbonk")  return `https://letsbonk.fun/token/${encodeURIComponent(mint)}`;
-  if (pad === "moonshot")  return `https://dexscreener.com/solana/${encodeURIComponent(mint)}`;
-  if (pad === "believe")   return `https://dexscreener.com/solana/${encodeURIComponent(mint)}`;
-  if (pad === "jup-studio") return `https://jup.ag/tokens/${encodeURIComponent(mint)}`;
-  if (pad === "raydium")   return `https://raydium.io/swap/?outputCurrency=${encodeURIComponent(mint)}`;
-  if (pad === "dexscreener") return `https://dexscreener.com/solana/${encodeURIComponent(mint)}`;
-  return `https://pump.fun/coin/${encodeURIComponent(mint)}`;
+function chainExplorerUrl(mint) {
+  // Neutral Solana explorer — no launchpad brand in the URL the user sees.
+  return `https://solscan.io/token/${encodeURIComponent(mint)}`;
 }
 
 function updateFresh(fresh) {
@@ -266,11 +250,10 @@ function updateFresh(fresh) {
     return;
   }
   el.innerHTML = `<table class="trading-table"><thead><tr>
-      <th>TOKEN</th><th>PAD</th><th>NAME</th><th>AGE</th><th>MCAP</th><th>STATUS</th><th>LINKS</th>
+      <th>TOKEN</th><th>NAME</th><th>AGE</th><th>MCAP</th><th>STATUS</th><th>LINKS</th>
     </tr></thead><tbody>
     ${fresh.slice(0, 14).map((c) => {
-      const pad = c.launchpad || "pump.fun";
-      const mintUrl = launchpadUrl(c.mint, pad);
+      const mintUrl = chainExplorerUrl(c.mint);
       const ageStr = c.age_minutes < 60
         ? `${Math.round(c.age_minutes)}m`
         : `${(c.age_minutes / 60).toFixed(1)}h`;
@@ -289,7 +272,6 @@ function updateFresh(fresh) {
         <td class="sym">
           <a href="${escapeHtml(mintUrl)}" target="_blank" rel="noopener">${escapeHtml(c.symbol || "?")}</a>
         </td>
-        <td>${padBadge(pad)}</td>
         <td class="mono-sm" style="color:var(--text-muted)">${escapeHtml((c.name || "").slice(0, 22))}</td>
         <td class="mono-sm">${ageStr}</td>
         <td>${fmtBig(c.usd_market_cap)}</td>
