@@ -500,15 +500,29 @@ class WebEmbodiment:
         err = None
         tokens: List[WebToken] = []
         try:
-            await self._page.goto(url, timeout=25_000, wait_until="domcontentloaded")
+            # Use `commit` as the wait signal — it fires the moment the
+            # server accepts the navigation, before any HTML parsing.
+            # Heavy JS SPAs like Robinhood never fire `domcontentloaded`
+            # within any reasonable timeout (their initial HTML is a
+            # 200 KB skeleton that hydrates for 15+ seconds). We wait
+            # for `a[href]` selectors afterwards to give the page a
+            # real chance to render, and always follow with a short
+            # hydration sleep. The overall goto ceiling is generous.
+            try:
+                await self._page.goto(url, timeout=40_000, wait_until="commit")
+            except Exception:
+                # Fall back to the older, stricter signal for pages that
+                # never even reach commit (extremely rare).
+                await self._page.goto(url, timeout=15_000, wait_until="domcontentloaded")
             # Wait for the page's actual link-heavy content to render.
             # Failing this is fine — we still get a screenshot below.
             try:
-                await self._page.wait_for_selector("a[href]", timeout=8_000, state="attached")
+                await self._page.wait_for_selector("a[href]", timeout=12_000, state="attached")
             except Exception:
                 pass
-            # Give SPAs a beat to finish hydrating.
-            await asyncio.sleep(2.8)
+            # Give SPAs a longer beat to finish hydrating — Robinhood
+            # and gmgn are heavy React shells that need this.
+            await asyncio.sleep(4.5)
             screenshot_bytes = await self._page.screenshot(
                 type="jpeg", quality=62, full_page=False,
             )
