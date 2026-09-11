@@ -133,6 +133,13 @@ class Brain:
         self._last_position: tuple = (0, 0)
         self._last_visual: Optional[torch.Tensor] = None
 
+        # Throttling state for the thought stream so we don't spam the UI
+        # with identical PFC/motor lines every tick when the brain is stuck
+        # committing to the same action.
+        self._last_reported_action: Optional[int] = None
+        self._last_reported_confidence: float = -1.0
+        self._same_action_streak: int = 0
+
         self.thoughts: Deque[Thought] = deque(maxlen=120)
         self.engagement: float = 0.5  # 0=idle, 1=very engaged
 
@@ -252,14 +259,50 @@ class Brain:
         self._last_log_prob = log_prob
         self._last_value = value
 
-        self._add_thought("prefrontal_cortex",
-                          f"Considering options: {[round(p, 2) for p in probs.tolist()]} → chose {ACTION_NAMES[action]} (conf {self.motor_cortex.last_confidence:.2f}).",
-                          f"权衡选项：{[round(p, 2) for p in probs.tolist()]} → 选择{ACTION_NAMES_ZH[action]}（置信度 {self.motor_cortex.last_confidence:.2f}）。",
-                          kind="plan")
-        self._add_thought("motor_cortex",
-                          f"Motor command: {ACTION_NAMES[action]}.",
-                          f"运动指令：{ACTION_NAMES_ZH[action]}。",
-                          kind="action")
+        confidence = float(self.motor_cortex.last_confidence)
+        action_changed = action != self._last_reported_action
+        conf_delta = abs(confidence - self._last_reported_confidence)
+        if action_changed:
+            self._same_action_streak = 1
+        else:
+            self._same_action_streak += 1
+
+        # PFC "plan" thought — only when the decision meaningfully changes
+        # (new action or ≥20% jump in confidence), OR every 30 ticks (~5s)
+        # so we still emit a heartbeat when the brain is committing.
+        if action_changed or conf_delta >= 0.20 or self._same_action_streak % 30 == 0:
+            intent_en, intent_zh = self._describe_intent(action, probs)
+            if action_changed and self._last_reported_action is not None:
+                prev_en = ACTION_NAMES[self._last_reported_action]
+                prev_zh = ACTION_NAMES_ZH[self._last_reported_action]
+                prefix_en = f"switched from {prev_en} → "
+                prefix_zh = f"从「{prev_zh}」切换 → "
+            elif not action_changed and self._same_action_streak >= 30:
+                secs = self._same_action_streak // 6  # brain runs ~6Hz
+                prefix_en = f"still committing after {secs}s — "
+                prefix_zh = f"已坚持 {secs} 秒 — "
+            else:
+                prefix_en = ""
+                prefix_zh = ""
+            self._add_thought(
+                "prefrontal_cortex",
+                f"{prefix_en}{intent_en}",
+                f"{prefix_zh}{intent_zh}",
+                kind="plan",
+            )
+
+        # Motor "action" thought — only when the action itself flips.
+        if action_changed:
+            self._add_thought(
+                "motor_cortex",
+                f"Motor command → {ACTION_NAMES[action]}.",
+                f"运动指令 → {ACTION_NAMES_ZH[action]}。",
+                kind="action",
+            )
+            self._last_reported_action = action
+            self._last_reported_confidence = confidence
+        elif conf_delta >= 0.20:
+            self._last_reported_confidence = confidence
 
         # ---- 8b. Central complex: advance the spiking ring-attractor ----
         # The bump is our heading compass. It shifts based on the motor
@@ -345,6 +388,53 @@ class Brain:
             kind="associate",
             extra={"concept_id": concept.id, "category": concept.category,
                    "similarity": round(float(sim), 3)},
+        )
+
+    def _describe_intent(self, action: int, probs: torch.Tensor) -> tuple:
+        """Turn the raw softmax over 5 actions into readable EN/ZH text.
+
+        We used to dump the full 5-vector as `[0.0, 1.0, 0.0, 0.0, 0.0]`
+        which looks like garbage in the UI, especially when the brain is
+        stuck on one action. Now we return e.g.
+            'decisively picks move down (100%)'
+            'leans toward move down (68%)'
+            'torn between move down (52%) and move right (44%)'
+            'weighing all options'
+        """
+        p_list = [float(x) for x in probs.tolist()]
+        chosen_p = p_list[action]
+        # Second-most-likely alternative
+        alt_action = max(
+            (i for i in range(len(p_list)) if i != action),
+            key=lambda i: p_list[i],
+        )
+        alt_p = p_list[alt_action]
+
+        chosen_en = ACTION_NAMES[action]
+        chosen_zh = ACTION_NAMES_ZH[action]
+        alt_en = ACTION_NAMES[alt_action]
+        alt_zh = ACTION_NAMES_ZH[alt_action]
+
+        if chosen_p >= 0.85:
+            return (
+                f"decisively picks {chosen_en} ({chosen_p * 100:.0f}%)",
+                f"果断选择「{chosen_zh}」（{chosen_p * 100:.0f}%）",
+            )
+        if chosen_p >= 0.5:
+            return (
+                f"leans toward {chosen_en} ({chosen_p * 100:.0f}%)",
+                f"倾向「{chosen_zh}」（{chosen_p * 100:.0f}%）",
+            )
+        if chosen_p >= 0.35:
+            return (
+                f"torn between {chosen_en} ({chosen_p * 100:.0f}%) and "
+                f"{alt_en} ({alt_p * 100:.0f}%)",
+                f"在「{chosen_zh}」（{chosen_p * 100:.0f}%）和"
+                f"「{alt_zh}」（{alt_p * 100:.0f}%）之间犹豫",
+            )
+        return (
+            f"weighing all options — tentatively {chosen_en}",
+            f"权衡所有选项——暂选「{chosen_zh}」",
         )
 
     def _build_thought_vector_preview(self, image, danger, reward):
