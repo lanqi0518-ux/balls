@@ -41,8 +41,8 @@ class TraderCortex(BrainRegion):
         zh_name="交易皮层",
         position=(35.0, 40.0, 20.0),
         color="#f97316",
-        role="Trades Solana meme tokens with its own opinions — learns from smart money only when uncertain",
-        role_zh="独立判断 Solana meme 币交易，仅在不确定时才向聪明钱学习",
+        role="Hunts fresh pump.fun launches; forms its own opinions; learns from smart money only when uncertain",
+        role_zh="扫描 pump.fun 新发射，独立判断，仅在不确定时才向聪明钱学习",
     )
 
     def __init__(self, market_feature_dim: int = 16, hidden: int = 96,

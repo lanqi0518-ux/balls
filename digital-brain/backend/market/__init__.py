@@ -15,6 +15,7 @@ Sub-modules:
 """
 
 from .dexscreener import DexScreenerClient, PairSnapshot
+from .pump_fun import PumpFunClient, FreshCoin
 from .tokens import TrendingTokenWatcher
 from .wallets import WalletWatcher, TrackedTrade
 from .leaderboard import Leaderboard
@@ -28,6 +29,8 @@ from .features import (
 __all__ = [
     "DexScreenerClient",
     "PairSnapshot",
+    "PumpFunClient",
+    "FreshCoin",
     "TrendingTokenWatcher",
     "WalletWatcher",
     "TrackedTrade",

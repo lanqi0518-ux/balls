@@ -147,23 +147,20 @@ async def _extract_via_link_pattern(
     return out
 
 
-async def _coingecko_extractor(page) -> List[WebToken]:
-    """CoinGecko coin table: rows link to /en/coins/<slug>. The slug is
-    the human coin id (e.g. 'bonk'), not the on-chain mint. We keep the
-    slug as ``address`` for de-dup purposes so downstream code always has
-    a stable id, and extract the ticker + price/change hints from row
-    text."""
-    return await _extract_via_link_pattern(page, r"/en/coins/([a-z0-9\\-]{2,60})")
-
-
-async def _cmc_extractor(page) -> List[WebToken]:
-    """CoinMarketCap: rows link to /currencies/<slug>/."""
-    return await _extract_via_link_pattern(page, r"/currencies/([a-z0-9\\-]{2,60})/?")
-
-
 async def _pumpfun_extractor(page) -> List[WebToken]:
     """pump.fun token pages: /coin/<mint>."""
     return await _extract_via_link_pattern(page, r"/coin/([A-Za-z0-9]{25,})")
+
+
+async def _gmgn_extractor(page) -> List[WebToken]:
+    """gmgn.ai token detail pages: /sol/token/<mint>. Their pair detail
+    pages also use /sol/token/, so a single regex catches both feeds."""
+    return await _extract_via_link_pattern(page, r"/sol/token/([A-Za-z0-9]{25,})")
+
+
+async def _coingecko_extractor(page) -> List[WebToken]:
+    """CoinGecko coin table: rows link to /en/coins/<slug>."""
+    return await _extract_via_link_pattern(page, r"/en/coins/([a-z0-9\\-]{2,60})")
 
 
 async def _generic_extractor(page) -> List[WebToken]:
@@ -175,33 +172,38 @@ async def _generic_extractor(page) -> List[WebToken]:
 # ----------------------------------------------------------------------
 Extractor = Callable[[Any], Awaitable[List[WebToken]]]
 
-# We picked the tour based on which sites let a headless Chromium in
-# without a Cloudflare challenge. DexScreener, GeckoTerminal, Birdeye,
-# and Solscan all currently gate headless traffic (title == "Just a
-# moment...") — so we stick to CoinGecko / CoinMarketCap / Pump.fun,
-# which happily serve real HTML to our browser. The brain then feeds
-# extracted tokens back into the same DexScreener REST API it already
-# uses for pricing (which is *not* CF-gated), so we still get live
-# quotes for anything the browser spots.
+# The tour is now oriented around FRESH launches, not established
+# mega-caps. The old tour spent most of its time on CoinGecko /
+# CoinMarketCap pages dominated by BNB / PEPE / SOL / WIF — coins that
+# every bot on earth is already competing for. The brain's edge is
+# reasoning about NEW small-cap projects the moment they appear, so we
+# point the browser at pump.fun's newest boards and try gmgn.ai's
+# discover pages.
+#
+# gmgn.ai gates bare HTTPS (Cloudflare 403), but their pages often
+# render fine to a real headless Chromium with a proper UA + stealth
+# init script — worst case a visit fails and we log it in the errors
+# rail and move on. CoinGecko's Solana-meme-only page is kept as a
+# single sanity anchor to prove the browser can reach the wider web.
 DEFAULT_TOUR: List[Tuple[str, str, Extractor]] = [
+    ("pump.fun · new launches",
+     "https://pump.fun/board?sort=creation_time&order=DESC",
+     _pumpfun_extractor),
+    ("pump.fun · about to graduate",
+     "https://pump.fun/board?sort=market_cap&order=DESC",
+     _pumpfun_extractor),
+    ("pump.fun · king of the hill",
+     "https://pump.fun/advanced",
+     _pumpfun_extractor),
+    ("gmgn.ai · new pairs (SOL)",
+     "https://gmgn.ai/sol/discover?tab=new_pool",
+     _gmgn_extractor),
+    ("gmgn.ai · trending SOL",
+     "https://gmgn.ai/sol",
+     _gmgn_extractor),
     ("coingecko · Solana meme coins",
      "https://www.coingecko.com/en/categories/solana-meme-coins",
      _coingecko_extractor),
-    ("coingecko · Solana ecosystem",
-     "https://www.coingecko.com/en/categories/solana-ecosystem-and-token-standards",
-     _coingecko_extractor),
-    ("coingecko · trending",
-     "https://www.coingecko.com/en/highlights/trending-crypto",
-     _coingecko_extractor),
-    ("coinmarketcap · trending",
-     "https://coinmarketcap.com/trending-cryptocurrencies/",
-     _cmc_extractor),
-    ("coinmarketcap · Solana ecosystem",
-     "https://coinmarketcap.com/view/solana-ecosystem/",
-     _cmc_extractor),
-    ("pump.fun · board",
-     "https://pump.fun",
-     _pumpfun_extractor),
 ]
 
 

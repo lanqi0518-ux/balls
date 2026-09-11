@@ -123,6 +123,9 @@ class TradingService:
         # seen on real web pages, not just DexScreener's API firehose.
         self._web = None
         self._web_seen_addrs: set = set()  # dedup: which mints we've already logged
+        # Fresh-launch dedup: which pump.fun mints we've already reasoned
+        # about at least once, so we don't spam "explore" thoughts.
+        self._explored_fresh_mints: set = set()
 
         # Seed wallets (default + env-configured) — always source=env
         for addr, label in DEFAULT_SEED_WALLETS + _parse_env_wallets():
@@ -433,17 +436,28 @@ class TradingService:
                 if closed:
                     self._on_position_closed(closed)
 
-        # 5) Ask the Trader Cortex for a decision on each hot token
-        # Only consider fresh-ish + liquid + big-move tokens to save compute
-        candidates = [
-            p for p in hot
-            if p.liquidity_usd >= 20_000
-            and abs(p.price_change_h1) >= 1.0
-        ]
+        # 5) Ask the Trader Cortex for a decision on each candidate token.
+        # Candidate rules:
+        #   * Fresh pump.fun launches ALWAYS make the cut (that's the whole
+        #     point — we don't wait for them to develop a 1h price history
+        #     before the brain gets to look at them). Even a $2k-liquidity
+        #     coin is interesting, we just won't buy it.
+        #   * Established pairs need >= $20K liquidity AND at least a 1%
+        #     move in the last hour, otherwise it's not worth compute.
+        def _is_candidate(p) -> bool:
+            if self.tokens.is_fresh_launch(p.base_address):
+                return True
+            return p.liquidity_usd >= 20_000 and abs(p.price_change_h1) >= 1.0
+
+        candidates = [p for p in hot if _is_candidate(p)]
+        # Fresh launches first — we want the brain to LOOK at them ahead of
+        # older stuff.
+        candidates.sort(key=lambda p: 0 if self.tokens.is_fresh_launch(p.base_address) else 1)
         best_intent: Optional[dict] = None
-        for p in candidates[:12]:
+        for p in candidates[:16]:
             if p.price_usd <= 0:
                 continue
+            is_fresh = self.tokens.is_fresh_launch(p.base_address)
             feats = market_features_from_pair(p)
             hints = torch.tensor(
                 self.paper.hint_vector_for(p.base_address, p.price_usd),
@@ -455,6 +469,33 @@ class TradingService:
             conf = self.brain.trader_cortex.last_confidence
             probs_list = [round(float(x), 3) for x in probs.tolist()]
             action_name = TRADER_ACTION_NAMES[action]
+            action_name_zh = TRADER_ACTION_NAMES_ZH[action]
+
+            # First time we look at a fresh pump.fun launch → emit an
+            # "explore" thought so the user sees the brain scanning new
+            # projects (not just reasoning about the same old memes).
+            if is_fresh and p.base_address not in self._explored_fresh_mints:
+                self._explored_fresh_mints.add(p.base_address)
+                meta = self.tokens.fresh_launch_meta(p.base_address)
+                age_min = meta.age_minutes if meta else 0.0
+                mcap = meta.usd_market_cap if meta else (p.market_cap or 0.0)
+                short_mint = p.base_address[:4] + "…"
+                self._push_event(
+                    "explore",
+                    f"scanning fresh launch ${p.base_symbol} "
+                    f"({age_min:.0f}m old, ${mcap:,.0f} mcap, {short_mint}) → "
+                    f"initial read: {action_name.upper()} ({conf * 100:.0f}%)",
+                    f"扫描新盘 ${p.base_symbol}"
+                    f"（{age_min:.0f} 分钟前发射，市值 ${mcap:,.0f}，{short_mint}）"
+                    f" → 初判：{action_name_zh}（{conf * 100:.0f}%）",
+                    extra={
+                        "symbol": p.base_symbol, "mint": p.base_address,
+                        "age_minutes": round(age_min, 1),
+                        "mcap_usd": round(mcap, 2),
+                        "action": action_name, "confidence": round(conf, 3),
+                        "source": "pump.fun",
+                    },
+                )
             # Track the strongest non-HOLD intent this cycle for the hero card.
             candidate_intent = {
                 "symbol": p.base_symbol,
@@ -477,8 +518,12 @@ class TradingService:
 
             held = p.base_address in self.paper.positions
             # Confidence gate: don't act unless the cortex is clearly leaning
-            # that way. Prevents random-scalping-into-the-ground while untrained.
-            if action == BUY and not held and conf >= 0.50:
+            # that way. Prevents random-scalping-into-the-ground while
+            # untrained. Fresh pump.fun launches get a stricter gate — the
+            # noise floor on brand-new tokens is much higher and rug risk
+            # is real, so we demand more conviction before opening.
+            buy_gate = 0.65 if is_fresh else 0.50
+            if action == BUY and not held and conf >= buy_gate:
                 pos = self.paper.try_buy(
                     p.base_address, p.base_symbol, p.price_usd,
                     features=feats.tolist(), hints=hints.tolist(),
@@ -500,6 +545,10 @@ class TradingService:
 
         if best_intent is not None:
             self._latest_intent = best_intent
+
+        # Cap the explored-fresh set so it doesn't grow unbounded.
+        if len(self._explored_fresh_mints) > 4000:
+            self._explored_fresh_mints = set(list(self._explored_fresh_mints)[-2000:])
 
         # 6) Persist state every few minutes
         if time.time() - self._last_save > 180:
@@ -694,6 +743,7 @@ class TradingService:
             "wallets_status": self.wallets.status(),
             "discovery_status": self.discovery.status(),
             "hot_tokens": self.tokens.snapshot_public(),
+            "fresh_launches": self.tokens.fresh_launches_public(),
             "tracked_wallets": self.wallets.wallets_public(),
             "recent_wallet_trades": self.wallets.recent_trades_public(limit=30),
             "leaderboard": self.leaderboard.top_public(15),

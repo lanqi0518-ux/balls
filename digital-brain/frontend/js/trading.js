@@ -14,10 +14,12 @@ export function initTrading(panelEl, opts = {}) {
   panelEl.innerHTML = `
     <div class="trading-intro">
       <strong>Paper trading only — no real money.</strong>
-      The brain watches a batch of Solana wallets, does behaviour cloning on
-      their on-chain trades, then simulates buys/sells at live prices with the
-      cloned policy. Closed-trade PnL is back-propagated into the cortex, with
-      more profitable wallets getting more weight.
+      The brain hunts <strong>fresh pump.fun launches</strong> (mega-caps like
+      SOL/WIF/BONK/PEPE are filtered out of the candidate pool). It forms its
+      own opinion on every candidate, and only borrows from smart-money
+      wallets when it's genuinely uncertain. Closed-trade PnL is
+      back-propagated into the cortex, wallet-copied trades are down-weighted
+      by an annealing schedule, and independent convictions are respected.
       <span class="warn">⚠ Phase 4 (real on-chain execution) is <strong>disabled</strong>
       — enabling it requires you to plug in a Solana private key and hard limits.</span>
     </div>
@@ -41,7 +43,16 @@ export function initTrading(panelEl, opts = {}) {
 
     <div class="trading-block">
       <div class="trading-block-title">
-        <span>🔥 Hot Solana meme tokens</span><span class="count" id="hot-count">0</span>
+        <span>🆕 Fresh launches (pump.fun, &lt; 6h old)</span>
+        <span class="count" id="fresh-count">0</span>
+      </div>
+      <div id="fresh-body"></div>
+    </div>
+
+    <div class="trading-block">
+      <div class="trading-block-title">
+        <span>🎯 Candidate pool (fresh + small-cap, mega-caps filtered out)</span>
+        <span class="count" id="hot-count">0</span>
       </div>
       <div id="hot-body"></div>
     </div>
@@ -109,6 +120,7 @@ export function updateTrading(trading) {
   updateSummary(trading);
   updateEquityCurve(trading.paper.equity_curve || [], trading.paper.start_usd);
   updatePositions(trading.paper.positions || []);
+  updateFresh(trading.fresh_launches || []);
   updateHot(trading.hot_tokens || []);
   updateLeaderboard(trading.leaderboard || []);
   updateWallets(trading.tracked_wallets || [], trading.discovery_status || {},
@@ -208,7 +220,10 @@ function updateHot(hot) {
     </tr></thead><tbody>
     ${hot.slice(0, 12).map((p) => `
       <tr>
-        <td class="sym"><a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.base_symbol || "?")}</a></td>
+        <td class="sym">
+          <a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.base_symbol || "?")}</a>
+          ${p.is_fresh_launch ? `<span class="fresh-badge" title="pump.fun fresh launch, ${p.fresh_age_minutes}m old">NEW</span>` : ""}
+        </td>
         <td>${fmtUsd(p.price_usd)}</td>
         <td class="${clsSign(p.price_change_h1)}">${fmtPct(p.price_change_h1)}</td>
         <td class="${clsSign(p.price_change_h24)}">${fmtPct(p.price_change_h24)}</td>
@@ -217,6 +232,48 @@ function updateHot(hot) {
         <td class="mono-sm">${p.age_hours > 24 ? (p.age_hours / 24).toFixed(1) + "d" : p.age_hours.toFixed(1) + "h"}</td>
       </tr>
     `).join("")}
+    </tbody></table>`;
+}
+
+function updateFresh(fresh) {
+  document.getElementById("fresh-count").textContent = fresh.length;
+  const el = document.getElementById("fresh-body");
+  if (!fresh.length) {
+    el.innerHTML = `<div class="trading-empty">
+      polling pump.fun for freshly-minted tokens…
+    </div>`;
+    return;
+  }
+  el.innerHTML = `<table class="trading-table"><thead><tr>
+      <th>TOKEN</th><th>NAME</th><th>AGE</th><th>MCAP</th><th>STATUS</th><th>LINKS</th>
+    </tr></thead><tbody>
+    ${fresh.slice(0, 12).map((c) => {
+      const mintUrl = `https://pump.fun/coin/${encodeURIComponent(c.mint)}`;
+      const ageStr = c.age_minutes < 60
+        ? `${Math.round(c.age_minutes)}m`
+        : `${(c.age_minutes / 60).toFixed(1)}h`;
+      const status = c.complete
+        ? `<span class="fresh-badge grad">GRAD</span>`
+        : (c.king_of_the_hill
+            ? `<span class="fresh-badge koth">KOTH</span>`
+            : `<span class="mono-sm" style="color:#8a9dbb">bonding</span>`);
+      const links = [
+        c.twitter ? `<a href="${escapeHtml(c.twitter)}" target="_blank" rel="noopener" title="twitter">𝕏</a>` : "",
+        c.telegram ? `<a href="${escapeHtml(c.telegram)}" target="_blank" rel="noopener" title="telegram">TG</a>` : "",
+        c.website ? `<a href="${escapeHtml(c.website)}" target="_blank" rel="noopener" title="website">web</a>` : "",
+      ].filter(Boolean).join(" ");
+      return `
+      <tr>
+        <td class="sym">
+          <a href="${escapeHtml(mintUrl)}" target="_blank" rel="noopener">${escapeHtml(c.symbol || "?")}</a>
+        </td>
+        <td class="mono-sm" style="color:#8a9dbb">${escapeHtml((c.name || "").slice(0, 22))}</td>
+        <td class="mono-sm">${ageStr}</td>
+        <td>${fmtBig(c.usd_market_cap)}</td>
+        <td>${status}</td>
+        <td class="mono-sm">${links || "—"}</td>
+      </tr>`;
+    }).join("")}
     </tbody></table>`;
 }
 
