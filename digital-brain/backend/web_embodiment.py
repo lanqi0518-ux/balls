@@ -297,6 +297,17 @@ async def _robinhood_extractor(page) -> List[WebToken]:
     return hits
 
 
+async def _dexscreener_extractor(page) -> List[WebToken]:
+    """DexScreener chain pages: /<chain>/<pair-address>. Handles every
+    chain DexScreener indexes (solana, robinhood, ethereum, base, bsc,
+    hyperevm, etc.). This is the workhorse extractor for the tour
+    entries pointing at chain-specific trending/new-pair boards."""
+    return await _merge_extractors(
+        page,
+        r"/(?:solana|robinhood|ethereum|base|bsc|arbitrum|polygon|avalanche|hyperevm)/([A-Za-z0-9]{25,})",
+    )
+
+
 async def _generic_extractor(page) -> List[WebToken]:
     return await _merge_extractors(page, r"/(?:solana|token|coin|currencies)/([A-Za-z0-9\\-]{2,60})")
 
@@ -343,21 +354,23 @@ DEFAULT_TOUR: List[Tuple[str, str, Extractor]] = [
     ("Solana meme category",
      "https://www.coingecko.com/en/categories/solana-meme-coins",
      _coingecko_extractor),
-    # Robinhood crypto & stock discover pages. The brain's second cortex
-    # is now looking at the retail flow, not just launchpad boards.
-    # Robinhood's public routes are:
-    #   /us/en/crypto/          — the full supported-crypto catalog
-    #   /us/en/crypto/discover/ — the "Discover crypto" landing
-    #   /us/en/lists/100-most-popular/ — trending stocks by retail volume
-    ("Robinhood crypto",
-     "https://robinhood.com/us/en/crypto/",
-     _robinhood_extractor),
-    ("Robinhood crypto discover",
-     "https://robinhood.com/us/en/crypto/discover/",
-     _robinhood_extractor),
-    ("Robinhood 100 most popular",
-     "https://robinhood.com/us/en/lists/100-most-popular/",
-     _robinhood_extractor),
+    # Robinhood **Chain** — Robinhood's new EVM-style L2. Top-cap
+    # tokens like $PONS ($400M mcap) live here. DexScreener indexes it
+    # as chainId="robinhood"; the /robinhood/ page is the trending
+    # board for the whole chain.
+    ("Robinhood-chain trending",
+     "https://dexscreener.com/robinhood?rankBy=trendingScoreH24&order=desc",
+     _dexscreener_extractor),
+    ("Robinhood-chain new pairs",
+     "https://dexscreener.com/robinhood?rankBy=pairAge&order=asc",
+     _dexscreener_extractor),
+    ("Robinhood-chain top volume",
+     "https://dexscreener.com/robinhood?rankBy=volume&order=desc",
+     _dexscreener_extractor),
+    # DexScreener multi-chain gems view — surfaces every-chain trending.
+    ("DexScreener gems",
+     "https://dexscreener.com/gainers/5m?chain=robinhood",
+     _dexscreener_extractor),
 ]
 
 

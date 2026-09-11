@@ -54,7 +54,8 @@ USER_AGENT = (
 class FreshCoin:
     """A freshly-created pump.fun token."""
 
-    mint: str                         # Solana mint address (base58, ~44 chars)
+    mint: str                         # on-chain token address (base58 on
+                                      # solana; 0x… on evm-style chains)
     symbol: str
     name: str
     description: str
@@ -66,6 +67,7 @@ class FreshCoin:
     telegram: Optional[str]
     website: Optional[str]
     image_uri: Optional[str]
+    chain: str = "solana"             # 'solana' | 'robinhood' | 'ethereum' | …
     raw: dict = field(default_factory=dict, repr=False)
 
     @classmethod
@@ -134,6 +136,7 @@ class FreshCoin:
             "website": self.website,
             "image_uri": self.image_uri,
             "launchpad": self.launchpad,
+            "chain": self.chain,
         }
 
 

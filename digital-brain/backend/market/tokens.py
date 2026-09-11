@@ -70,6 +70,7 @@ class TrendingTokenWatcher:
                  pumpfun: Optional[PumpFunClient] = None,
                  launchpads: Optional[MultiLaunchpadWatcher] = None,
                  chain: str = "solana",
+                 chains: Optional[List[str]] = None,
                  top_n: int = 30,
                  refresh_interval: float = 45.0,
                  seed_addresses: Optional[List[str]] = None,
@@ -80,7 +81,11 @@ class TrendingTokenWatcher:
         self.launchpads = launchpads or MultiLaunchpadWatcher(
             dex=self.client, pumpfun=self.pumpfun,
         )
+        # `chain` retained for backward compatibility. `chains` is the
+        # real driver — the watcher hydrates fresh launches across every
+        # listed chain and merges them into a single candidate pool.
         self.chain = chain
+        self.chains: List[str] = list(chains) if chains else [chain, "robinhood"]
         self.top_n = top_n
         self.refresh_interval = refresh_interval
         self.seed_addresses: List[str] = list(seed_addresses or DEFAULT_SEED_TOKENS)
@@ -147,9 +152,14 @@ class TrendingTokenWatcher:
         return launchpad_of(c) if c else None
 
     def status(self) -> dict:
+        chain_counts: Dict[str, int] = {}
+        for p in self._pairs:
+            chain_counts[p.chain] = chain_counts.get(p.chain, 0) + 1
         return {
             "chain": self.chain,
+            "chains": list(self.chains),
             "count": len(self._pairs),
+            "chain_counts": chain_counts,
             "fresh_launches_seen": len(self._fresh_launches),
             "last_refresh_ms": int(self._last_refresh_at * 1000) if self._last_refresh_at else 0,
             "refresh_interval": self.refresh_interval,
@@ -172,18 +182,17 @@ class TrendingTokenWatcher:
                 pass
 
     async def _refresh_once(self) -> None:
-        addrs: Set[str] = set(self.seed_addresses)
         source_counts: Dict[str, int] = {"seed": len(self.seed_addresses)}
 
-        # (1) Ask every launchpad we can reach at once.
+        # (1) Ask every launchpad we can reach at once. `all_fresh` now
+        # includes Robinhood Chain sources alongside every Solana
+        # launchpad, so `fresh` is multi-chain from here on.
         fresh, per_source = await self.launchpads.all_fresh(
             per_source_limit=max(self.fresh_pool_size // 3, 15),
         )
         fresh = [c for c in fresh if c.age_minutes * 60.0 >= MIN_AGE_SECONDS or c.age_minutes == 0.0]
         self._fresh_launches = fresh
         self._fresh_by_mint = {c.mint: c for c in fresh}
-        for c in fresh:
-            addrs.add(c.mint)
         source_counts.update({f"launchpad::{k}": v for k, v in per_source.items()})
 
         # Per-launchpad tally (across the deduped final set).
@@ -193,19 +202,45 @@ class TrendingTokenWatcher:
             pad_counts[pad] = pad_counts.get(pad, 0) + 1
         self._launchpad_counts = pad_counts
 
-        # DexScreener token endpoint accepts up to 30 comma-separated addresses.
-        addrs_list = list(addrs)[:30]
-        pairs = await self.client.tokens(self.chain, addrs_list) if addrs_list else []
+        # (2) Bucket candidate addrs by chain, then hydrate each chain
+        # via a separate DexScreener `tokens(chain, addrs)` call. The
+        # DexScreener tokens endpoint accepts up to 30 comma-separated
+        # addresses per call, so we cap per-chain.
+        addrs_by_chain: Dict[str, Set[str]] = {c: set() for c in self.chains}
+        # Seed addresses default to the primary chain.
+        for a in self.seed_addresses:
+            addrs_by_chain.setdefault(self.chain, set()).add(a)
+        for c in fresh:
+            chain = (c.chain or self.chain)
+            if chain not in addrs_by_chain:
+                addrs_by_chain[chain] = set()
+            addrs_by_chain[chain].add(c.mint)
+
+        # Kick off one hydration call per chain in parallel.
+        hydrate_tasks = []
+        chain_order: List[str] = []
+        for chain, addrs in addrs_by_chain.items():
+            if not addrs:
+                continue
+            chain_order.append(chain)
+            hydrate_tasks.append(
+                self.client.tokens(chain, list(addrs)[:30])
+            )
+        hydrated = await asyncio.gather(*hydrate_tasks, return_exceptions=True)
 
         # Deduplicate: same base token can have multiple pools.
         best_per_base: Dict[str, PairSnapshot] = {}
-        for p in pairs:
-            if p.chain != self.chain:
+        for chain, result in zip(chain_order, hydrated):
+            if isinstance(result, Exception):
+                LOG.debug("hydration failed for chain=%s: %s", chain, result)
                 continue
-            key = p.base_address or p.pair_address
-            prev = best_per_base.get(key)
-            if prev is None or p.liquidity_usd > prev.liquidity_usd:
-                best_per_base[key] = p
+            for p in result:
+                if p.chain not in self.chains:
+                    continue
+                key = f"{p.chain}::{p.base_address or p.pair_address}"
+                prev = best_per_base.get(key)
+                if prev is None or p.liquidity_usd > prev.liquidity_usd:
+                    best_per_base[key] = p
 
         # Filter out mega-caps. If a pair has no FDV info we let it through
         # (usually the case for freshly-launched pump.fun tokens whose FDV
@@ -241,8 +276,12 @@ class TrendingTokenWatcher:
         self._pairs = ordered[: self.top_n]
         self._last_refresh_at = time.time()
         self._last_source_counts = source_counts
-        LOG.info("fresh-tokens: kept %d Solana pairs from %d addrs "
-                 "(launchpads=%s, rejected_megacap=%d)",
-                 len(self._pairs), len(addrs_list),
-                 pad_counts,
+        total_addrs = sum(len(v) for v in addrs_by_chain.values())
+        chain_kept: Dict[str, int] = {}
+        for p in self._pairs:
+            chain_kept[p.chain] = chain_kept.get(p.chain, 0) + 1
+        LOG.info("fresh-tokens: kept %d pairs from %d addrs across %s "
+                 "(launchpads=%s, chains=%s, rejected_megacap=%d)",
+                 len(self._pairs), total_addrs, sorted(self.chains),
+                 pad_counts, chain_kept,
                  source_counts.get("rejected_megacap", 0))

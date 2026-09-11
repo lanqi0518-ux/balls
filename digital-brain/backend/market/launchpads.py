@@ -44,6 +44,9 @@ LAUNCHPAD_HINTS = {
     "moonshot":       ["moonshot"],
     "jup-studio":     ["jup.studio", "jupiter studio", "jup-studio", "jup_studio"],
     "raydium":        ["raydium-launchlab", "launchlab", "raydium"],
+    # Robinhood Chain (their new EVM-style L2). Tokens here are EVM
+    # addresses (0x…) and typically launched via Uniswap-family DEXes.
+    "robinhood-chain": ["robinhood", "robinhoodchain", "hoodchain"],
 }
 
 
@@ -103,6 +106,7 @@ def _pair_to_fresh(p: PairSnapshot, launchpad: str) -> FreshCoin:
         telegram=telegram,
         website=website,
         image_uri=image,
+        chain=(p.chain or "solana"),
         raw={"launchpad_source": launchpad, "pair": raw},
     )
 
@@ -129,6 +133,15 @@ class MultiLaunchpadWatcher:
             self._dex_search("jup.studio", per_source_limit, default_pad="jup-studio"),
             self._dex_boosted(),
             self._dex_profiles(),
+            # Robinhood Chain — their brand-new EVM-style L2. The API
+            # exposes it as chainId="robinhood"; we hunt trending token
+            # names and DexScreener's chain-agnostic boosted/profile
+            # feeds and keep whichever ones landed on that chain.
+            self._robinhood_chain_boosted(),
+            self._robinhood_chain_profiles(),
+            self._robinhood_chain_search("uniswap", per_source_limit),
+            self._robinhood_chain_search("meme", per_source_limit),
+            self._robinhood_chain_search("robinhood", per_source_limit),
         ]
         results: List[Tuple[str, List[FreshCoin]]] = []
         gathered = await asyncio.gather(*tasks, return_exceptions=True)
@@ -268,3 +281,83 @@ class MultiLaunchpadWatcher:
                 pad = "dexscreener"
             coins.append(_pair_to_fresh(p, pad))
         return "dexscreener", coins
+
+    # ---------- Robinhood Chain ----------
+    # Robinhood's new EVM-style L2 shows up in DexScreener as
+    # chainId="robinhood". These sources hunt for real launches on
+    # that chain (top-cap tokens like $PONS live here — $400M mcap).
+    async def _robinhood_chain_boosted(self) -> Tuple[str, List[FreshCoin]]:
+        try:
+            boosted = await self.dex.token_boosts_top()
+        except Exception:  # noqa: BLE001
+            return "robinhood-chain-boosted", []
+        addrs = [t["tokenAddress"] for t in boosted
+                 if t.get("chainId") == "robinhood" and t.get("tokenAddress")]
+        if not addrs:
+            return "robinhood-chain-boosted", []
+        addrs = addrs[:30]
+        try:
+            pairs = await self.dex.tokens("robinhood", addrs)
+        except Exception:  # noqa: BLE001
+            return "robinhood-chain-boosted", []
+        return "robinhood-chain-boosted", self._pairs_to_coins(
+            pairs, "robinhood", default_pad="robinhood-chain",
+        )
+
+    async def _robinhood_chain_profiles(self) -> Tuple[str, List[FreshCoin]]:
+        try:
+            profiles = await self.dex.token_profiles_latest()
+        except Exception:  # noqa: BLE001
+            return "robinhood-chain-profiles", []
+        addrs = [t["tokenAddress"] for t in profiles
+                 if t.get("chainId") == "robinhood" and t.get("tokenAddress")]
+        if not addrs:
+            return "robinhood-chain-profiles", []
+        addrs = addrs[:30]
+        try:
+            pairs = await self.dex.tokens("robinhood", addrs)
+        except Exception:  # noqa: BLE001
+            return "robinhood-chain-profiles", []
+        return "robinhood-chain-profiles", self._pairs_to_coins(
+            pairs, "robinhood", default_pad="robinhood-chain",
+        )
+
+    async def _robinhood_chain_search(self, query: str,
+                                      limit: int) -> Tuple[str, List[FreshCoin]]:
+        """DexScreener's search endpoint is chain-agnostic — filter it
+        for chainId=='robinhood' to pull real Robinhood-Chain pairs."""
+        try:
+            pairs = await self.dex.search_pairs(query)
+        except Exception:  # noqa: BLE001
+            return f"robinhood-chain::{query}", []
+        best: Dict[str, PairSnapshot] = {}
+        for p in pairs:
+            if p.chain != "robinhood":
+                continue
+            key = p.base_address or p.pair_address
+            prev = best.get(key)
+            if prev is None or p.liquidity_usd > prev.liquidity_usd:
+                best[key] = p
+        return f"robinhood-chain::{query}", self._pairs_to_coins(
+            list(best.values())[:limit], "robinhood",
+            default_pad="robinhood-chain",
+        )
+
+    # ---------- helpers ----------
+    @staticmethod
+    def _pairs_to_coins(pairs: List[PairSnapshot], expected_chain: str,
+                        default_pad: str) -> List[FreshCoin]:
+        coins: List[FreshCoin] = []
+        seen: set = set()
+        for p in pairs:
+            if not p.base_address or p.base_address in seen:
+                continue
+            if expected_chain and p.chain != expected_chain:
+                continue
+            seen.add(p.base_address)
+            labels = " ".join((p.raw or {}).get("labels") or [])
+            pad = _classify_launchpad(p.dex, p.url, labels)
+            if pad == "unknown":
+                pad = default_pad
+            coins.append(_pair_to_fresh(p, pad))
+        return coins
