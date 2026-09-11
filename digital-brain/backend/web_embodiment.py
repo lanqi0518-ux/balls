@@ -113,7 +113,7 @@ async def _extract_via_link_pattern(
         const txt = (a.innerText || a.textContent || '').replace(/\\s+/g, ' ').trim();
         if (!txt) continue;
         out.push({{ addr, text: txt }});
-        if (out.length >= 40) break;
+        if (out.length >= 60) break;
       }}
       return out;
     }}
@@ -147,24 +147,137 @@ async def _extract_via_link_pattern(
     return out
 
 
+async def _extract_visible_symbols(page, max_out: int = 40) -> List[WebToken]:
+    """Fallback extractor: scrape visible text for symbol-shaped tokens.
+
+    Some sites (Robinhood, Cloudflare-gated JS apps) don't expose
+    Solana-mint-shaped href attributes we can match. We instead look at
+    every visible element with short bold-ish text that looks like a
+    ticker ("$XYZ" or "XYZ / USDC" or standalone 2-6 char uppercase),
+    grabbing the surrounding cell text as context. Duplicates de-duped
+    by symbol.
+
+    Never guarantees a mint address — those get resolved later by the
+    trader's DexScreener lookup.
+    """
+    js = f"""
+    () => {{
+      const symRx = /(^|[^A-Z0-9$])\\$?([A-Z][A-Z0-9]{{1,9}})(?![A-Z0-9])/;
+      const priceRx = /\\$[0-9]+(?:[.,][0-9]+)?(?:[KMB])?/;
+      const changeRx = /[-+]?[0-9]+(?:\\.[0-9]+)?%/;
+      const skip = new Set([
+        'USD','USDC','USDT','SOL','ETH','BTC','WBTC','BNB','MATIC',
+        'AVAX','ARB','OP','NEAR','ATOM','APT','SUI','TRX','XRP','ADA',
+        'DOGE','LTC','SHIB','LINK','DAI','PYUSD','USDS','WSOL','BUSD',
+        'API','APR','APY','TVL','LP','CEX','DEX','NFT','KYC','GM','GN',
+        'CEO','CTO','CFO','IPO','FAQ','TOS','EULA',
+      ]);
+      const nodes = document.querySelectorAll(
+        'td, span, div, a, li, h2, h3, h4, p, strong, b'
+      );
+      const seen = new Set();
+      const out = [];
+      for (const n of nodes) {{
+        const text = (n.innerText || n.textContent || '').replace(/\\s+/g, ' ').trim();
+        if (!text || text.length < 2 || text.length > 220) continue;
+        const m = text.match(symRx);
+        if (!m) continue;
+        const sym = m[2];
+        if (skip.has(sym) || seen.has(sym)) continue;
+        // Symbol must look like a real ticker — 3-6 chars is the sweet spot.
+        if (sym.length < 3 || sym.length > 8) continue;
+        seen.add(sym);
+        out.push({{ symbol: sym, text: text.slice(0, 200) }});
+        if (out.length >= {max_out}) break;
+      }}
+      return out;
+    }}
+    """
+    try:
+        rows = await page.evaluate(js)
+    except Exception as e:
+        LOG.warning("visible-symbol evaluate failed: %s", e)
+        return []
+    price_rx = re.compile(r"\$[0-9]+(?:[.,][0-9]+)?(?:[KMB])?")
+    change_rx = re.compile(r"[-+]?\d+(?:\.\d+)?%")
+    out: List[WebToken] = []
+    for r in rows:
+        text = _clean(r.get("text") or "", 200)
+        sym = (r.get("symbol") or "").upper()[:10]
+        if not sym:
+            continue
+        price_m = price_rx.search(text)
+        change_m = change_rx.search(text)
+        out.append(WebToken(
+            symbol=sym,
+            address=None,
+            price_hint=price_m.group(0) if price_m else None,
+            change_hint=change_m.group(0) if change_m else None,
+            text=text,
+        ))
+    return out
+
+
+async def _merge_extractors(page, primary_href_pattern: str,
+                            fallback: bool = True) -> List[WebToken]:
+    """Run the href-pattern extractor first; if it yields very few tokens
+    (Cloudflare partial render, JS-heavy page), also add visible-symbol
+    hits. Symbols already seen via href are kept; the fallback fills in
+    the gaps."""
+    primary = await _extract_via_link_pattern(page, primary_href_pattern)
+    if not fallback:
+        return primary
+    if len(primary) >= 6:
+        return primary
+    extra = await _extract_visible_symbols(page)
+    seen_syms = {t.symbol for t in primary}
+    for t in extra:
+        if t.symbol in seen_syms:
+            continue
+        primary.append(t)
+        seen_syms.add(t.symbol)
+    return primary
+
+
 async def _pumpfun_extractor(page) -> List[WebToken]:
     """pump.fun token pages: /coin/<mint>."""
-    return await _extract_via_link_pattern(page, r"/coin/([A-Za-z0-9]{25,})")
+    return await _merge_extractors(page, r"/coin/([A-Za-z0-9]{25,})")
 
 
 async def _gmgn_extractor(page) -> List[WebToken]:
     """gmgn.ai token detail pages: /sol/token/<mint>. Their pair detail
-    pages also use /sol/token/, so a single regex catches both feeds."""
-    return await _extract_via_link_pattern(page, r"/sol/token/([A-Za-z0-9]{25,})")
+    pages also use /sol/token/, so a single regex catches both feeds.
+    Cloudflare occasionally serves partial content — fallback extractor
+    scrapes visible symbols to compensate."""
+    return await _merge_extractors(page, r"/sol/token/([A-Za-z0-9]{25,})")
 
 
 async def _coingecko_extractor(page) -> List[WebToken]:
     """CoinGecko coin table: rows link to /en/coins/<slug>."""
-    return await _extract_via_link_pattern(page, r"/en/coins/([a-z0-9\\-]{2,60})")
+    return await _merge_extractors(page, r"/en/coins/([a-z0-9\\-]{2,60})")
+
+
+async def _robinhood_extractor(page) -> List[WebToken]:
+    """Robinhood pages: /us/en/stocks/<TICKER>/ for stocks and
+    /us/en/crypto/<TICKER>/ for supported crypto assets, plus a heavy
+    JS shell on the discover pages. We use the URL-pattern extractor
+    when we can and always augment with the visible-symbol fallback."""
+    hits = await _extract_via_link_pattern(
+        page, r"/us/en/(?:crypto|stocks)/([A-Z0-9\\-]{1,10})",
+        symbol_hint_regex=r"\$?([A-Z][A-Z0-9]{1,9})",
+    )
+    extra = await _extract_visible_symbols(page)
+    seen = {t.symbol for t in hits}
+    for t in extra:
+        if t.symbol in seen:
+            continue
+        hits.append(t)
+        seen.add(t.symbol)
+    return hits
 
 
 async def _generic_extractor(page) -> List[WebToken]:
-    return await _extract_via_link_pattern(page, r"/(?:solana|token|coin|currencies)/([A-Za-z0-9\\-]{2,60})")
+    return await _merge_extractors(page, r"/(?:solana|token|coin|currencies)/([A-Za-z0-9\\-]{2,60})")
 
 
 # ----------------------------------------------------------------------
@@ -209,6 +322,21 @@ DEFAULT_TOUR: List[Tuple[str, str, Extractor]] = [
     ("Solana meme category",
      "https://www.coingecko.com/en/categories/solana-meme-coins",
      _coingecko_extractor),
+    # Robinhood crypto & stock discover pages. The brain's second cortex
+    # is now looking at the retail flow, not just launchpad boards.
+    # Robinhood's public routes are:
+    #   /us/en/crypto/          — the full supported-crypto catalog
+    #   /us/en/crypto/discover/ — the "Discover crypto" landing
+    #   /us/en/lists/100-most-popular/ — trending stocks by retail volume
+    ("Robinhood crypto",
+     "https://robinhood.com/us/en/crypto/",
+     _robinhood_extractor),
+    ("Robinhood crypto discover",
+     "https://robinhood.com/us/en/crypto/discover/",
+     _robinhood_extractor),
+    ("Robinhood 100 most popular",
+     "https://robinhood.com/us/en/lists/100-most-popular/",
+     _robinhood_extractor),
 ]
 
 
@@ -387,10 +515,17 @@ class WebEmbodiment:
             except Exception as e:
                 LOG.debug("extraction skipped [%s]: %s", url, e)
                 tokens = []
-            # Trust anything the extractor's regex accepted; some sites
-            # give us on-chain mints (25-44 chars, base58) and some give
-            # us slugs like 'bonk' (3-15 chars). Both are useful.
-            tokens = [t for t in tokens if t.address and len(t.address) >= 3]
+            # Trust anything the extractor emitted. Href-based hits give us
+            # on-chain mints (25-44 chars, base58) or slugs like 'bonk'
+            # (3-15 chars). The visible-symbol fallback gives us tokens
+            # with no address at all (Robinhood shows tickers, not mints);
+            # the trader resolves those via a DexScreener symbol lookup.
+            tokens = [
+                t for t in tokens
+                if t.symbol and (
+                    (t.address and len(t.address) >= 3) or (not t.address)
+                )
+            ]
             ok = True
             self._latest = {
                 "site_name": name,
