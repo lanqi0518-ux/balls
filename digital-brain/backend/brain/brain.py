@@ -1,24 +1,36 @@
 """The Brain — orchestrates every region.
 
-A single `step(observation)` call runs the full perception→memory→emotion→
-decision→action pipeline, and returns:
+A single ``step(observation)`` call runs the full perception → memory →
+emotion → decision → action pipeline, and returns:
 
   * the chosen action
   * a snapshot of the whole brain (streamed to the frontend)
-  * a human-readable "thought" describing what just happened
+  * a stream of human-readable "thoughts" describing what just happened
 
 Nothing here uses an LLM. Every 'thought' is generated from the actual
 computations happening inside the regions.
+
+Two extras compared to a bare RL agent:
+
+* At boot the hippocampus is (optionally) seeded with ~60 permanent
+  **knowledge memories** — crypto and Einstein concepts (see
+  ``backend/knowledge.py``). During thinking the brain occasionally
+  *associates* to one of these and it surfaces in the thought stream.
+* An **"Einstein mode"** preset (default) enlarges the PFC, extends the
+  hippocampus capacity, and makes the default-mode network more active.
 """
 
 from __future__ import annotations
 
+import random
 import time
 from collections import deque
 from typing import Deque, Dict, List, Optional
 
 import torch
+import torch.nn.functional as F
 
+from .config import BrainConfig
 from .regions import (
     Amygdala,
     DefaultModeNetwork,
@@ -31,6 +43,7 @@ from .regions import (
     ACTION_NAMES,
     ACTION_NAMES_ZH,
 )
+from ..knowledge import all_concepts_with_embeddings
 
 
 FEATURE_DIM = 32
@@ -41,13 +54,14 @@ class Thought:
     """One entry in the brain's stream of consciousness."""
 
     def __init__(self, step: int, region: str, text: str, text_zh: str,
-                 kind: str = "info"):
+                 kind: str = "info", extra: Optional[dict] = None):
         self.step = step
         self.region = region
         self.text = text
         self.text_zh = text_zh
-        self.kind = kind  # info | plan | recall | emotion | reward | action
+        self.kind = kind  # info | plan | recall | emotion | reward | action | associate
         self.time = time.time()
+        self.extra = extra or {}
 
     def to_dict(self) -> dict:
         return {
@@ -57,24 +71,36 @@ class Thought:
             "text_zh": self.text_zh,
             "kind": self.kind,
             "time": self.time,
+            "extra": self.extra,
         }
 
 
 class Brain:
-    def __init__(self, num_actions: int = NUM_ACTIONS, feature_dim: int = FEATURE_DIM):
+    def __init__(self,
+                 num_actions: int = NUM_ACTIONS,
+                 config: Optional[BrainConfig] = None):
+        self.config = config or BrainConfig.from_env()
+        feature_dim = self.config.feature_dim
+
         # --- Cortical & subcortical modules ---
         self.visual_cortex = VisualCortex(feature_dim=feature_dim)
         self.thalamus = Thalamus(feature_dim=feature_dim)
-        self.hippocampus = Hippocampus(feature_dim=feature_dim)
+        self.hippocampus = Hippocampus(
+            feature_dim=feature_dim,
+            capacity=self.config.hippocampus_capacity,
+        )
         self.amygdala = Amygdala(feature_dim=feature_dim)
         self.nucleus_accumbens = NucleusAccumbens()
         # Thought vector = visual (32) + recalled memory (32) + fear (1) + reward-baseline (1)
         self.prefrontal_cortex = PrefrontalCortex(
             input_dim=feature_dim * 2 + 2,
             num_actions=num_actions,
+            hidden=self.config.pfc_hidden,
         )
         self.motor_cortex = MotorCortex(num_actions=num_actions)
-        self.default_mode = DefaultModeNetwork()
+        self.default_mode = DefaultModeNetwork(
+            replay_rate=self.config.dmn_replay_rate,
+        )
 
         self.regions: List = [
             self.visual_cortex,
@@ -98,8 +124,26 @@ class Brain:
         self.thoughts: Deque[Thought] = deque(maxlen=120)
         self.engagement: float = 0.5  # 0=idle, 1=very engaged
 
-    def _add_thought(self, region: str, text: str, text_zh: str, kind: str = "info"):
-        self.thoughts.append(Thought(self.step_count, region, text, text_zh, kind))
+        # Which concept id is currently 'lit up' (for UI). Decays over time.
+        self.active_concept: Optional[dict] = None
+        self._concept_lit_until_step: int = -1
+
+        # --- Seed permanent knowledge memories ---
+        self._concepts_by_id: Dict[str, "Concept"] = {}
+        if self.config.knowledge_enabled:
+            for concept, emb in all_concepts_with_embeddings(dim=feature_dim):
+                self.hippocampus.store_knowledge(
+                    features=emb, label=concept.id, category=concept.category,
+                )
+                self._concepts_by_id[concept.id] = concept
+
+    # ------------------------------------------------------------------
+
+    def _add_thought(self, region: str, text: str, text_zh: str,
+                     kind: str = "info", extra: Optional[dict] = None):
+        self.thoughts.append(Thought(
+            self.step_count, region, text, text_zh, kind, extra=extra,
+        ))
 
     def step(self, observation: dict) -> Dict:
         """Run one perception→action cycle.
@@ -160,16 +204,18 @@ class Brain:
 
         # ---- 5. Memory: hippocampus recalls similar past experience ----
         recalled = self.hippocampus.recall(gated_visual)
-        if recalled is not None and self.hippocampus.last_similarity > 0.75:
+        if (recalled is not None
+                and recalled.tag == "episode"
+                and self.hippocampus.last_similarity > 0.75):
             if recalled.valence > 0.3:
                 self._add_thought("hippocampus",
-                                  f"I've been somewhere like this — it was good.",
-                                  f"这地方我似曾相识——上次是好的。",
+                                  "I've been somewhere like this — it was good.",
+                                  "这地方我似曾相识——上次是好的。",
                                   kind="recall")
             elif recalled.valence < -0.3:
                 self._add_thought("hippocampus",
-                                  f"I remember this — it hurt.",
-                                  f"这地方我记得——上次受伤了。",
+                                  "I remember this — it hurt.",
+                                  "这地方我记得——上次受伤了。",
                                   kind="recall")
 
         # ---- 6. Build the unified 'thought vector' ----
@@ -185,7 +231,6 @@ class Brain:
         # ---- 7. Decision: prefrontal cortex ----
         logits, value, hidden = self.prefrontal_cortex.forward(thought_vec)
 
-        # Fear biases action distribution away from 'stay' (encourages escape).
         if fear > 0.6:
             logits = logits.clone()
             logits[4] -= 1.5  # discourage freezing when scared
@@ -205,7 +250,6 @@ class Brain:
                           kind="action")
 
         # ---- 9. Store this moment in episodic memory ----
-        # Valence is estimated from the value head (how good this state feels).
         valence = float(torch.tanh(value.detach()).item())
         self.hippocampus.store(gated_visual, valence=valence, fear=fear,
                                location=position, step=self.step_count)
@@ -219,6 +263,13 @@ class Brain:
                               "后台：随机回放一段过去的经历。",
                               kind="info")
 
+        # ---- 11. Knowledge association (Einstein-mode 'thinking off-topic') ----
+        self._maybe_associate_knowledge(gated_visual)
+
+        # Decay concept lighting.
+        if self.active_concept and self.step_count > self._concept_lit_until_step:
+            self.active_concept = None
+
         self._last_position = position
         self._last_visual = gated_visual.detach()
 
@@ -228,6 +279,45 @@ class Brain:
             "action_label_zh": ACTION_NAMES_ZH[action],
             "loss": loss,
         }
+
+    # ------------------------------------------------------------------
+
+    def _maybe_associate_knowledge(self, cue: torch.Tensor) -> None:
+        """With small probability, sample a knowledge concept and 'think about it'."""
+        if not (self.config.knowledge_enabled and self.hippocampus.knowledge):
+            return
+        idle = 1.0 - min(1.0, self.engagement)
+        prob = self.config.association_prob_base + self.config.association_prob_idle * idle
+        if random.random() >= prob:
+            return
+        assoc = self.hippocampus.associate_knowledge(
+            cue, temperature=self.config.association_temperature,
+        )
+        if assoc is None:
+            return
+        ep, sim = assoc
+        concept = self._concepts_by_id.get(ep.label)
+        if concept is None:
+            return
+        self.active_concept = {
+            "id": concept.id,
+            "category": concept.category,
+            "zh": concept.zh,
+            "en": concept.en,
+            "desc_zh": concept.desc_zh,
+            "desc_en": concept.desc_en,
+            "similarity": round(float(sim), 3),
+        }
+        # Concept stays 'lit' for ~4 steps so the frontend has time to show it.
+        self._concept_lit_until_step = self.step_count + 4
+        self._add_thought(
+            "prefrontal_cortex",
+            f"💭 associates with {concept.en} — {concept.desc_en[:80]}",
+            f"💭 联想到「{concept.zh}」——{concept.desc_zh[:40]}",
+            kind="associate",
+            extra={"concept_id": concept.id, "category": concept.category,
+                   "similarity": round(float(sim), 3)},
+        )
 
     def _build_thought_vector_preview(self, image, danger, reward):
         """Cheap approximate 'next-state' thought vector for bootstrapping the
@@ -249,10 +339,13 @@ class Brain:
         return {
             "step": self.step_count,
             "engagement": round(self.engagement, 3),
+            "mode": self.config.mode,
+            "config": self.config.to_public(),
             "regions": [r.state() for r in self.regions],
             "thoughts": [t.to_dict() for t in self.thoughts],
             "hippocampus_stats": self.hippocampus.stats(),
             "amygdala_stats": self.amygdala.stats(),
             "reward_stats": self.nucleus_accumbens.stats(),
             "motor_stats": self.motor_cortex.stats(),
+            "active_concept": self.active_concept,
         }

@@ -7,11 +7,15 @@ experience — a rough analogue of pattern completion in real hippocampal CA3.
 
 This gives the whole system a functional episodic memory: it can 'recall'
 "I've been somewhere like this before, and it felt X".
+
+It also holds a separate **knowledge bank**: permanent semantic memories
+seeded at boot (e.g. crypto and Einstein concepts). Knowledge entries are
+never evicted, and always participate in recall.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 import torch
@@ -22,11 +26,15 @@ from ..region import BrainRegion, RegionMeta
 
 @dataclass
 class Episode:
-    features: torch.Tensor    # visual feature vector
+    features: torch.Tensor    # feature vector this memory is keyed on
     valence: float            # +1 good, -1 bad, 0 neutral
-    fear: float
+    fear: float               # emotional colour at storage time
     location: tuple           # optional: agent position when stored
-    step: int                 # global timestep
+    step: int                 # global timestep (-1 for permanent knowledge)
+    # Optional metadata used by the knowledge bank:
+    label: Optional[str] = None    # e.g. "btc"
+    tag: str = "episode"           # "episode" | "knowledge"
+    category: Optional[str] = None # e.g. "crypto_core"
 
 
 class Hippocampus(BrainRegion):
@@ -44,16 +52,19 @@ class Hippocampus(BrainRegion):
         super().__init__()
         self.capacity = capacity
         self.feature_dim = feature_dim
-        self.memory: List[Episode] = []
+        self.memory: List[Episode] = []          # episodic, FIFO-evicted
+        self.knowledge: List[Episode] = []       # permanent, never evicted
         self.last_similarity: float = 0.0
         self.last_recalled_idx: Optional[int] = None
+        self.last_recalled_tag: str = "episode"
         self.neurons_total = capacity
 
+    # ------------------------------------------------------------------
+    # Storage
+    # ------------------------------------------------------------------
     def store(self, features: torch.Tensor, valence: float, fear: float,
               location: tuple, step: int) -> None:
-        # Only store if this experience is meaningfully different from the
-        # most recent one (avoids filling memory with near-duplicates while
-        # sitting still).
+        """Store a normal episodic memory (evictable)."""
         if self.memory:
             last = self.memory[-1]
             sim = F.cosine_similarity(features.unsqueeze(0), last.features.unsqueeze(0)).item()
@@ -61,30 +72,71 @@ class Hippocampus(BrainRegion):
                 return
         ep = Episode(features=features.detach().clone(),
                      valence=float(valence), fear=float(fear),
-                     location=location, step=step)
+                     location=location, step=step, tag="episode")
         self.memory.append(ep)
         if len(self.memory) > self.capacity:
             self.memory.pop(0)
 
+    def store_knowledge(self, features: torch.Tensor, label: str,
+                        category: str) -> None:
+        """Store a permanent knowledge memory. Never evicted."""
+        ep = Episode(features=features.detach().clone(),
+                     valence=0.0, fear=0.0,
+                     location=(-1, -1), step=-1,
+                     label=label, tag="knowledge", category=category)
+        self.knowledge.append(ep)
+
+    # ------------------------------------------------------------------
+    # Retrieval
+    # ------------------------------------------------------------------
+    def _combined(self) -> List[Episode]:
+        return self.memory + self.knowledge
+
     def recall(self, cue: torch.Tensor) -> Optional[Episode]:
-        if not self.memory:
+        pool = self._combined()
+        if not pool:
             self._set_activity(0.0, 0)
             self.last_similarity = 0.0
             self.last_recalled_idx = None
+            self.last_recalled_tag = "episode"
             return None
-        stacked = torch.stack([m.features for m in self.memory])
+        stacked = torch.stack([m.features for m in pool])
         sims = F.cosine_similarity(cue.unsqueeze(0), stacked, dim=-1)
         idx = int(sims.argmax().item())
         best = float(sims[idx].item())
         self.last_similarity = best
         self.last_recalled_idx = idx
-        # Activation is proportional to retrieval confidence.
-        self._set_activity(max(0.05, best), active_neurons=len(self.memory))
-        return self.memory[idx]
+        ep = pool[idx]
+        self.last_recalled_tag = ep.tag
+        self._set_activity(max(0.05, best), active_neurons=len(pool))
+        return ep
 
+    def associate_knowledge(self, cue: torch.Tensor,
+                            temperature: float = 2.0
+                            ) -> Optional[tuple]:
+        """Sample one knowledge concept, biased toward those most similar to the cue.
+
+        Returns (Episode, similarity_score) or None if the knowledge bank is empty.
+        Unlike ``recall``, this always draws from the knowledge bank only, and
+        returns a *sampled* concept rather than the strict argmax — so the brain
+        wanders over related ideas instead of always fixating on one.
+        """
+        if not self.knowledge:
+            return None
+        stacked = torch.stack([m.features for m in self.knowledge])
+        sims = F.cosine_similarity(cue.unsqueeze(0), stacked, dim=-1)
+        probs = F.softmax(sims * temperature, dim=0)
+        idx = int(torch.multinomial(probs, 1).item())
+        return self.knowledge[idx], float(sims[idx].item())
+
+    # ------------------------------------------------------------------
+    # Stats
+    # ------------------------------------------------------------------
     def stats(self) -> dict:
         return {
             "memories": len(self.memory),
+            "knowledge": len(self.knowledge),
             "capacity": self.capacity,
             "last_similarity": round(self.last_similarity, 3),
+            "last_recalled_tag": self.last_recalled_tag,
         }

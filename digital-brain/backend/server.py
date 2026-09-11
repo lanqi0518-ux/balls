@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .brain import Brain
 from .env import GridWorld
+from .knowledge import categories_public, concepts_public
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -155,7 +156,19 @@ async def ws_endpoint(ws: WebSocket) -> None:
 @app.get("/health")
 async def health() -> dict:
     return {"ok": True, "clients": len(sim.clients), "running": sim.running,
-            "tick_hz": sim.tick_hz, "step": sim.brain.step_count}
+            "tick_hz": sim.tick_hz, "step": sim.brain.step_count,
+            "mode": sim.brain.config.mode,
+            "knowledge": len(sim.brain.hippocampus.knowledge)}
+
+
+@app.get("/api/knowledge")
+async def api_knowledge() -> dict:
+    return {
+        "mode": sim.brain.config.mode,
+        "config": sim.brain.config.to_public(),
+        "categories": categories_public(),
+        "concepts": concepts_public(),
+    }
 
 
 if FRONTEND_DIR.exists():

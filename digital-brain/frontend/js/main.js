@@ -7,6 +7,7 @@
 import { BrainScene } from "/static/js/brain3d.js";
 import { EnvironmentView, renderEnvStats } from "/static/js/environment.js";
 import { ThoughtStream } from "/static/js/thoughtstream.js";
+import { loadKnowledge, setActiveConcept, categoryColor } from "/static/js/knowledge.js";
 
 // ---------- DOM refs ----------
 const brainContainer = document.getElementById("brain3d");
@@ -21,6 +22,9 @@ const connDot = document.getElementById("conn-dot");
 const connLabel = document.getElementById("conn-label");
 const tickLabel = document.getElementById("tick-label");
 const rewardLabel = document.getElementById("reward-label");
+const modeBadge = document.getElementById("mode-badge");
+const modeLabel = document.getElementById("mode-label");
+const footerKnowledge = document.getElementById("footer-knowledge");
 const btnPause = document.getElementById("btn-pause");
 const btnResetEnv = document.getElementById("btn-reset-env");
 const btnResetBrain = document.getElementById("btn-reset-brain");
@@ -29,12 +33,19 @@ const btnPokeHazard = document.getElementById("btn-poke-hazard");
 const tickHzInput = document.getElementById("tick-hz");
 const tickHzLabel = document.getElementById("tick-hz-label");
 
+const knowledgePanel = document.getElementById("knowledge-panel");
+const detailTabs = document.getElementById("detail-tabs");
+const thinkingRibbon = document.getElementById("thinking-ribbon");
+const thinkingTitle = document.getElementById("thinking-title");
+const thinkingDesc = document.getElementById("thinking-desc");
+
 // ---------- Init subsystems ----------
 let selectedRegionName = null;
 
 const brainScene = new BrainScene(brainContainer, {
   onRegionSelect: (r) => {
     selectedRegionName = r.name;
+    switchDetailView("region");
     renderRegionDetail(r);
   },
 });
@@ -42,6 +53,27 @@ const envView = new EnvironmentView(envCanvas);
 const thoughtStream = new ThoughtStream(thoughtEl, tabsEl);
 
 let latestBrain = null;
+let detailView = "region";
+let lastConceptId = null;
+let modeInitialized = false;
+
+loadKnowledge(knowledgePanel);
+
+detailTabs.addEventListener("click", (e) => {
+  const btn = e.target.closest(".tab[data-view]");
+  if (!btn) return;
+  switchDetailView(btn.dataset.view);
+});
+
+function switchDetailView(view) {
+  if (view !== "region" && view !== "knowledge") return;
+  detailView = view;
+  document.querySelectorAll("#detail-tabs .tab").forEach((el) => {
+    el.classList.toggle("active", el.dataset.view === view);
+  });
+  document.getElementById("region-detail").style.display = view === "region" ? "" : "none";
+  document.getElementById("knowledge-panel").style.display = view === "knowledge" ? "flex" : "none";
+}
 
 // ---------- WebSocket ----------
 let ws = null;
@@ -96,10 +128,20 @@ function handlePayload(data) {
   rewardLabel.textContent = `Σreward ${cum.toFixed(2)}`;
   rewardLabel.style.color = cum > 0 ? "var(--good)" : (cum < 0 ? "var(--bad)" : "var(--text-secondary)");
 
+  if (!modeInitialized && brain.mode) {
+    modeLabel.textContent = brain.mode === "einstein" ? "◈ EINSTEIN" : "◇ DEFAULT";
+    modeBadge.classList.toggle("mode-default", brain.mode !== "einstein");
+    modeInitialized = true;
+  }
+  const knowN = brain.hippocampus_stats?.knowledge ?? 0;
+  const memN = brain.hippocampus_stats?.memories ?? 0;
+  footerKnowledge.textContent = `Memory: ${memN} eps + ${knowN} knowledge`;
+
   brainScene.updateRegions(brain.regions);
   envView.update(env);
   renderEnvStats(envStatsEl, env, brain);
   thoughtStream.addFromSnapshot(brain.thoughts);
+  updateThinkingRibbon(brain.active_concept);
 
   if (selectedRegionName) {
     const r = brain.regions.find((r) => r.name === selectedRegionName);
@@ -108,6 +150,30 @@ function handlePayload(data) {
 
   running = !!data.running;
   btnPause.textContent = running ? "⏸ Pause" : "▶ Resume";
+}
+
+function updateThinkingRibbon(active) {
+  setActiveConcept(active);
+  if (!active) {
+    thinkingRibbon.dataset.empty = "true";
+    thinkingRibbon.classList.remove("lit");
+    thinkingRibbon.style.setProperty("--ribbon-color", "var(--accent)");
+    thinkingTitle.textContent = "—";
+    thinkingDesc.textContent = "brain is between associations…";
+    lastConceptId = null;
+    return;
+  }
+  thinkingRibbon.dataset.empty = "false";
+  const color = categoryColor(active.category);
+  thinkingRibbon.style.setProperty("--ribbon-color", color);
+  thinkingTitle.textContent = `${active.zh}  ·  ${active.en}`;
+  thinkingDesc.textContent = active.desc_zh;
+  if (active.id !== lastConceptId) {
+    thinkingRibbon.classList.remove("lit");
+    void thinkingRibbon.offsetWidth; // restart animation
+    thinkingRibbon.classList.add("lit");
+    lastConceptId = active.id;
+  }
 }
 
 // ---------- Region detail ----------

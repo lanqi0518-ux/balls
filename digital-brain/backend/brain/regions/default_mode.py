@@ -31,10 +31,11 @@ class DefaultModeNetwork(BrainRegion):
         role_zh="空闲时的记忆回放、想象、自省",
     )
 
-    def __init__(self):
+    def __init__(self, replay_rate: float = 0.05):
         super().__init__()
         self.last_replay_step: int = -1
         self.replay_cue: Optional[torch.Tensor] = None
+        self.replay_rate = replay_rate
         self.neurons_total = 120
 
     def tick(self, task_engagement: float, hippocampus: Hippocampus,
@@ -44,18 +45,20 @@ class DefaultModeNetwork(BrainRegion):
         Returns a feature cue that downstream regions can use to 'imagine' the
         replayed episode. When there's no replay, returns None.
         """
-        # Idle level = inverse of engagement (with a floor).
         idle = 1.0 - min(1.0, task_engagement)
         base = 0.15 + 0.35 * idle + 0.05 * math.sin(time.time() * 1.7)
         self._set_activity(base, int(base * self.neurons_total))
 
-        # Replay a random memory with probability proportional to how idle we are.
-        if hippocampus.memory and random.random() < 0.05 * idle:
-            ep = random.choice(hippocampus.memory)
+        pool = hippocampus.memory + hippocampus.knowledge
+        if pool and random.random() < self.replay_rate * idle:
+            ep = random.choice(pool)
             self.replay_cue = ep.features.clone()
             self.last_replay_step = step
-            emo = "positive" if ep.valence > 0 else ("negative" if ep.valence < 0 else "neutral")
-            self.note(f"replaying {emo} memory from t={ep.step}")
+            if ep.tag == "knowledge":
+                self.note(f"drifting toward concept '{ep.label}'")
+            else:
+                emo = "positive" if ep.valence > 0 else ("negative" if ep.valence < 0 else "neutral")
+                self.note(f"replaying {emo} memory from t={ep.step}")
             self._set_activity(min(1.0, base + 0.4))
             return self.replay_cue
 

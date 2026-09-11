@@ -41,6 +41,9 @@
       <div class="status-item">
         <span class="mono" id="reward-label">Σreward 0.00</span>
       </div>
+      <div class="status-item mode-badge" id="mode-badge" title="Brain mode">
+        <span class="mode-dot"></span><span id="mode-label">BOOT</span>
+      </div>
     </nav>
 
     <div class="topbar-actions">
@@ -59,6 +62,13 @@
         <span class="hint">拖拽旋转 · 滚轮缩放 · 悬停脑区看名字</span>
       </div>
       <div id="brain3d"></div>
+      <div class="thinking-ribbon" id="thinking-ribbon" data-empty="true">
+        <div class="thinking-label">现在在想 · thinking about</div>
+        <div class="thinking-body">
+          <div class="thinking-title" id="thinking-title">—</div>
+          <div class="thinking-desc" id="thinking-desc">brain is warming up…</div>
+        </div>
+      </div>
       <div class="brain-legend" id="brain-legend"></div>
     </section>
 
@@ -82,15 +92,19 @@
       <div class="env-stats" id="env-stats"></div>
     </section>
 
-    <!-- MIDDLE-BOTTOM: REGION DETAIL -->
+    <!-- MIDDLE-BOTTOM: REGION DETAIL / KNOWLEDGE -->
     <section class="panel panel-region">
-      <div class="panel-title">
-        <h2 id="region-title">脑区详情</h2>
-        <span class="hint">点上方大脑里任意脑区</span>
+      <div class="panel-title panel-title-tabs">
+        <div class="tabs" id="detail-tabs">
+          <button class="tab active" data-view="region">脑区详情</button>
+          <button class="tab" data-view="knowledge">知识库</button>
+        </div>
+        <span class="hint mono" id="region-title">—</span>
       </div>
       <div id="region-detail" class="region-detail-empty">
         <p>👈 点一个脑区看它内部在算什么</p>
       </div>
+      <div id="knowledge-panel" class="knowledge-panel" style="display:none"></div>
     </section>
 
     <!-- RIGHT: THOUGHT STREAM -->
@@ -109,11 +123,13 @@
 
   <footer class="footer">
     <div class="footer-l">
-      <span class="mono">Brain: 8 regions · ~350 parameters</span>
+      <span class="mono">Brain: 8 regions</span>
       <span class="mono">·</span>
       <span class="mono">Environment: 9×9 grid</span>
       <span class="mono">·</span>
       <span class="mono">Learning: online actor-critic</span>
+      <span class="mono">·</span>
+      <span class="mono" id="footer-knowledge">Knowledge seeds: —</span>
       <span class="mono">·</span>
       <span class="mono" style="color: var(--accent)">No LLM used</span>
     </div>
