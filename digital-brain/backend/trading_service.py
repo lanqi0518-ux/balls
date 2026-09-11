@@ -118,6 +118,11 @@ class TradingService:
         # Latest intent computed by the trader cortex for the hottest token
         # each decision tick. Powers the "About to do" hero card.
         self._latest_intent: Optional[dict] = None
+        # Web-embodiment reference: injected by the server after boot so
+        # the trader can widen its candidate pool with tokens actually
+        # seen on real web pages, not just DexScreener's API firehose.
+        self._web = None
+        self._web_seen_addrs: set = set()  # dedup: which mints we've already logged
 
         # Seed wallets (default + env-configured) — always source=env
         for addr, label in DEFAULT_SEED_WALLETS + _parse_env_wallets():
@@ -137,6 +142,46 @@ class TradingService:
             )
 
     # ------------------------------------------------------------------
+    def attach_web_embodiment(self, web) -> None:
+        """Wire in the ``WebEmbodiment`` so the trading loop can pull in
+        tokens the brain has actually SEEN on a real web page (rather
+        than just fetched via the DexScreener REST API).
+
+        We push a one-shot event whenever a new mint address appears on
+        one of the tour pages — good context for the user watching the
+        trader panel.
+        """
+        self._web = web
+
+    def _drain_web_sightings(self) -> None:
+        """Log any newly-spotted mint addresses from the web tour into
+        the event stream so the user sees them show up in real time."""
+        if self._web is None:
+            return
+        snap = self._web.snapshot() or {}
+        latest = snap.get("latest") or {}
+        site = latest.get("site_name") or "web"
+        for t in (latest.get("tokens") or []):
+            addr = t.get("address")
+            if not addr or addr in self._web_seen_addrs:
+                continue
+            # Only announce base58-looking mints (25+ char), skip site slugs.
+            if len(addr) < 25:
+                self._web_seen_addrs.add(addr)  # still dedup, just don't announce
+                continue
+            self._web_seen_addrs.add(addr)
+            sym = t.get("symbol") or "?"
+            hint = (t.get("change_hint") or "").strip()
+            self._push_event(
+                "web_sighting",
+                f"[web:{site}] spotted ${sym}{(' ' + hint) if hint else ''} · "
+                f"{addr[:4]}…{addr[-4:]}",
+                f"[web:{site}] 看到 ${sym}{(' ' + hint) if hint else ''} · "
+                f"{addr[:4]}…{addr[-4:]}",
+                extra={"symbol": sym, "mint": addr,
+                       "site_name": site, "change_hint": hint,
+                       "text": t.get("text", "")},
+            )
 
     async def start(self) -> None:
         if self._tasks:
@@ -344,6 +389,9 @@ class TradingService:
     # ------------------------------------------------------------------
 
     async def _decision_tick(self) -> None:
+        # 0) Log any newly-seen web-embodiment sightings.
+        self._drain_web_sightings()
+
         # 1) Ingest any new expert wallet trades → behavior cloning
         new_trades = self.wallets.recent_trades(limit=20)
         self.leaderboard.ingest(new_trades)

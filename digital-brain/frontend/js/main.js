@@ -9,6 +9,7 @@ import { EnvironmentView, renderEnvStats } from "/static/js/environment.js";
 import { ThoughtStream } from "/static/js/thoughtstream.js";
 import { loadKnowledge, setActiveConcept, categoryColor } from "/static/js/knowledge.js";
 import { initTrading, updateTrading } from "/static/js/trading.js";
+import { initWebView, updateWebView, updateWebTopbarStrip } from "/static/js/web_view.js";
 
 // ---------- DOM refs ----------
 const brainContainer = document.getElementById("brain3d");
@@ -33,6 +34,7 @@ const tickHzLabel = document.getElementById("tick-hz-label");
 
 const knowledgePanel = document.getElementById("knowledge-panel");
 const tradingPanel = document.getElementById("trading-panel");
+const webPanel = document.getElementById("web-panel");
 const detailTabs = document.getElementById("detail-tabs");
 
 // Hero panel — main-view focus: what he's thinking + what he's about to do
@@ -73,6 +75,7 @@ let modeInitialized = false;
 
 loadKnowledge(knowledgePanel);
 initTrading(tradingPanel, { onCommand: (cmd, extra) => send(cmd, extra) });
+initWebView(webPanel);
 
 detailTabs.addEventListener("click", (e) => {
   const btn = e.target.closest(".tab[data-view]");
@@ -81,14 +84,15 @@ detailTabs.addEventListener("click", (e) => {
 });
 
 function switchDetailView(view) {
-  if (!["region", "knowledge", "trading"].includes(view)) return;
+  if (!["region", "knowledge", "trading", "web"].includes(view)) return;
   detailView = view;
   document.querySelectorAll("#detail-tabs .tab").forEach((el) => {
     el.classList.toggle("active", el.dataset.view === view);
   });
-  document.getElementById("region-detail").style.display = view === "region" ? "" : "none";
+  document.getElementById("region-detail").style.display = view === "region"    ? "" : "none";
   document.getElementById("knowledge-panel").style.display = view === "knowledge" ? "flex" : "none";
-  document.getElementById("trading-panel").style.display  = view === "trading"   ? "flex" : "none";
+  document.getElementById("trading-panel").style.display  = view === "trading"  ? "flex" : "none";
+  document.getElementById("web-panel").style.display      = view === "web"      ? "flex" : "none";
 }
 
 // ---------- WebSocket ----------
@@ -158,6 +162,11 @@ function handlePayload(data) {
     const st = data.trading.trader_cortex_stats || {};
     footerTrader.textContent =
       `Trader: ${st.bc_updates || 0} BC / ${st.rl_updates || 0} RL updates`;
+  }
+
+  if (data.web !== undefined) {
+    updateWebView(data.web);
+    updateWebTopbarStrip(data.web);
   }
 
   brainScene.updateRegions(brain.regions);

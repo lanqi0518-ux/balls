@@ -52,6 +52,10 @@
       <div class="status-item always-learning" title="Brain never stops. No pause, no reset.">
         <span class="always-dot"></span><span>ALWAYS LEARNING</span>
       </div>
+      <div class="status-item browser-strip" id="browser-strip" title="Real headless Chromium roaming Solana sites">
+        <span class="browser-icon">🌐</span>
+        <span class="mono" id="browser-strip-label">browser idle</span>
+      </div>
     </nav>
 
     <div class="topbar-actions">
@@ -138,7 +142,7 @@
       <div class="env-stats" id="env-stats"></div>
     </section>
 
-    <!-- CENTER-BOTTOM: REGION / KNOWLEDGE / TRADING TABS -->
+    <!-- CENTER-BOTTOM: REGION / KNOWLEDGE / TRADING / WEB VIEW TABS -->
     <section class="panel panel-region">
       <div class="panel-title panel-title-tabs">
         <div class="tabs" id="detail-tabs">
@@ -146,6 +150,9 @@
           <button class="tab" data-view="knowledge">Knowledge</button>
           <button class="tab" data-view="trading">
             Trading desk <span class="tab-badge" id="trading-badge">paper</span>
+          </button>
+          <button class="tab" data-view="web">
+            Web view <span class="tab-badge" id="web-badge">live</span>
           </button>
         </div>
         <span class="hint mono" id="region-title">—</span>
@@ -158,6 +165,7 @@
       </div>
       <div id="knowledge-panel" class="knowledge-panel" style="display:none"></div>
       <div id="trading-panel" class="trading-panel" style="display:none"></div>
+      <div id="web-panel" class="web-panel" style="display:none"></div>
     </section>
 
   </main>

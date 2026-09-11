@@ -36,9 +36,12 @@ primary_region = "sjc"
     path = "/health"
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "1gb"
-  cpus = 1
+  # Bumped to 2GB and 2 CPUs so the headless Chromium web-embodiment
+  # subsystem (Phase 2) has memory headroom alongside PyTorch + the
+  # spiking central complex.
+  size = "shared-cpu-2x"
+  memory = "2gb"
+  cpus = 2
 
 # One volume per machine; created via `flyctl volumes create data -r sjc -s 1`
 [[mounts]]

@@ -22,6 +22,7 @@ from .brain import Brain
 from .env import GridWorld
 from .knowledge import categories_public, concepts_public
 from .trading_service import TradingService
+from .web_embodiment import WebEmbodiment
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -41,6 +42,14 @@ class Simulation:
         self.tick_hz: float = 6.0  # frames per second the brain "lives" at
         self._current_obs = self.env.reset()
         self.trading: TradingService = TradingService(self.brain)
+        # The brain's SECOND body: a real headless Chromium roaming
+        # Solana-oriented crypto sites. Disabled via env if needed.
+        self.web: WebEmbodiment | None = None
+        if os.getenv("WEB_EMBODIMENT", "1") != "0":
+            self.web = WebEmbodiment(
+                interval_s=float(os.getenv("WEB_TOUR_INTERVAL_S", "22.0")),
+            )
+            self.trading.attach_web_embodiment(self.web)
 
     # ------------------------------------------------------------------
 
@@ -102,6 +111,7 @@ class Simulation:
             "running": self.running,
             "tick_hz": self.tick_hz,
             "trading": self.trading.snapshot(),
+            "web": self.web.snapshot() if self.web else {"enabled": False},
         }
 
     async def _broadcast(self, payload: dict) -> None:
@@ -132,10 +142,16 @@ sim = Simulation()
 async def lifespan(app: FastAPI):
     task = asyncio.create_task(sim.run_forever())
     await sim.trading.start()
+    if sim.web is not None:
+        # Any launch failure inside the web embodiment gracefully disables
+        # itself — it never blocks the rest of the app from booting.
+        await sim.web.start()
     try:
         yield
     finally:
         await sim.trading.stop()
+        if sim.web is not None:
+            await sim.web.stop()
         task.cancel()
         try:
             await task

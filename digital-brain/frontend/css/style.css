@@ -175,6 +175,28 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   font-weight: 700;
   text-transform: uppercase;
 }
+
+/* --- Topbar browser strip (headless Chromium indicator) --- */
+.browser-strip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(96, 165, 250, 0.12);
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  color: #60a5fa;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  max-width: 240px;
+  overflow: hidden;
+}
+.browser-strip .browser-icon {
+  filter: drop-shadow(0 0 4px rgba(96, 165, 250, 0.7));
+}
+.browser-strip #browser-strip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .always-learning .always-dot {
   width: 6px; height: 6px; border-radius: 50%;
   background: #34d399;
@@ -1136,4 +1158,248 @@ input[type=range] {
   }
   .topbar { flex-wrap: wrap; }
   .topbar-status { order: 3; width: 100%; }
+}
+
+/* ---------- Web view: the brain's second body ---------------------------- */
+.web-panel {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+  padding-top: 6px;
+}
+.web-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.web-top-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.web-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.web-badge.on {
+  background: rgba(96, 165, 250, 0.16);
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  color: #60a5fa;
+}
+.web-badge.off {
+  background: rgba(200, 200, 200, 0.1);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.web-site {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.web-url {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+  text-decoration: none;
+}
+.web-url:hover { color: var(--accent); text-decoration: underline; }
+.web-next {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.web-body {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.4fr) 1fr;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.web-shot-col { min-width: 0; overflow: hidden; }
+.web-shot-wrap {
+  position: relative;
+  background: rgba(5, 7, 13, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.web-shot {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 6px;
+}
+.web-shot-empty {
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 40px 20px;
+  text-align: center;
+}
+.web-shot-at {
+  position: absolute;
+  bottom: 6px;
+  right: 8px;
+  font-size: 9px;
+  color: var(--text-muted);
+  background: rgba(0,0,0,0.55);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.web-side-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow: hidden;
+}
+.web-side-head {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+.web-tokens {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 210px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.web-tok {
+  display: grid;
+  grid-template-columns: 60px 60px 1fr 80px;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 8px;
+  background: var(--bg-2);
+  border-radius: 4px;
+  font-size: 11px;
+  min-width: 0;
+}
+.web-tok-sym {
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.web-tok-change { font-size: 10px; }
+.web-tok-change.up   { color: var(--good); }
+.web-tok-change.down { color: var(--bad); }
+.web-tok-text {
+  color: var(--text-secondary);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.web-tok-addr {
+  color: var(--text-muted);
+  font-size: 9px;
+  text-align: right;
+}
+.web-empty {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: italic;
+  padding: 8px 4px;
+}
+.web-visits {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 140px;
+  overflow-y: auto;
+  padding: 0;
+  margin: 0;
+}
+.web-visit {
+  display: grid;
+  grid-template-columns: 32px 1fr auto auto;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  align-items: center;
+}
+.web-visit.ok  { background: rgba(52, 211, 153, 0.07); }
+.web-visit.err { background: rgba(239, 68, 68, 0.09); }
+.web-visit-status {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.web-visit.ok  .web-visit-status { color: var(--good); }
+.web-visit.err .web-visit-status { color: var(--bad); }
+.web-visit-site {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.web-visit-meta { color: var(--text-muted); }
+.web-visit-at { color: var(--text-muted); font-size: 9px; }
+.web-footer {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  font-size: 10px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.web-stats { font-size: 10px; }
+.web-errors { display: flex; flex-direction: column; gap: 2px; }
+.web-errors-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--bad);
+  letter-spacing: 0.08em;
+}
+.web-err {
+  font-size: 10px;
+  color: var(--text-secondary);
+  padding: 3px 6px;
+  background: rgba(239, 68, 68, 0.06);
+  border-radius: 3px;
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 8px;
+  min-width: 0;
+}
+.web-err-site { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.web-err-msg  {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+@media (max-width: 900px) {
+  .web-body { grid-template-columns: 1fr; }
+  .web-shot-wrap { min-height: 160px; }
 }

@@ -7,13 +7,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PORT=8080
+    PORT=8080 \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
 
 WORKDIR /app
 
-# System deps kept minimal
+# System deps: curl + Chromium runtime libs Playwright needs.
+# Using system chromium binary + Playwright as the driver saves ~150MB
+# vs. letting Playwright download its own bundled Chromium.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        curl \
+        curl ca-certificates \
+        chromium fonts-liberation fonts-noto-color-emoji \
+        libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+        libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
+        libgbm1 libpango-1.0-0 libcairo2 libasound2 libxshmfence1 \
     && rm -rf /var/lib/apt/lists/*
 
 # PyTorch CPU wheels first (large, cache-friendly)
