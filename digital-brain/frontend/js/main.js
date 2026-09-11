@@ -154,6 +154,19 @@ function handlePayload(data) {
   thoughtStream.addFromSnapshot(brain.thoughts);
   updateThinkingRibbon(brain.active_concept);
 
+  // If the user hasn't clicked a region yet, auto-select the most active
+  // one so the detail panel is never empty. Once they DO click, respect
+  // their choice.
+  if (!selectedRegionName && brain.regions && brain.regions.length) {
+    const mostActive = [...brain.regions].sort(
+      (a, b) => (b.activation || 0) - (a.activation || 0),
+    )[0];
+    if (mostActive) {
+      selectedRegionName = mostActive.name;
+      brainScene.select(mostActive.name);
+    }
+  }
+
   if (selectedRegionName) {
     const r = brain.regions.find((r) => r.name === selectedRegionName);
     if (r) renderRegionDetail(r);
