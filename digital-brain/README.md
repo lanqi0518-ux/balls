@@ -6,6 +6,11 @@
 
 **在线 Demo** · Live: <https://balls-lanqi.fly.dev>（部署在 Fly.io，`sjc`，2 台机器）
 
+> 当前默认为 **Einstein 模式**：更宽的前额叶（192-wide）、更长的海马体（400 槽）、更活跃的默认网络，
+> 且启动时向海马体灌入 **60 个语义种子**——30+ 个加密货币概念（BTC / ETH / SOL / DOGE / PEPE / WIF / HODL / rug pull / gas ...）
+> 加 20+ 个爱因斯坦概念（狭义&广义相对论 / E=mc² / 光速 / 引力波 / 张量 / 场方程 / 思想实验 / "上帝不掷骰子" ...）。
+> 它在思考时会不定期"联想"到其中之一，你能在 UI 上看到当下想到的概念。
+
 ![Digital Human Brain screenshot placeholder](docs/screenshot.png)
 
 ## 它是什么
@@ -106,7 +111,34 @@ digital-brain/
 - **它不会跟你对话**——那需要 LLM，本项目故意不用
 - **它的"思考"是结构化的**（感知 → 记忆 → 决策 → 行动），不是人的意识流
 - **它的"情绪"是功能等价物**（一个变量），不代表主观体验
-- 只有 8 个脑区、几百个参数——离真人脑（860 亿神经元、每个 1000+ 突触）差 8 个数量级
+- **它不是"真的懂"加密货币或相对论**。知识库里的 60 个概念，是启动时塞进海马体的语义种子（每个是一个 32 维向量），
+  在思考时会被联想到，但它不会推导 E=mc²，也没读过比特币白皮书。要想让它"懂"，只能上 LLM。
+- 只有 8 个脑区、几百到几千个参数——离真人脑（860 亿神经元、每个 1000+ 突触）差 8 个数量级
+
+## 关于 Einstein 模式 & 知识库
+
+启动时把两组概念灌入海马体作为**永久记忆**（不会被后续经历淘汰）：
+
+| 分类 | 例子 | 数量 |
+|---|---|---|
+| 主流加密货币 | BTC / ETH / SOL / BNB / XRP / ADA / TON / TRX / LTC / USDT | 10 |
+| Meme 币 | DOGE / SHIB / PEPE / WIF / BONK / FLOKI / POPCAT / MOG / TRUMP / FARTCOIN | 10 |
+| 加密技术 / DeFi | PoW / PoS / halving / gas / wallet / seed / cold wallet / DEX / LP / NFT / airdrop / rugpull | 12 |
+| 加密文化 | 中本聪 / WAGMI / GM / HODL / to the moon / diamond hands / FOMO / shill | 8 |
+| 爱因斯坦·物理 | 狭义 / 广义相对论 / E=mc² / 光速 / 时空 / 引力波 / 光电效应 / 光子 / 黑洞 / 宇宙常数 Λ | 10 |
+| 爱因斯坦·数学 | 张量 / 洛伦兹变换 / 场方程 / 黎曼几何 / 思想实验 | 5 |
+| 爱因斯坦·生平 | 伯尔尼专利局 / 奇迹年 1905 / 上帝不掷骰子 / 普林斯顿 IAS / 想象力比知识更重要 | 5 |
+
+**联想机制**：每步以一定概率（越无聊概率越高）从知识库里按余弦相似度加权采样一个概念，
+在思考流里打出「💭 联想到 XX」，并把 UI 上对应的知识片高亮出来。整个过程用的是同一个 Hopfield 风格相似度检索，**没有任何 LLM 调用**。
+
+想关掉知识库、跑纯 RL 版本？
+
+```bash
+BRAIN_MODE=default python -m backend.server
+# 或
+BRAIN_KNOWLEDGE=0 python -m backend.server
+```
 
 ## 它真的做到了什么
 
