@@ -4,12 +4,16 @@
 
 一个真正在"活着"的数字人脑：8 个脑区，每个都是一个**真实的神经网络模块**，共同感知、记忆、决策、产生情绪。整个系统运行在浏览器里，实时可视化，**完全不使用 LLM**。
 
-**在线 Demo** · Live: <https://balls-lanqi.fly.dev>（部署在 Fly.io，`sjc`，2 台机器）
+**在线 Demo** · Live: <https://balls-lanqi.fly.dev>（部署在 Fly.io，`sjc`，1 台 + 1GB volume）
 
 > 当前默认为 **Einstein 模式**：更宽的前额叶（192-wide）、更长的海马体（400 槽）、更活跃的默认网络，
 > 且启动时向海马体灌入 **60 个语义种子**——30+ 个加密货币概念（BTC / ETH / SOL / DOGE / PEPE / WIF / HODL / rug pull / gas ...）
 > 加 20+ 个爱因斯坦概念（狭义&广义相对论 / E=mc² / 光速 / 引力波 / 张量 / 场方程 / 思想实验 / "上帝不掷骰子" ...）。
 > 它在思考时会不定期"联想"到其中之一，你能在 UI 上看到当下想到的概念。
+>
+> **另外**：现在多了一块**交易皮层**（Trader Cortex），可以跟踪 Solana 链上钱包的行为、行为克隆学他们的
+> 买卖决策、用真实 DexScreener 价格模拟买卖，并把实盈亏反传回来微调策略。默认为**只做 paper 交易**——
+> 不动真钱。见下方 [交易皮层](#交易皮层--traders-cortex) 一节。
 
 ![Digital Human Brain screenshot placeholder](docs/screenshot.png)
 
@@ -139,6 +143,83 @@ BRAIN_MODE=default python -m backend.server
 # 或
 BRAIN_KNOWLEDGE=0 python -m backend.server
 ```
+
+## 交易皮层 · Trader's cortex
+
+> 大脑现在多了一块 **Trader Cortex**（前额叶右侧那个橙色球），它做的事：
+> **观察 Solana 链上钱包的真实交易 → 行为克隆学习他们 → 用实时价模拟买卖 → 平仓的实盈亏
+> 反传回来微调策略**。整套流程默认只跑 paper，**不动真钱**。
+
+### 数据链路（gmgn.ai 在做什么，我们就自己算一遍）
+
+由于 gmgn.ai 的 API 挡在 Cloudflare 后面，我们直接从两个公开源拿数据：
+
+* **DexScreener** — 免费公开，每 60 秒拉一次 Solana 上的热门 meme 币，包括价格、24h/1h/5m 涨跌、
+  流动性、Buy/Sell 数量。
+* **Solana public RPC** (`api.mainnet-beta.solana.com`) — 每 25 秒轮询已跟踪钱包的最近 15 笔交易，
+  用 `preTokenBalances` / `postTokenBalances` 提取 buy/sell 事件（SPL 增加+SOL 减少=买入；反之=卖出）。
+
+跟踪的钱包**默认为空**。gmgn 战壕榜上的每一个钱包地址都是可复制的——你在浏览器打开
+gmgn.ai/trenches（避开 CF），把觉得靠谱的地址复制过来，粘到 UI 里的"👁 跟踪中的钱包"表下面
+即可。我们从那一刻起就在 Solana RPC 上跟着它的每笔交易了。
+
+### 学习机制（两种梯度同时下降）
+
+1. **行为克隆 (Behavior Cloning)** — 每次跟踪的钱包出一笔 buy/sell：
+   - 把那个时刻那个 token 的 16 维市场特征算出来
+   - 把钱包的动作作为标签（BUY/SELL），做一次交叉熵梯度更新
+   - **权重按那个钱包的滚动 24h 已实现 PnL 加权**——赚的钱包影响大，亏的影响小
+2. **PnL 强化学习** — 每次我们自己 paper 平仓：
+   - 用实际实现的收益率（例如 +8%、-12%）作为 reward
+   - 对建仓时的状态做一步 REINFORCE + value baseline 更新
+
+### Smart-money 榜（我们自己算的）
+
+每个被跟踪钱包按滚动 24h 已实现 PnL 排序，FIFO 匹配每 token 的买卖计算成本和收益。
+这就是 gmgn "战壕榜"的算法本质，我们只是从零算了一遍。
+
+### Paper trader（模拟撮合）
+
+* 起始资金 **$10,000 USD**
+* 单笔上限：账户的 10%
+* 最多 6 个并行持仓
+* 摩擦成本：**1.5% round-trip**（滑点 + 手续费的粗估）
+* 自动止损 **-18%**、自动止盈 **+35%**、最大持仓时间 **12 小时**
+
+### 持久化
+
+Cortex 权重和 paper 账本每 3 分钟保存一次到 `$DATA_DIR/state.pt`。Fly.io 部署里挂了一个 1GB 卷到
+`/data`，重启和滚动部署都不会丢学到的东西。
+
+### 环境变量
+
+| 变量 | 作用 | 默认 |
+|---|---|---|
+| `BRAIN_MODE` | `einstein` / `default` | `einstein` |
+| `BRAIN_KNOWLEDGE` | 是否灌入知识库 (`1`/`0`) | 跟 BRAIN_MODE 走 |
+| `DATA_DIR` | 状态持久化目录 | `./data` |
+| `TRACK_WALLETS` | 启动时预先跟踪的钱包，格式 `addr:label,addr:label,addr` | 空 |
+
+例：`TRACK_WALLETS='6WdEZ...ABCDE:cupsey,GJRs4Fw...ABC:whale2' python -m backend.server`
+
+### 关于实盘（Phase 4，**目前未实现**）
+
+要让这套系统真的去 Jupiter/Raydium 下单，需要：
+
+* 一个 Solana 私钥（或 delegate 权限的次级钱包）
+* 用户显式的每笔确认，或一个"自动预算 $X"上限
+* 硬性风控：单笔上限、日损止损、最大 open positions
+
+**我没有做这一步。** paper 不动真钱，是我给自己留的止损。真要上，先跑一周 paper 看它 PnL 是不是
+稳定的，再动手加执行层。跟单 top traders 的**尾部亏损**和**头部收益**同样真实。
+
+### 老实说清楚这个系统不是什么
+
+* **不是印钞机**。gmgn "战壕榜"高收益选手多是短线尾部胜出，跟他们跟不出稳定收益。
+* **不是"AI 交易员"**。cortex 只有 ~30K 参数，跟一个大型量化模型差 6 个数量级。
+* **不做技术分析**。它只看 16 维原始市场状态 + 你选的钱包的动作。K 线、成交量分布、订单簿都没用。
+* **数据滞后**。DexScreener 数据 30-60s 延迟；公共 Solana RPC 有速率限制。真做 alpha 需要
+  Helius 之类的付费实时源。
 
 ## 它真的做到了什么
 
