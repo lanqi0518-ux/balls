@@ -35,6 +35,8 @@ class Simulation:
         self.brain = Brain()
         self.env = GridWorld(size=9, n_food=5, n_hazard=4, max_steps=250, seed=42)
         self.clients: Set[WebSocket] = set()
+        # The simulation never pauses. We keep `running` as an always-True flag
+        # for the payload so old clients that still watch it don't get confused.
         self.running: bool = True
         self.tick_hz: float = 6.0  # frames per second the brain "lives" at
         self._current_obs = self.env.reset()
@@ -55,18 +57,11 @@ class Simulation:
 
     async def handle_command(self, ws: WebSocket, msg: dict) -> None:
         cmd = msg.get("cmd")
-        if cmd == "pause":
-            self.running = False
-        elif cmd == "resume":
-            self.running = True
-        elif cmd == "reset":
+        # NOTE: `pause`, `resume`, and `reset_brain` are intentionally NOT
+        # accepted. The brain is designed to run and learn continuously; the
+        # only thing users can restart is the gridworld body it's driving.
+        if cmd == "reset":
             self._current_obs = self.env.reset()
-        elif cmd == "reset_brain":
-            await self.trading.stop()
-            self.brain = Brain()
-            self._current_obs = self.env.reset()
-            self.trading = TradingService(self.brain)
-            await self.trading.start()
         elif cmd == "add_wallet":
             addr = str(msg.get("address", "")).strip()
             label = str(msg.get("label", "")).strip()
@@ -120,15 +115,13 @@ class Simulation:
             self.remove_client(ws)
 
     async def run_forever(self) -> None:
+        # No pause branch: this loop steps the brain and environment every
+        # tick, forever. The only knob is `self.tick_hz`.
         while True:
             interval = 1.0 / max(0.5, self.tick_hz)
-            if self.running:
-                info = self.brain.step(self._current_obs)
-                self._current_obs = self.env.step(info["action"])
-                await self._broadcast(self._payload(action_info=info))
-            else:
-                # still push heartbeat so client stays in sync
-                await self._broadcast(self._payload(action_info=None))
+            info = self.brain.step(self._current_obs)
+            self._current_obs = self.env.step(info["action"])
+            await self._broadcast(self._payload(action_info=info))
             await asyncio.sleep(interval)
 
 

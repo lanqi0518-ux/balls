@@ -163,6 +163,29 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   50%      { opacity: 0.55; transform: scale(1.35); }
 }
 
+.always-learning {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(52, 211, 153, 0.14);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  color: #34d399;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.always-learning .always-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 10px #34d399;
+  animation: alwaysLearningPulse 1.6s ease-in-out infinite;
+}
+@keyframes alwaysLearningPulse {
+  0%, 100% { opacity: 1;    transform: scale(1);    }
+  50%      { opacity: 0.45; transform: scale(1.55); }
+}
+
 .btn {
   padding: 8px 14px;
   border-radius: 8px;

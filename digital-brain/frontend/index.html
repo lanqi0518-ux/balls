@@ -49,12 +49,13 @@
       <div class="status-item mode-badge" id="mode-badge" title="Brain mode">
         <span class="mode-dot"></span><span id="mode-label">BOOT</span>
       </div>
+      <div class="status-item always-learning" title="Brain never stops. No pause, no reset.">
+        <span class="always-dot"></span><span>ALWAYS LEARNING</span>
+      </div>
     </nav>
 
     <div class="topbar-actions">
-      <button class="btn btn-ghost" id="btn-pause">⏸ Pause</button>
-      <button class="btn btn-ghost" id="btn-reset-env">↻ New environment</button>
-      <button class="btn btn-danger" id="btn-reset-brain">💥 Reset brain</button>
+      <button class="btn btn-ghost" id="btn-reset-env" title="Spawn a fresh gridworld. Does NOT reset the brain — it keeps everything it has learned.">↻ New gridworld</button>
     </div>
   </header>
 

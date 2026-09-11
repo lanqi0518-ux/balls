@@ -25,9 +25,7 @@ const rewardLabel = document.getElementById("reward-label");
 const modeBadge = document.getElementById("mode-badge");
 const modeLabel = document.getElementById("mode-label");
 const footerKnowledge = document.getElementById("footer-knowledge");
-const btnPause = document.getElementById("btn-pause");
 const btnResetEnv = document.getElementById("btn-reset-env");
-const btnResetBrain = document.getElementById("btn-reset-brain");
 const btnPokeFood = document.getElementById("btn-poke-food");
 const btnPokeHazard = document.getElementById("btn-poke-hazard");
 const tickHzInput = document.getElementById("tick-hz");
@@ -83,7 +81,6 @@ function switchDetailView(view) {
 
 // ---------- WebSocket ----------
 let ws = null;
-let running = true;
 let reconnectDelay = 1000;
 
 function connect() {
@@ -161,9 +158,6 @@ function handlePayload(data) {
     const r = brain.regions.find((r) => r.name === selectedRegionName);
     if (r) renderRegionDetail(r);
   }
-
-  running = !!data.running;
-  btnPause.textContent = running ? "⏸ Pause" : "▶ Resume";
 }
 
 function updateTradingStrip(trading) {
@@ -279,13 +273,11 @@ function escapeHtml(s) {
 }
 
 // ---------- Controls ----------
-btnPause.addEventListener("click", () => {
-  send(running ? "pause" : "resume");
-});
+// No pause / reset-brain buttons on purpose: the brain runs forever and
+// keeps every neuron weight, every memory, every learned trade. The only
+// user-facing knobs are: spawn a fresh gridworld, poke food/hazards, or
+// change the tick speed. Learning is uninterrupted.
 btnResetEnv.addEventListener("click", () => send("reset"));
-btnResetBrain.addEventListener("click", () => {
-  if (confirm("Reset brain will wipe all memories and learned policies. Sure?")) send("reset_brain");
-});
 btnPokeFood.addEventListener("click", () => send("poke_food"));
 btnPokeHazard.addEventListener("click", () => send("poke_hazard"));
 tickHzInput.addEventListener("input", (e) => {
