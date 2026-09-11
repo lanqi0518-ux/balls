@@ -17,7 +17,6 @@ const envStatsEl = document.getElementById("env-stats");
 const regionDetailEl = document.getElementById("region-detail");
 const regionTitleEl = document.getElementById("region-title");
 const thoughtEl = document.getElementById("thought-stream");
-const tabsEl = document.querySelector(".panel-thoughts .tabs");
 
 const connDot = document.getElementById("conn-dot");
 const connLabel = document.getElementById("conn-label");
@@ -55,7 +54,7 @@ const brainScene = new BrainScene(brainContainer, {
   },
 });
 const envView = new EnvironmentView(envCanvas);
-const thoughtStream = new ThoughtStream(thoughtEl, tabsEl);
+const thoughtStream = new ThoughtStream(thoughtEl);
 
 let latestBrain = null;
 let detailView = "region";
@@ -193,8 +192,8 @@ function updateThinkingRibbon(active) {
   thinkingRibbon.dataset.empty = "false";
   const color = categoryColor(active.category);
   thinkingRibbon.style.setProperty("--ribbon-color", color);
-  thinkingTitle.textContent = `${active.zh}  ·  ${active.en}`;
-  thinkingDesc.textContent = active.desc_zh;
+  thinkingTitle.textContent = active.en;
+  thinkingDesc.textContent = active.desc_en;
   if (active.id !== lastConceptId) {
     thinkingRibbon.classList.remove("lit");
     void thinkingRibbon.offsetWidth; // restart animation
@@ -205,7 +204,7 @@ function updateThinkingRibbon(active) {
 
 // ---------- Region detail ----------
 function renderRegionDetail(r) {
-  regionTitleEl.textContent = `${r.zh_name || r.display_name} · ${r.display_name}`;
+  regionTitleEl.textContent = r.display_name;
   regionDetailEl.classList.remove("region-detail-empty");
   regionDetailEl.classList.add("region-detail");
 
@@ -226,7 +225,7 @@ function renderRegionDetail(r) {
              <div class="meter"><div class="meter-label">Σ REWARD</div><div class="meter-value">${s.cumulative_reward}</div></div>`;
   } else if (latestBrain && r.name === "motor_cortex") {
     const s = latestBrain.motor_stats;
-    extra = `<div class="meter"><div class="meter-label">LAST ACTION</div><div class="meter-value">${s.action_label_zh}</div></div>
+    extra = `<div class="meter"><div class="meter-label">LAST ACTION</div><div class="meter-value">${s.action_label}</div></div>
              <div class="meter"><div class="meter-label">CONFIDENCE</div><div class="meter-value">${s.confidence}</div></div>`;
   }
 
@@ -247,11 +246,10 @@ function renderRegionDetail(r) {
       <span class="swatch" style="background:${r.color}"></span>
       <div>
         <div class="name">${r.display_name}</div>
-        <div class="zh">${r.zh_name}</div>
       </div>
     </div>
     <div class="region-detail-role" style="color:${r.color}">
-      <span style="color: var(--text-secondary)">${r.role_zh || r.role}</span>
+      <span style="color: var(--text-secondary)">${r.role}</span>
     </div>
     <div class="region-detail-meters">
       <div class="meter">
@@ -266,7 +264,7 @@ function renderRegionDetail(r) {
     </div>
     <div class="region-detail-neuron-grid">${grid.join("")}</div>
     <div class="region-events">
-      <h4>最近事件</h4>
+      <h4>Recent events</h4>
       <ul>${events}</ul>
     </div>
   `;
@@ -286,7 +284,7 @@ btnPause.addEventListener("click", () => {
 });
 btnResetEnv.addEventListener("click", () => send("reset"));
 btnResetBrain.addEventListener("click", () => {
-  if (confirm("重置大脑会清空所有记忆和学到的策略，确定？")) send("reset_brain");
+  if (confirm("Reset brain will wipe all memories and learned policies. Sure?")) send("reset_brain");
 });
 btnPokeFood.addEventListener("click", () => send("poke_food"));
 btnPokeHazard.addEventListener("click", () => send("poke_hazard"));

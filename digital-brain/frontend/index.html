@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>数字人脑 · The Digital Human Brain</title>
-  <meta name="description" content="A live digital human brain — 8 anatomical regions, each a real neural network, cooperating in real time." />
+  <title>Digital Human Brain</title>
+  <meta name="description" content="A live digital human brain — 9 anatomical regions, each a real neural network, cooperating in real time." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -26,7 +26,7 @@
       </div>
       <div class="brand-text">
         <div class="brand-title">Digital Human Brain</div>
-        <div class="brand-sub">数字人脑 · 8 个真实神经网络协同工作</div>
+        <div class="brand-sub">9 real neural networks cooperating in real time</div>
       </div>
     </div>
 
@@ -63,12 +63,12 @@
     <!-- LEFT: 3D BRAIN + REGIONS -->
     <section class="panel panel-brain">
       <div class="panel-title">
-        <h2>3D 人脑</h2>
-        <span class="hint">拖拽旋转 · 滚轮缩放 · 悬停脑区看名字</span>
+        <h2>3D brain</h2>
+        <span class="hint">drag to rotate · scroll to zoom · hover a region</span>
       </div>
       <div id="brain3d"></div>
       <div class="thinking-ribbon" id="thinking-ribbon" data-empty="true">
-        <div class="thinking-label">现在在想 · thinking about</div>
+        <div class="thinking-label">thinking about</div>
         <div class="thinking-body">
           <div class="thinking-title" id="thinking-title">—</div>
           <div class="thinking-desc" id="thinking-desc">brain is warming up…</div>
@@ -80,19 +80,19 @@
     <!-- MIDDLE-TOP: ENVIRONMENT & VITALS -->
     <section class="panel panel-env">
       <div class="panel-title">
-        <h2>虚拟环境</h2>
+        <h2>Environment</h2>
         <div class="hint">
-          <span class="tag tag-agent">身体</span>
-          <span class="tag tag-food">食物 +1</span>
-          <span class="tag tag-hazard">危险 −1</span>
+          <span class="tag tag-agent">body</span>
+          <span class="tag tag-food">food +1</span>
+          <span class="tag tag-hazard">hazard −1</span>
         </div>
       </div>
       <div class="env-wrap">
         <canvas id="env-canvas" width="360" height="360"></canvas>
       </div>
       <div class="env-actions">
-        <button class="btn btn-mini" id="btn-poke-food">+ 加一个食物</button>
-        <button class="btn btn-mini" id="btn-poke-hazard">+ 加一个危险</button>
+        <button class="btn btn-mini" id="btn-poke-food">+ Drop food</button>
+        <button class="btn btn-mini" id="btn-poke-hazard">+ Drop hazard</button>
       </div>
       <div class="env-stats" id="env-stats"></div>
     </section>
@@ -101,16 +101,16 @@
     <section class="panel panel-region">
       <div class="panel-title panel-title-tabs">
         <div class="tabs" id="detail-tabs">
-          <button class="tab active" data-view="region">脑区详情</button>
-          <button class="tab" data-view="knowledge">知识库</button>
+          <button class="tab active" data-view="region">Region</button>
+          <button class="tab" data-view="knowledge">Knowledge</button>
           <button class="tab" data-view="trading">
-            交易台 <span class="tab-badge" id="trading-badge">paper</span>
+            Trading desk <span class="tab-badge" id="trading-badge">paper</span>
           </button>
         </div>
         <span class="hint mono" id="region-title">—</span>
       </div>
       <div id="region-detail" class="region-detail-empty">
-        <p>👈 点一个脑区看它内部在算什么</p>
+        <p>👈 click a region to see what it's computing</p>
       </div>
       <div id="knowledge-panel" class="knowledge-panel" style="display:none"></div>
       <div id="trading-panel" class="trading-panel" style="display:none"></div>
@@ -119,11 +119,8 @@
     <!-- RIGHT: THOUGHT STREAM -->
     <section class="panel panel-thoughts">
       <div class="panel-title">
-        <h2>思考流</h2>
-        <div class="tabs">
-          <button class="tab active" data-lang="zh">中</button>
-          <button class="tab" data-lang="en">EN</button>
-        </div>
+        <h2>Thought stream</h2>
+        <span class="hint mono">live from the cortex</span>
       </div>
       <div id="thought-stream" class="thought-stream"></div>
     </section>

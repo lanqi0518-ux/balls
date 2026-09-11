@@ -7,17 +7,6 @@
  */
 
 const REGION_LABELS = {
-  visual_cortex: "视觉皮层",
-  thalamus: "丘脑",
-  hippocampus: "海马体",
-  amygdala: "杏仁核",
-  nucleus_accumbens: "伏隔核",
-  prefrontal_cortex: "前额叶",
-  motor_cortex: "运动皮层",
-  default_mode: "默认网络",
-};
-
-const REGION_LABELS_EN = {
   visual_cortex: "Visual cortex",
   thalamus: "Thalamus",
   hippocampus: "Hippocampus",
@@ -25,25 +14,15 @@ const REGION_LABELS_EN = {
   nucleus_accumbens: "Nucleus accumbens",
   prefrontal_cortex: "Prefrontal cortex",
   motor_cortex: "Motor cortex",
-  default_mode: "Default mode",
+  default_mode: "Default mode network",
+  trader_cortex: "Trader cortex",
 };
 
 export class ThoughtStream {
-  constructor(container, tabsContainer) {
+  constructor(container) {
     this.container = container;
     this.seen = new Set();
-    this.buffer = []; // keep raw list so we can re-render on language change
-    this.lang = "zh";
-    if (tabsContainer) {
-      tabsContainer.addEventListener("click", (e) => {
-        const btn = e.target.closest(".tab");
-        if (!btn) return;
-        tabsContainer.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        this.lang = btn.dataset.lang;
-        this._rerender();
-      });
-    }
+    this.buffer = [];
   }
 
   addFromSnapshot(thoughts) {
@@ -59,7 +38,6 @@ export class ThoughtStream {
       this.buffer.splice(0, this.buffer.length - 60);
     }
     if (this.seen.size > 300) {
-      // trim seen set (rebuild from buffer)
       this.seen = new Set(this.buffer.map((t) => `${t.step}|${t.region}|${t.kind}|${t.text}`));
     }
     if (appended) this._rerender();
@@ -78,10 +56,8 @@ export class ThoughtStream {
   }
 
   _render(t) {
-    const label = this.lang === "zh"
-      ? (REGION_LABELS[t.region] || t.region)
-      : (REGION_LABELS_EN[t.region] || t.region);
-    const text = this.lang === "zh" ? (t.text_zh || t.text) : t.text;
+    const label = REGION_LABELS[t.region] || t.region;
+    const text = t.text || t.text_zh || "";
     return `<div class="thought thought-kind-${t.kind}">
       <div class="thought-meta">
         <span class="step">t=${t.step}</span>
@@ -94,7 +70,7 @@ export class ThoughtStream {
 }
 
 function escapeHtml(s) {
-  return String(s)
+  return String(s == null ? "" : s)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")

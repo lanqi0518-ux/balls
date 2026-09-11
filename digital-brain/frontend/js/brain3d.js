@@ -1,7 +1,11 @@
 /**
  * brain3d.js — Three.js visualisation of the digital brain.
  *
- *   * Cortical hull: a translucent, slightly noisy "brain-shaped" mesh
+ *   * Cerebrum: an anatomically-shaped, translucent cortical mesh with a
+ *               longitudinal fissure, frontal / temporal / occipital lobes,
+ *               and noise-displaced cortical folds (gyri + sulci).
+ *   * Cerebellum: two ridged lobes tucked under the occipital pole.
+ *   * Brainstem: a tapered stem descending from the base.
  *   * Region blobs: one per anatomical region, colour-coded, pulsing with
  *                   real-time activation streamed from the backend.
  *   * Interaction: orbit controls, hover tooltip, click-to-select.
@@ -11,12 +15,10 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 /**
- * BrainScene manages the whole 3D visualisation.
  * Backend region positions are (x, y, z) in a millimetre-ish space where:
  *   x = left–right         (Three.js x)
  *   y = anterior–posterior (Three.js z, with anterior = +z)
  *   z = superior–inferior  (Three.js y, with superior = +y)
- *
  * We rotate the backend coordinate into Three.js on ingest.
  */
 export class BrainScene {
@@ -28,7 +30,7 @@ export class BrainScene {
     this.hoveredName = null;
 
     this._initScene();
-    this._buildCorticalHull();
+    this._buildAnatomy();
     this._addLights();
     this._addStarfield();
     this._addInteraction();
@@ -39,10 +41,10 @@ export class BrainScene {
 
   _initScene() {
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x05070d, 0.0035);
+    this.scene.fog = new THREE.FogExp2(0x05070d, 0.0032);
 
     this.camera = new THREE.PerspectiveCamera(45, 1, 1, 4000);
-    this.camera.position.set(160, 70, 200);
+    this.camera.position.set(170, 90, 220);
     this.camera.lookAt(0, 0, 0);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -53,12 +55,11 @@ export class BrainScene {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
-    this.controls.minDistance = 100;
-    this.controls.maxDistance = 500;
+    this.controls.minDistance = 110;
+    this.controls.maxDistance = 520;
     this.controls.autoRotate = true;
     this.controls.autoRotateSpeed = 0.35;
 
-    // Tooltip element
     this.tooltip = document.createElement("div");
     this.tooltip.className = "brain-tooltip";
     this.tooltip.style.display = "none";
@@ -66,114 +67,260 @@ export class BrainScene {
   }
 
   _addLights() {
-    this.scene.add(new THREE.AmbientLight(0x223045, 0.7));
-    const key = new THREE.DirectionalLight(0x9fd6ff, 0.9);
-    key.position.set(200, 300, 200);
+    this.scene.add(new THREE.AmbientLight(0x2a3550, 0.75));
+    const key = new THREE.DirectionalLight(0xc0ddff, 0.9);
+    key.position.set(200, 320, 220);
     this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0xc084fc, 0.4);
-    rim.position.set(-200, -150, -100);
+    const rim = new THREE.DirectionalLight(0xd8b4fe, 0.4);
+    rim.position.set(-220, -140, -110);
     this.scene.add(rim);
-    const bottom = new THREE.DirectionalLight(0x38bdf8, 0.25);
-    bottom.position.set(0, -300, 0);
+    const bottom = new THREE.DirectionalLight(0x60a5fa, 0.28);
+    bottom.position.set(0, -320, 0);
     this.scene.add(bottom);
   }
 
+  // -----------------------------------------------------------------
+  //  Anatomy
+  // -----------------------------------------------------------------
+
+  _buildAnatomy() {
+    this._buildCerebrum();
+    this._buildCerebellum();
+    this._buildBrainstem();
+  }
+
   /**
-   * Build a stylised, anatomically-plausible cerebral hull:
-   *   1) an ellipsoid roughly matching brain proportions
-   *   2) displaced vertex-by-vertex with 3D noise to give the appearance of
-   *      gyri and sulci (fissures)
-   *   3) split into two hemispheres via a longitudinal fissure
-   *   4) rendered translucent so the region blobs inside are visible
+   * Cerebrum: one closed mesh reshaped from a high-res sphere into a
+   * two-hemisphere brain silhouette. We add a deep longitudinal fissure
+   * along the sagittal midplane, forward-projecting frontal lobes, an
+   * overhanging occipital pole, temporal-lobe bulges on the flanks, and
+   * multi-octave noise displacement approximating gyri and sulci.
    */
-  _buildCorticalHull() {
-    const geo = new THREE.SphereGeometry(90, 96, 64);
-    // Squash to brain proportions (longer front-back, shorter top-bottom)
+  _buildCerebrum() {
+    const R = 55;
+    const geo = new THREE.SphereGeometry(R, 192, 128);
     const pos = geo.attributes.position;
+
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      const y = pos.getY(i);
-      const z = pos.getZ(i);
-      // scale: x = left-right (0.85), y = top-bottom (0.85), z = front-back (1.15)
-      let sx = x * 0.9;
-      let sy = y * 0.85;
-      let sz = z * 1.15;
-      // Add pseudo-random ridges (fake gyri)
-      const noise = this._noise3(sx * 0.06, sy * 0.06, sz * 0.06) * 5;
-      const ridges = Math.sin(sx * 0.11) * Math.cos(sy * 0.12) * Math.sin(sz * 0.09) * 3.5;
-      const disp = noise + ridges;
-      const len = Math.sqrt(sx * sx + sy * sy + sz * sz) || 1;
-      sx += (sx / len) * disp;
-      sy += (sy / len) * disp;
-      sz += (sz / len) * disp;
-      // Longitudinal fissure: push slightly inward near x=0
-      const fissure = Math.max(0, 1 - Math.abs(sx) / 12) * (1 - Math.abs(sy) / 100);
-      sx += (sx >= 0 ? 1 : -1) * fissure * 1.5;
-      // Tilt slightly (occipital lower)
-      const tilt = -0.06;
-      const yr = sy * Math.cos(tilt) - sz * Math.sin(tilt);
-      const zr = sy * Math.sin(tilt) + sz * Math.cos(tilt);
-      pos.setXYZ(i, sx, yr, zr);
+      let x = pos.getX(i);
+      let y = pos.getY(i);
+      let z = pos.getZ(i);
+      const ux = x / R, uy = y / R, uz = z / R;
+
+      // 1) Anisotropic ellipsoid: L/R narrower, front-back longer.
+      x = ux * 50;
+      y = uy * 52;
+      z = uz * 80;
+
+      // 2) Frontal-lobe forward bulge (+z) — rounder and slightly taller.
+      if (uz > 0) {
+        const t = uz;
+        z += Math.pow(t, 1.4) * 14;
+        y += Math.pow(t, 2) * 4;
+      }
+
+      // 3) Occipital taper + lift (real brains overhang cerebellum).
+      if (uz < -0.35) {
+        const t = Math.min(1, (-uz - 0.35) / 0.65);
+        x *= (1 - t * 0.18);
+        y *= (1 - t * 0.14);
+        y += t * 6;
+        z -= t * 4;
+      }
+
+      // 4) Temporal-lobe bulges — outward + downward on the mid-lower flank.
+      {
+        const midlow = Math.max(0, 1 - Math.abs(uy + 0.32) * 2.6) *
+                       Math.max(0, 1 - Math.abs(uz)        * 1.4);
+        x += Math.sign(ux || 1) * midlow * 11;
+        y -= midlow * 7;
+      }
+
+      // 5) Base flattening — bottom is flatter (skull-base support).
+      if (uy < -0.7) {
+        const t = Math.min(1, (-uy - 0.7) / 0.3);
+        y = y * (1 - t) + (-52 * 0.82) * t;
+      }
+
+      // 6) Longitudinal fissure along x = 0. Deep on top, shallow on base.
+      const distFromMid = Math.abs(x);
+      const fissureShape = Math.max(0, 1 - distFromMid / 9) *
+                           Math.max(0, 1 - Math.abs(z) / 95);
+      const topWeight = Math.max(0, Math.min(1, (uy + 0.15) * 1.6));
+      const fissureDepth = fissureShape * topWeight;
+      // Groove: press downward.
+      y -= fissureDepth * 6.0;
+      // Push away from midline (widens the crease).
+      x += Math.sign(x || 1) * fissureDepth * 2.8;
+
+      // 7) Cortical folds — gyri (outward) and sulci (inward) via multi-
+      // octave sines. Sulci are exaggerated so the surface reads as folded.
+      const nx = x * 0.11, ny = y * 0.11, nz = z * 0.095;
+      const fold = (
+        Math.sin(nx * 1.9 + ny * 1.3 + 0.7) * 0.55 +
+        Math.sin(nx * 2.7 - nz * 1.8 + 1.2) * 0.35 +
+        Math.sin(ny * 2.4 + nz * 2.1 + 2.5) * 0.25 +
+        Math.sin(nx * 3.9 + nz * 3.2 + 4.1) * 0.16 +
+        Math.sin(nx * 5.1 + ny * 4.8 - nz * 4.5) * 0.09
+      );
+      const sulci = -Math.max(0, -fold) * 4.8;
+      const gyri  =  Math.max(0,  fold) * 2.2;
+      const disp = sulci + gyri;
+      const len = Math.sqrt(x * x + y * y + z * z) || 1;
+      x += (x / len) * disp;
+      y += (y / len) * disp;
+      z += (z / len) * disp;
+
+      // 8) Slight forward tilt (occipital lower than frontal).
+      const tilt = -0.04;
+      const yr = y * Math.cos(tilt) - z * Math.sin(tilt);
+      const zr = y * Math.sin(tilt) + z * Math.cos(tilt);
+      pos.setXYZ(i, x, yr, zr);
     }
     geo.computeVertexNormals();
 
     const mat = new THREE.MeshPhongMaterial({
-      color: 0x3b4a6b,
-      emissive: 0x1a2540,
-      specular: 0x4a5c85,
-      shininess: 25,
+      color: 0xb8a8c8,
+      emissive: 0x2b1f35,
+      specular: 0x6f5f80,
+      shininess: 28,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.30,
       side: THREE.DoubleSide,
       flatShading: false,
     });
-    const brain = new THREE.Mesh(geo, mat);
-    this.scene.add(brain);
-    this.brainHull = brain;
+    const cerebrum = new THREE.Mesh(geo, mat);
+    this.scene.add(cerebrum);
+    this.cerebrum = cerebrum;
 
-    // Wireframe overlay for that MRI look
-    const wireGeo = new THREE.EdgesGeometry(geo, 25);
+    // Fine wireframe overlay traces the folds — looks like MRI surface lines.
+    const wireGeo = new THREE.EdgesGeometry(geo, 22);
     const wireMat = new THREE.LineBasicMaterial({
-      color: 0x5a7599,
+      color: 0x7a6890,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.28,
     });
     const wire = new THREE.LineSegments(wireGeo, wireMat);
     this.scene.add(wire);
-    this.brainWireframe = wire;
+    this.cerebrumWireframe = wire;
+  }
 
-    // Brainstem (small cylinder trailing down)
-    const stemGeo = new THREE.CylinderGeometry(8, 5, 40, 16, 8, true);
-    const stemMat = new THREE.MeshPhongMaterial({
-      color: 0x2a3550,
-      emissive: 0x090c14,
-      shininess: 10,
-      transparent: true, opacity: 0.35,
+  /**
+   * Cerebellum: two smaller ridged lobes at the posterior-inferior position
+   * (behind and below the occipital cortex). The ridges approximate the
+   * cerebellar folia — parallel bands running roughly left-to-right.
+   */
+  _buildCerebellum() {
+    const buildLobe = (side, seedOffset) => {
+      const geo = new THREE.SphereGeometry(22, 96, 72);
+      const pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        let x = pos.getX(i);
+        let y = pos.getY(i);
+        let z = pos.getZ(i);
+        const ux = x / 22, uy = y / 22, uz = z / 22;
+
+        // Squash: wider L-R + top-bottom, shorter front-back.
+        x = ux * 20;
+        y = uy * 14;
+        z = uz * 18;
+
+        // Parallel folia — dense ridges running along x, with slight z-wobble.
+        const ridge = Math.sin(z * 1.05 + Math.sin(x * 0.35 + seedOffset) * 0.6);
+        const jitter = Math.sin(x * 0.7 + seedOffset) *
+                       Math.sin(y * 0.9 + seedOffset * 0.5) * 0.35;
+        const foliaDisp = -Math.abs(ridge + jitter) * 1.35;
+        const len = Math.sqrt(x * x + y * y + z * z) || 1;
+        x += (x / len) * foliaDisp;
+        y += (y / len) * foliaDisp;
+        z += (z / len) * foliaDisp;
+
+        // Flatten the medial side (touches the vermis / midline).
+        if (side < 0 && x > -1.5) {
+          x -= (x + 1.5) * 0.7;
+        } else if (side > 0 && x < 1.5) {
+          x -= (x - 1.5) * 0.7;
+        }
+        pos.setXYZ(i, x, y, z);
+      }
+      geo.computeVertexNormals();
+
+      const mat = new THREE.MeshPhongMaterial({
+        color: 0xa79db8,
+        emissive: 0x241a30,
+        specular: 0x62526f,
+        shininess: 22,
+        transparent: true,
+        opacity: 0.42,
+        side: THREE.DoubleSide,
+        flatShading: false,
+      });
+      const lobe = new THREE.Mesh(geo, mat);
+      lobe.position.set(side * 14, -34, -60);
+      lobe.rotation.x = 0.15;
+      lobe.rotation.z = side * -0.05;
+      return lobe;
+    };
+
+    this.cerebellumL = buildLobe(-1, 0.0);
+    this.cerebellumR = buildLobe(+1, 3.7);
+    this.scene.add(this.cerebellumL);
+    this.scene.add(this.cerebellumR);
+
+    // A soft vermis (central ridge) bridging the two lobes.
+    const vermisGeo = new THREE.SphereGeometry(8, 32, 24);
+    const vp = vermisGeo.attributes.position;
+    for (let i = 0; i < vp.count; i++) {
+      const x = vp.getX(i), y = vp.getY(i), z = vp.getZ(i);
+      vp.setXYZ(i, x * 0.55, y * 0.9, z * 1.2);
+    }
+    vermisGeo.computeVertexNormals();
+    const vermisMat = new THREE.MeshPhongMaterial({
+      color: 0x9c92b0, emissive: 0x1d1428,
+      transparent: true, opacity: 0.5, shininess: 18,
     });
-    const stem = new THREE.Mesh(stemGeo, stemMat);
-    stem.position.set(0, -55, -10);
-    stem.rotation.x = 0.15;
+    const vermis = new THREE.Mesh(vermisGeo, vermisMat);
+    vermis.position.set(0, -34, -60);
+    this.scene.add(vermis);
+  }
+
+  /**
+   * Brainstem: tapered cylinder descending from base of the cerebrum,
+   * angled slightly backward.
+   */
+  _buildBrainstem() {
+    const geo = new THREE.CylinderGeometry(7, 4.5, 46, 24, 12, true);
+    const pos = geo.attributes.position;
+    // Add slight noise so it's not perfectly smooth.
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      const bump = Math.sin(y * 0.4) * 0.35 + Math.sin(x * 0.5 + z * 0.3) * 0.25;
+      const len = Math.sqrt(x * x + z * z) || 1;
+      pos.setXYZ(i, x + (x / len) * bump, y, z + (z / len) * bump);
+    }
+    geo.computeVertexNormals();
+    const mat = new THREE.MeshPhongMaterial({
+      color: 0x8f85a5,
+      emissive: 0x1b1428,
+      specular: 0x4f4560,
+      shininess: 18,
+      transparent: true,
+      opacity: 0.5,
+      side: THREE.DoubleSide,
+    });
+    const stem = new THREE.Mesh(geo, mat);
+    stem.position.set(0, -55, -32);
+    stem.rotation.x = 0.28;
     this.scene.add(stem);
-
-    // Central axis reference (subtle)
-    const axisGeo = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(0, -85, 0),
-      new THREE.Vector3(0, 85, 0),
-    ]);
-    const axisMat = new THREE.LineBasicMaterial({
-      color: 0x1e2a3f,
-      transparent: true, opacity: 0.4,
-    });
-    this.scene.add(new THREE.Line(axisGeo, axisMat));
+    this.brainstem = stem;
   }
 
   _addStarfield() {
-    // Ambient particles — subtle "neural dust"
-    const N = 250;
+    const N = 260;
     const geo = new THREE.BufferGeometry();
     const positions = new Float32Array(N * 3);
     for (let i = 0; i < N; i++) {
-      const r = 300 + Math.random() * 400;
+      const r = 320 + Math.random() * 420;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
       positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
@@ -185,21 +332,21 @@ export class BrainScene {
       color: 0x38bdf8,
       size: 1.4,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.32,
       sizeAttenuation: true,
     });
     this.scene.add(new THREE.Points(geo, mat));
   }
 
+  // -----------------------------------------------------------------
+  //  Region markers (one glowing sphere per BrainRegion)
+  // -----------------------------------------------------------------
+
   /**
    * Convert a backend region position (x, y, z) to Three.js coords.
-   * Backend: x=L/R, y=A/P, z=S/I  →  Three.js: (x, z, y)
+   * Backend: x=L/R, y=A/P (front=+), z=S/I (up=+)  →  Three.js (x, z, y).
    */
   _backendToScene(pos) {
-    // Backend coords: x=L/R, y=A/P (front=positive), z=S/I (up=positive).
-    // Three.js: x=L/R, y=up/down, z=front/back (with -z = front by convention,
-    // but our camera looks from +z, so we treat +z as front for authoring).
-    // Scale roughly to fit inside a hull of extent ~[100, 90, 115].
     const [x, y, z] = pos;
     return new THREE.Vector3(x * 0.9, z * 0.9, y * 0.9);
   }
@@ -211,7 +358,6 @@ export class BrainScene {
       }
       const entry = this.regions.get(r.name);
       entry.data = r;
-      // Sphere radius range: 7–14 (readable but non-overlapping).
       const size = 7 + Math.pow(r.activation, 0.6) * 7;
       entry.core.scale.setScalar(size / entry.baseSize);
       entry.core.material.opacity = 0.85 + r.activation * 0.15;
@@ -226,7 +372,6 @@ export class BrainScene {
     const color = new THREE.Color(meta.color);
     const scenePos = this._backendToScene(meta.position);
 
-    // Core sphere (solid, colored)
     const baseSize = 10;
     const coreGeo = new THREE.SphereGeometry(baseSize, 24, 20);
     const coreMat = new THREE.MeshBasicMaterial({
@@ -234,7 +379,6 @@ export class BrainScene {
     });
     const core = new THREE.Mesh(coreGeo, coreMat);
 
-    // Outer glow (large translucent sphere)
     const glowGeo = new THREE.SphereGeometry(baseSize, 24, 20);
     const glowMat = new THREE.MeshBasicMaterial({
       color, transparent: true, opacity: 0.2,
@@ -243,7 +387,6 @@ export class BrainScene {
     const glow = new THREE.Mesh(glowGeo, glowMat);
     glow.scale.setScalar(2.2);
 
-    // Group both
     const group = new THREE.Group();
     group.add(glow);
     group.add(core);
@@ -251,8 +394,7 @@ export class BrainScene {
     group.userData.regionName = meta.name;
     this.scene.add(group);
 
-    // Label sprite (small text)
-    const labelSprite = this._makeLabel(meta.zh_name || meta.display_name, color);
+    const labelSprite = this._makeLabel(meta.display_name, color);
     labelSprite.position.set(0, baseSize + 8, 0);
     labelSprite.visible = false;
     group.add(labelSprite);
@@ -305,7 +447,7 @@ export class BrainScene {
         item.style.color = r.color;
         item.innerHTML = `
           <span class="legend-swatch" style="background:${r.color}"></span>
-          <span class="legend-name">${r.zh_name || r.display_name}</span>
+          <span class="legend-name">${r.display_name}</span>
           <span class="legend-bar"><span class="legend-bar-fill" style="width:0%"></span></span>
         `;
         item.addEventListener("click", () => this.select(r.name));
@@ -351,8 +493,7 @@ export class BrainScene {
         this.tooltip.style.top = `${e.clientY - rect.top + 12}px`;
         this.tooltip.innerHTML = `
           <div class="tt-title" style="color:${entry.meta.color}">${entry.meta.display_name}</div>
-          <div class="tt-title mono" style="font-size:11px; color: var(--text-muted); margin-bottom:4px">${entry.meta.zh_name || ""}</div>
-          <div class="tt-role">${entry.meta.role_zh || entry.meta.role}</div>
+          <div class="tt-role">${entry.meta.role}</div>
           <div class="tt-act">activation ${(entry.data.activation * 100).toFixed(0)}%</div>
         `;
         this.renderer.domElement.style.cursor = "pointer";
@@ -413,8 +554,6 @@ export class BrainScene {
 
   _animate() {
     requestAnimationFrame(() => this._animate());
-    // Smoothly interpolate pulses toward target activation and add a subtle
-    // breathing wobble proportional to activation.
     for (const entry of this.regions.values()) {
       entry.pulseCurrent += (entry.pulseTarget - entry.pulseCurrent) * 0.15;
       const t = performance.now() * 0.001;
@@ -424,15 +563,5 @@ export class BrainScene {
     }
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
-  }
-
-  // Tiny deterministic 3D "noise" using layered sines.
-  _noise3(x, y, z) {
-    return (
-      Math.sin(x * 1.3 + y * 0.7 + z * 1.1) +
-      Math.sin(x * 2.1 - z * 1.9) +
-      Math.sin(y * 1.7 + z * 2.3) +
-      Math.sin(x * 0.4 - y * 1.5 + z * 0.9)
-    ) * 0.25;
   }
 }

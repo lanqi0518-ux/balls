@@ -13,17 +13,20 @@ export function initTrading(panelEl, opts = {}) {
   onCommand = opts.onCommand || (() => {});
   panelEl.innerHTML = `
     <div class="trading-intro">
-      <strong>Paper trading only — 不动真钱。</strong>
-      大脑跟踪一批 Solana 钱包的链上买卖，做行为克隆学他们，然后按学到的策略在实时价上模拟买卖。
-      平仓的实盈亏会反向传播回大脑，越赚的钱包影响权重越大。
-      <span class="warn">⚠ Phase 4（实盘）目前<strong>未启用</strong>——需要你显式提供 Solana 私钥并设定硬止损。</span>
+      <strong>Paper trading only — no real money.</strong>
+      The brain watches a batch of Solana wallets, does behaviour cloning on
+      their on-chain trades, then simulates buys/sells at live prices with the
+      cloned policy. Closed-trade PnL is back-propagated into the cortex, with
+      more profitable wallets getting more weight.
+      <span class="warn">⚠ Phase 4 (real on-chain execution) is <strong>disabled</strong>
+      — enabling it requires you to plug in a Solana private key and hard limits.</span>
     </div>
 
     <div class="trading-summary" id="trading-summary"></div>
 
     <div class="trading-block">
       <div class="trading-block-title">
-        <span>Paper 净值曲线</span>
+        <span>Paper equity curve</span>
         <span class="count" id="eqcurve-hint">—</span>
       </div>
       <div class="equity-curve-wrap"><svg id="eq-curve" preserveAspectRatio="none"></svg></div>
@@ -31,40 +34,40 @@ export function initTrading(panelEl, opts = {}) {
 
     <div class="trading-block">
       <div class="trading-block-title">
-        <span>持仓</span><span class="count" id="pos-count">0</span>
+        <span>Positions</span><span class="count" id="pos-count">0</span>
       </div>
       <div id="pos-body"></div>
     </div>
 
     <div class="trading-block">
       <div class="trading-block-title">
-        <span>🔥 热门 Solana meme 币</span><span class="count" id="hot-count">0</span>
+        <span>🔥 Hot Solana meme tokens</span><span class="count" id="hot-count">0</span>
       </div>
       <div id="hot-body"></div>
     </div>
 
     <div class="trading-block">
       <div class="trading-block-title">
-        <span>🧠 我们自己算的 smart-money 榜（滚动 24h 已实现 PnL）</span>
+        <span>🧠 Smart-money leaderboard (rolling 24h realized PnL)</span>
       </div>
       <div id="lb-body"></div>
     </div>
 
     <div class="trading-block">
       <div class="trading-block-title">
-        <span>👁 跟踪中的钱包</span><span class="count" id="w-count">0</span>
+        <span>👁 Tracked wallets</span><span class="count" id="w-count">0</span>
       </div>
       <div id="wallets-body"></div>
       <div class="trading-add-wallet">
-        <input id="w-addr" placeholder="Solana 钱包地址..." spellcheck="false"/>
-        <input id="w-label" class="label" placeholder="标签（可选）"/>
-        <button class="btn btn-mini" id="w-track">+ 跟踪</button>
+        <input id="w-addr" placeholder="Solana wallet address…" spellcheck="false"/>
+        <input id="w-label" class="label" placeholder="Label (optional)"/>
+        <button class="btn btn-mini" id="w-track">+ Track</button>
       </div>
     </div>
 
     <div class="trading-block">
       <div class="trading-block-title">
-        <span>最近平仓</span><span class="count" id="closed-count">0</span>
+        <span>Recent closes</span><span class="count" id="closed-count">0</span>
       </div>
       <div id="closed-body"></div>
     </div>
@@ -135,7 +138,7 @@ function updateEquityCurve(curve, startUsd) {
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   const hint = document.getElementById("eqcurve-hint");
   if (!curve.length) {
-    svg.innerHTML = `<text x="50%" y="50%" fill="#5a6a82" font-size="10" text-anchor="middle" font-family="JetBrains Mono">等待第一个净值点…</text>`;
+    svg.innerHTML = `<text x="50%" y="50%" fill="#5a6a82" font-size="10" text-anchor="middle" font-family="JetBrains Mono">waiting for first equity sample…</text>`;
     hint.textContent = "";
     return;
   }
@@ -162,14 +165,14 @@ function updateEquityCurve(curve, startUsd) {
     <polygon class="equity-curve-area" points="${areaPts}"/>
     <polyline class="equity-curve-line" points="${pts}"/>
   `;
-  hint.textContent = `${values.length} 个净值样本 · 起始 ${fmtUsd(startUsd)} · 当前 ${fmtUsd(values[values.length - 1])}`;
+  hint.textContent = `${values.length} samples · start ${fmtUsd(startUsd)} · now ${fmtUsd(values[values.length - 1])}`;
 }
 
 function updatePositions(positions) {
   document.getElementById("pos-count").textContent = positions.length;
   const el = document.getElementById("pos-body");
   if (!positions.length) {
-    el.innerHTML = `<div class="trading-empty">目前没有持仓</div>`;
+    el.innerHTML = `<div class="trading-empty">no open positions</div>`;
     return;
   }
   el.innerHTML = `<table class="trading-table"><thead><tr>
@@ -192,7 +195,7 @@ function updateHot(hot) {
   document.getElementById("hot-count").textContent = hot.length;
   const el = document.getElementById("hot-body");
   if (!hot.length) {
-    el.innerHTML = `<div class="trading-empty">正在从 DexScreener 拉数据…</div>`;
+    el.innerHTML = `<div class="trading-empty">fetching from DexScreener…</div>`;
     return;
   }
   el.innerHTML = `<table class="trading-table"><thead><tr>
@@ -215,7 +218,7 @@ function updateHot(hot) {
 function updateLeaderboard(rows) {
   const el = document.getElementById("lb-body");
   if (!rows.length) {
-    el.innerHTML = `<div class="trading-empty">还没积累到 PnL — 等钱包出几笔交易</div>`;
+    el.innerHTML = `<div class="trading-empty">no PnL yet — waiting for tracked wallets to trade</div>`;
     return;
   }
   el.innerHTML = `<table class="trading-table"><thead><tr>
@@ -237,7 +240,7 @@ function updateWallets(wallets) {
   document.getElementById("w-count").textContent = wallets.length;
   const el = document.getElementById("wallets-body");
   if (!wallets.length) {
-    el.innerHTML = `<div class="trading-empty">还没跟踪任何钱包 — 下面加一个</div>`;
+    el.innerHTML = `<div class="trading-empty">no wallets tracked yet — add one below</div>`;
     return;
   }
   el.innerHTML = `<table class="trading-table"><thead><tr>
@@ -258,7 +261,7 @@ function updateClosed(closed) {
   document.getElementById("closed-count").textContent = closed.length;
   const el = document.getElementById("closed-body");
   if (!closed.length) {
-    el.innerHTML = `<div class="trading-empty">还没有平过仓</div>`;
+    el.innerHTML = `<div class="trading-empty">no closed trades yet</div>`;
     return;
   }
   el.innerHTML = `<table class="trading-table"><thead><tr>

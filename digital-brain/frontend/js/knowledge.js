@@ -31,7 +31,7 @@ export async function loadKnowledge(panelEl) {
     renderPanel(panelEl, data);
     return data;
   } catch (e) {
-    panelEl.innerHTML = `<div class="knowledge-intro">加载知识库失败：${escapeHtml(e.message)}</div>`;
+    panelEl.innerHTML = `<div class="knowledge-intro">Failed to load knowledge bank: ${escapeHtml(e.message)}</div>`;
     return null;
   }
 }
@@ -43,10 +43,11 @@ function renderPanel(panelEl, data) {
   const intro = document.createElement("div");
   intro.className = "knowledge-intro";
   intro.innerHTML = `
-    这不是"它真的懂"，而是启动时塞进海马体的 <strong>${total} 个语义种子</strong>。
-    大脑在思考时会不定期<strong>联想</strong>到其中一个（下面高亮的就是当下想到的）。
-    当前模式：<strong>${escapeHtml(mode)}</strong>·
-    联想不使用任何 LLM。
+    Not "understanding" — these are <strong>${total} semantic seeds</strong> loaded
+    into the hippocampus at boot. While the brain thinks, it occasionally
+    <strong>associates</strong> to one of them (the lit chip below is the one it's
+    on right now). Current mode: <strong>${escapeHtml(mode)}</strong>.
+    Association uses no LLM.
   `;
   panelEl.innerHTML = "";
   panelEl.appendChild(intro);
@@ -69,7 +70,7 @@ function renderPanel(panelEl, data) {
     title.className = "knowledge-cat-title";
     title.innerHTML = `
       <span class="swatch"></span>
-      <span>${escapeHtml(meta.zh || cat)}</span>
+      <span>${escapeHtml(meta.en || cat)}</span>
       <span class="count">· ${items.length}</span>
     `;
     catEl.appendChild(title);
@@ -80,8 +81,8 @@ function renderPanel(panelEl, data) {
       const chip = document.createElement("div");
       chip.className = "knowledge-chip";
       chip.style.setProperty("--chip-color", color);
-      chip.title = `${c.zh} · ${c.en}\n${c.desc_zh}`;
-      chip.innerHTML = `<span>${escapeHtml(c.zh)}</span><span class="chip-en">${escapeHtml(c.en)}</span>`;
+      chip.title = `${c.en}\n${c.desc_en}`;
+      chip.innerHTML = `<span>${escapeHtml(c.en)}</span>`;
       grid.appendChild(chip);
       CHIPS.set(c.id, chip);
     }
