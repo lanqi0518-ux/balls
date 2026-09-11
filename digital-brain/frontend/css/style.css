@@ -1408,6 +1408,50 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   color: var(--good);
 }
 
+.chain-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  border: 1px solid transparent;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.chain-badge.chain-sol {
+  background: rgba(153, 69, 255, 0.18);
+  border-color: rgba(153, 69, 255, 0.45);
+  color: #C4B5FD;
+}
+.chain-badge.chain-hood {
+  background: rgba(0, 200, 60, 0.16);
+  border-color: rgba(0, 200, 60, 0.45);
+  color: #6EE7B7;
+}
+.chain-badge.chain-eth {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.45);
+  color: #93C5FD;
+}
+.chain-badge.chain-base {
+  background: rgba(37, 99, 235, 0.16);
+  border-color: rgba(37, 99, 235, 0.45);
+  color: #60A5FA;
+}
+.chain-badge.chain-bsc {
+  background: rgba(240, 185, 11, 0.16);
+  border-color: rgba(240, 185, 11, 0.45);
+  color: #FCD34D;
+}
+.chain-badge.chain-other {
+  background: rgba(148, 163, 184, 0.16);
+  border-color: rgba(148, 163, 184, 0.45);
+  color: #CBD5E1;
+}
+
 .trading-table {
   width: 100%;
   border-collapse: collapse;

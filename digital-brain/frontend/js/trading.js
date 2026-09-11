@@ -43,7 +43,7 @@ export function initTrading(panelEl, opts = {}) {
 
     <div class="trading-block">
       <div class="trading-block-title">
-        <span>Fresh launches · every Solana launchpad</span>
+        <span>Fresh launches · Solana + Robinhood-chain</span>
         <span class="count" id="fresh-count">0</span>
       </div>
       <div id="fresh-body"></div>
@@ -216,7 +216,7 @@ function updateHot(hot) {
     return;
   }
   el.innerHTML = `<table class="trading-table"><thead><tr>
-      <th>TOKEN</th><th>PRICE</th><th>1H</th><th>24H</th><th>VOL 24H</th><th>LIQ</th><th>AGE</th>
+      <th>TOKEN</th><th>CHAIN</th><th>PRICE</th><th>1H</th><th>24H</th><th>VOL 24H</th><th>LIQ</th><th>AGE</th>
     </tr></thead><tbody>
     ${hot.slice(0, 12).map((p) => `
       <tr>
@@ -224,6 +224,7 @@ function updateHot(hot) {
           <a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.base_symbol || "?")}</a>
           ${p.is_fresh_launch ? `<span class="fresh-badge" title="fresh launch, ${p.fresh_age_minutes}m old">NEW</span>` : ""}
         </td>
+        <td>${chainBadge(p.chain)}</td>
         <td>${fmtUsd(p.price_usd)}</td>
         <td class="${clsSign(p.price_change_h1)}">${fmtPct(p.price_change_h1)}</td>
         <td class="${clsSign(p.price_change_h24)}">${fmtPct(p.price_change_h24)}</td>
@@ -235,8 +236,31 @@ function updateHot(hot) {
     </tbody></table>`;
 }
 
-function chainExplorerUrl(mint) {
-  // Neutral Solana explorer — no launchpad brand in the URL the user sees.
+function chainBadge(chain) {
+  const c = (chain || "solana").toLowerCase();
+  const map = {
+    solana:   { label: "SOL",   cls: "chain-sol" },
+    robinhood:{ label: "HOOD",  cls: "chain-hood" },
+    ethereum: { label: "ETH",   cls: "chain-eth" },
+    base:     { label: "BASE",  cls: "chain-base" },
+    bsc:      { label: "BSC",   cls: "chain-bsc" },
+  };
+  const m = map[c] || { label: c.toUpperCase().slice(0, 6), cls: "chain-other" };
+  return `<span class="chain-badge ${m.cls}">${m.label}</span>`;
+}
+
+function chainExplorerUrl(mint, chain) {
+  // Chain-aware explorer link.
+  const c = (chain || "solana").toLowerCase();
+  if (c === "robinhood") {
+    // Robinhood-chain uses EVM addresses. DexScreener is the best
+    // neutral explorer we can link to without picking a Robinhood-side
+    // block-explorer URL scheme that may change.
+    return `https://dexscreener.com/robinhood/${encodeURIComponent(mint)}`;
+  }
+  if (c === "ethereum")  return `https://etherscan.io/token/${encodeURIComponent(mint)}`;
+  if (c === "base")      return `https://basescan.org/token/${encodeURIComponent(mint)}`;
+  if (c === "bsc")       return `https://bscscan.com/token/${encodeURIComponent(mint)}`;
   return `https://solscan.io/token/${encodeURIComponent(mint)}`;
 }
 
@@ -250,10 +274,10 @@ function updateFresh(fresh) {
     return;
   }
   el.innerHTML = `<table class="trading-table"><thead><tr>
-      <th>TOKEN</th><th>NAME</th><th>AGE</th><th>MCAP</th><th>STATUS</th><th>LINKS</th>
+      <th>TOKEN</th><th>CHAIN</th><th>NAME</th><th>AGE</th><th>MCAP</th><th>STATUS</th><th>LINKS</th>
     </tr></thead><tbody>
     ${fresh.slice(0, 14).map((c) => {
-      const mintUrl = chainExplorerUrl(c.mint);
+      const mintUrl = chainExplorerUrl(c.mint, c.chain);
       const ageStr = c.age_minutes < 60
         ? `${Math.round(c.age_minutes)}m`
         : `${(c.age_minutes / 60).toFixed(1)}h`;
@@ -272,6 +296,7 @@ function updateFresh(fresh) {
         <td class="sym">
           <a href="${escapeHtml(mintUrl)}" target="_blank" rel="noopener">${escapeHtml(c.symbol || "?")}</a>
         </td>
+        <td>${chainBadge(c.chain)}</td>
         <td class="mono-sm" style="color:var(--text-muted)">${escapeHtml((c.name || "").slice(0, 22))}</td>
         <td class="mono-sm">${ageStr}</td>
         <td>${fmtBig(c.usd_market_cap)}</td>
