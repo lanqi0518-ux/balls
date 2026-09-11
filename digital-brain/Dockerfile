@@ -28,6 +28,11 @@ RUN pip install -r requirements.txt
 COPY backend ./backend
 COPY frontend ./frontend
 
+# Data directory (mounted from a Fly volume so cortex weights & paper book
+# survive across restarts and rolling deploys).
+RUN mkdir -p /data
+ENV DATA_DIR=/data
+
 # Fly.io injects $PORT; uvicorn honours it.
 EXPOSE 8080
 

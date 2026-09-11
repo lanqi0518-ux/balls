@@ -8,6 +8,7 @@ import { BrainScene } from "/static/js/brain3d.js";
 import { EnvironmentView, renderEnvStats } from "/static/js/environment.js";
 import { ThoughtStream } from "/static/js/thoughtstream.js";
 import { loadKnowledge, setActiveConcept, categoryColor } from "/static/js/knowledge.js";
+import { initTrading, updateTrading } from "/static/js/trading.js";
 
 // ---------- DOM refs ----------
 const brainContainer = document.getElementById("brain3d");
@@ -34,10 +35,14 @@ const tickHzInput = document.getElementById("tick-hz");
 const tickHzLabel = document.getElementById("tick-hz-label");
 
 const knowledgePanel = document.getElementById("knowledge-panel");
+const tradingPanel = document.getElementById("trading-panel");
 const detailTabs = document.getElementById("detail-tabs");
 const thinkingRibbon = document.getElementById("thinking-ribbon");
 const thinkingTitle = document.getElementById("thinking-title");
 const thinkingDesc = document.getElementById("thinking-desc");
+const paperEquityEl = document.getElementById("paper-equity");
+const paperPnlEl = document.getElementById("paper-pnl");
+const footerTrader = document.getElementById("footer-trader");
 
 // ---------- Init subsystems ----------
 let selectedRegionName = null;
@@ -58,6 +63,7 @@ let lastConceptId = null;
 let modeInitialized = false;
 
 loadKnowledge(knowledgePanel);
+initTrading(tradingPanel, { onCommand: (cmd, extra) => send(cmd, extra) });
 
 detailTabs.addEventListener("click", (e) => {
   const btn = e.target.closest(".tab[data-view]");
@@ -66,13 +72,14 @@ detailTabs.addEventListener("click", (e) => {
 });
 
 function switchDetailView(view) {
-  if (view !== "region" && view !== "knowledge") return;
+  if (!["region", "knowledge", "trading"].includes(view)) return;
   detailView = view;
   document.querySelectorAll("#detail-tabs .tab").forEach((el) => {
     el.classList.toggle("active", el.dataset.view === view);
   });
   document.getElementById("region-detail").style.display = view === "region" ? "" : "none";
   document.getElementById("knowledge-panel").style.display = view === "knowledge" ? "flex" : "none";
+  document.getElementById("trading-panel").style.display  = view === "trading"   ? "flex" : "none";
 }
 
 // ---------- WebSocket ----------
@@ -137,6 +144,14 @@ function handlePayload(data) {
   const memN = brain.hippocampus_stats?.memories ?? 0;
   footerKnowledge.textContent = `Memory: ${memN} eps + ${knowN} knowledge`;
 
+  if (data.trading) {
+    updateTradingStrip(data.trading);
+    updateTrading(data.trading);
+    const st = data.trading.trader_cortex_stats || {};
+    footerTrader.textContent =
+      `Trader: ${st.bc_updates || 0} BC / ${st.rl_updates || 0} RL updates`;
+  }
+
   brainScene.updateRegions(brain.regions);
   envView.update(env);
   renderEnvStats(envStatsEl, env, brain);
@@ -150,6 +165,18 @@ function handlePayload(data) {
 
   running = !!data.running;
   btnPause.textContent = running ? "⏸ Pause" : "▶ Resume";
+}
+
+function updateTradingStrip(trading) {
+  const p = trading.paper || {};
+  const eq = p.equity_usd || 0;
+  const pnl = p.total_pnl_usd || 0;
+  const pnlPct = p.total_pnl_pct || 0;
+  paperEquityEl.textContent = "$" + eq.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  const cls = pnl > 0 ? "up" : (pnl < 0 ? "down" : "");
+  paperPnlEl.className = "mono " + cls;
+  const sign = pnl >= 0 ? "+" : "";
+  paperPnlEl.textContent = `${sign}${pnl.toFixed(0)} (${sign}${pnlPct.toFixed(2)}%)`;
 }
 
 function updateThinkingRibbon(active) {

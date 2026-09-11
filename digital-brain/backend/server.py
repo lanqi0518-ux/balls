@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from .brain import Brain
 from .env import GridWorld
 from .knowledge import categories_public, concepts_public
+from .trading_service import TradingService
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -37,6 +38,7 @@ class Simulation:
         self.running: bool = True
         self.tick_hz: float = 6.0  # frames per second the brain "lives" at
         self._current_obs = self.env.reset()
+        self.trading: TradingService = TradingService(self.brain)
 
     # ------------------------------------------------------------------
 
@@ -60,8 +62,20 @@ class Simulation:
         elif cmd == "reset":
             self._current_obs = self.env.reset()
         elif cmd == "reset_brain":
+            await self.trading.stop()
             self.brain = Brain()
             self._current_obs = self.env.reset()
+            self.trading = TradingService(self.brain)
+            await self.trading.start()
+        elif cmd == "add_wallet":
+            addr = str(msg.get("address", "")).strip()
+            label = str(msg.get("label", "")).strip()
+            self.trading.add_wallet(addr, label)
+        elif cmd == "remove_wallet":
+            addr = str(msg.get("address", "")).strip()
+            self.trading.remove_wallet(addr)
+        elif cmd == "trading_save":
+            self.trading._save_now()
         elif cmd == "speed":
             hz = float(msg.get("hz", 6.0))
             self.tick_hz = max(0.5, min(30.0, hz))
@@ -92,6 +106,7 @@ class Simulation:
             "action": action_info,
             "running": self.running,
             "tick_hz": self.tick_hz,
+            "trading": self.trading.snapshot(),
         }
 
     async def _broadcast(self, payload: dict) -> None:
@@ -123,9 +138,11 @@ sim = Simulation()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     task = asyncio.create_task(sim.run_forever())
+    await sim.trading.start()
     try:
         yield
     finally:
+        await sim.trading.stop()
         task.cancel()
         try:
             await task
@@ -155,10 +172,25 @@ async def ws_endpoint(ws: WebSocket) -> None:
 
 @app.get("/health")
 async def health() -> dict:
+    tr = sim.trading
     return {"ok": True, "clients": len(sim.clients), "running": sim.running,
             "tick_hz": sim.tick_hz, "step": sim.brain.step_count,
             "mode": sim.brain.config.mode,
-            "knowledge": len(sim.brain.hippocampus.knowledge)}
+            "knowledge": len(sim.brain.hippocampus.knowledge),
+            "trading": {
+                "hot_tokens": len(tr.tokens.snapshot()),
+                "tracked_wallets": len(tr.wallets.wallets()),
+                "paper_equity_usd": tr.paper.equity_usd(
+                    {p.base_address: p.price_usd for p in tr.tokens.snapshot() if p.price_usd > 0}
+                ),
+                "bc_updates": tr.brain.trader_cortex.bc_updates,
+                "rl_updates": tr.brain.trader_cortex.rl_updates,
+            }}
+
+
+@app.get("/api/trading")
+async def api_trading() -> dict:
+    return sim.trading.snapshot()
 
 
 @app.get("/api/knowledge")

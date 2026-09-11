@@ -41,6 +41,11 @@
       <div class="status-item">
         <span class="mono" id="reward-label">Σreward 0.00</span>
       </div>
+      <div class="status-item paper-strip" id="paper-strip" title="Paper trading equity">
+        <span class="paper-label">📄 PAPER</span>
+        <span class="mono" id="paper-equity">—</span>
+        <span class="mono" id="paper-pnl">—</span>
+      </div>
       <div class="status-item mode-badge" id="mode-badge" title="Brain mode">
         <span class="mode-dot"></span><span id="mode-label">BOOT</span>
       </div>
@@ -92,12 +97,15 @@
       <div class="env-stats" id="env-stats"></div>
     </section>
 
-    <!-- MIDDLE-BOTTOM: REGION DETAIL / KNOWLEDGE -->
+    <!-- MIDDLE-BOTTOM: REGION DETAIL / KNOWLEDGE / TRADING -->
     <section class="panel panel-region">
       <div class="panel-title panel-title-tabs">
         <div class="tabs" id="detail-tabs">
           <button class="tab active" data-view="region">脑区详情</button>
           <button class="tab" data-view="knowledge">知识库</button>
+          <button class="tab" data-view="trading">
+            交易台 <span class="tab-badge" id="trading-badge">paper</span>
+          </button>
         </div>
         <span class="hint mono" id="region-title">—</span>
       </div>
@@ -105,6 +113,7 @@
         <p>👈 点一个脑区看它内部在算什么</p>
       </div>
       <div id="knowledge-panel" class="knowledge-panel" style="display:none"></div>
+      <div id="trading-panel" class="trading-panel" style="display:none"></div>
     </section>
 
     <!-- RIGHT: THOUGHT STREAM -->
@@ -123,15 +132,13 @@
 
   <footer class="footer">
     <div class="footer-l">
-      <span class="mono">Brain: 8 regions</span>
+      <span class="mono">Brain: 9 regions</span>
       <span class="mono">·</span>
-      <span class="mono">Environment: 9×9 grid</span>
+      <span class="mono" id="footer-knowledge">Memory: — eps + — knowledge</span>
       <span class="mono">·</span>
-      <span class="mono">Learning: online actor-critic</span>
+      <span class="mono" id="footer-trader">Trader: 0 BC / 0 RL updates</span>
       <span class="mono">·</span>
-      <span class="mono" id="footer-knowledge">Knowledge seeds: —</span>
-      <span class="mono">·</span>
-      <span class="mono" style="color: var(--accent)">No LLM used</span>
+      <span class="mono" style="color: var(--accent)">No LLM · Paper only</span>
     </div>
     <div class="footer-r">
       <label class="mono">

@@ -39,11 +39,13 @@ from .regions import (
     NucleusAccumbens,
     PrefrontalCortex,
     Thalamus,
+    TraderCortex,
     VisualCortex,
     ACTION_NAMES,
     ACTION_NAMES_ZH,
 )
 from ..knowledge import all_concepts_with_embeddings
+from ..market import MARKET_FEATURE_DIM
 
 
 FEATURE_DIM = 32
@@ -101,6 +103,8 @@ class Brain:
         self.default_mode = DefaultModeNetwork(
             replay_rate=self.config.dmn_replay_rate,
         )
+        self.trader_cortex = TraderCortex(market_feature_dim=MARKET_FEATURE_DIM,
+                                           hidden=96)
 
         self.regions: List = [
             self.visual_cortex,
@@ -111,6 +115,7 @@ class Brain:
             self.prefrontal_cortex,
             self.motor_cortex,
             self.default_mode,
+            self.trader_cortex,
         ]
 
         # Running state used for online learning.

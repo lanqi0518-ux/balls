@@ -587,6 +587,14 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   border-left-color: #facc15;
   background: linear-gradient(90deg, rgba(250, 204, 21, 0.10), transparent 60%);
 }
+.thought-kind-trade,
+.thought-kind-close,
+.thought-kind-imitate,
+.thought-kind-wallet_add,
+.thought-kind-wallet_remove {
+  border-left-color: #f97316;
+  background: linear-gradient(90deg, rgba(249, 115, 22, 0.10), transparent 60%);
+}
 
 /* ---------- Panel: knowledge library -------------------------------------- */
 
@@ -678,6 +686,179 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   letter-spacing: 0.05em;
 }
 .knowledge-chip.lit .chip-en { color: rgba(255,255,255,0.85); }
+
+/* ---------- Paper trading strip (topbar) ---------------------------------- */
+
+.paper-strip {
+  display: flex;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(249, 115, 22, 0.10);
+  border: 1px solid rgba(249, 115, 22, 0.35);
+  color: #f97316;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+.paper-strip .paper-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: rgba(249, 115, 22, 0.85);
+}
+.paper-strip .up   { color: var(--good); }
+.paper-strip .down { color: var(--bad); }
+
+.tab-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  background: rgba(249, 115, 22, 0.2);
+  color: #f97316;
+  letter-spacing: 0.05em;
+  vertical-align: middle;
+}
+
+/* ---------- Panel: trading desk ------------------------------------------ */
+
+.trading-panel {
+  flex: 1;
+  overflow: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.trading-intro {
+  padding: 8px 10px;
+  background: var(--bg-2);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  border-left: 2px solid #f97316;
+}
+.trading-intro strong { color: #f97316; }
+.trading-intro .warn {
+  display: block;
+  margin-top: 4px;
+  color: var(--warn);
+  font-size: 10.5px;
+}
+
+.trading-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.trading-summary .meter { padding: 6px 8px; }
+.trading-summary .meter-value { font-size: 13px; }
+
+.trading-block {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.trading-block-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.trading-block-title .count { font-weight: 400; }
+
+.trading-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  background: var(--bg-2);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.trading-table th,
+.trading-table td {
+  padding: 5px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--bg-3);
+}
+.trading-table th {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  background: var(--bg-3);
+}
+.trading-table tr:last-child td { border-bottom: none; }
+.trading-table .pos { color: var(--good); }
+.trading-table .neg { color: var(--bad); }
+.trading-table .sym { color: var(--text-primary); font-weight: 600; }
+.trading-table .mono-sm { font-size: 10.5px; color: var(--text-secondary); }
+
+.trading-empty {
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 6px 8px;
+  background: var(--bg-2);
+  border-radius: 6px;
+  font-family: var(--font-sans);
+}
+
+.trading-add-wallet {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+}
+.trading-add-wallet input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 5px 8px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.trading-add-wallet input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.trading-add-wallet input.label { max-width: 120px; }
+
+.equity-curve-wrap {
+  background: var(--bg-2);
+  border-radius: 6px;
+  padding: 8px;
+  min-height: 90px;
+}
+.equity-curve-wrap svg {
+  width: 100%;
+  height: 90px;
+  display: block;
+}
+.equity-curve-line {
+  fill: none;
+  stroke: #f97316;
+  stroke-width: 1.5;
+}
+.equity-curve-area {
+  fill: url(#eqGradient);
+  opacity: 0.35;
+}
+.equity-curve-baseline {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  fill: none;
+}
 
 /* ---------- Footer -------------------------------------------------------- */
 

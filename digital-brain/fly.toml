@@ -10,13 +10,17 @@ primary_region = "sjc"
 [env]
   PORT = "8080"
   PYTHONUNBUFFERED = "1"
+  DATA_DIR = "/data"
+  BRAIN_MODE = "einstein"
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"
+  # Trading loops run in the background and would be lost if the machine
+  # suspended. Keep at least one running so the cortex accumulates state.
+  auto_stop_machines = "off"
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
   processes = ["app"]
 
   [http_service.concurrency]
@@ -35,3 +39,8 @@ primary_region = "sjc"
   size = "shared-cpu-1x"
   memory = "1gb"
   cpus = 1
+
+# One volume per machine; created via `flyctl volumes create data -r sjc -s 1`
+[[mounts]]
+  source = "data"
+  destination = "/data"
