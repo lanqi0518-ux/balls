@@ -6,22 +6,27 @@
    ========================================================================== */
 
 :root {
-  /* Backgrounds */
-  --bg-0: #050612;              /* OLED near-black */
-  --bg-1: #080B1A;              /* base panel */
-  --bg-glass: rgba(15, 20, 40, 0.55);
-  --bg-glass-strong: rgba(20, 26, 48, 0.72);
-  --bg-elev: rgba(10, 14, 30, 0.9);
+  /* Backgrounds — true OLED. bg-0 is essentially pure black so any
+     panel/glass surface reads as elevated by contrast alone. */
+  --bg-0: #030308;              /* true OLED */
+  --bg-void: #000000;            /* absolute void, used for vignette bases */
+  --bg-1: #070917;              /* base panel */
+  --bg-2: #0A0E1F;              /* elevated panel */
+  --bg-glass: rgba(12, 16, 34, 0.62);
+  --bg-glass-strong: rgba(16, 22, 44, 0.78);
+  --bg-elev: rgba(8, 12, 26, 0.94);
 
-  /* Borders */
-  --border: rgba(255, 255, 255, 0.06);
-  --border-strong: rgba(255, 255, 255, 0.12);
+  /* Borders — hairline system. All borders are 1px but paired with
+     an inner 1px inset highlight for a "double line" premium feel. */
+  --border: rgba(255, 255, 255, 0.055);
+  --border-strong: rgba(255, 255, 255, 0.115);
+  --border-inner: rgba(255, 255, 255, 0.035);
   --border-glow: rgba(110, 231, 255, 0.35);
 
   /* Text */
-  --text-primary: #F1F5FF;
-  --text-secondary: #A5B0CC;
-  --text-muted: #667191;
+  --text-primary: #F5F7FF;
+  --text-secondary: #A9B3CE;
+  --text-muted: #6A7492;
   --text-faint: rgba(200, 210, 235, 0.35);
 
   /* Accents */
@@ -33,7 +38,14 @@
   --bad: #F87171;
   --warn: #FBBF24;
   --danger: #FB7185;
-  --profit: #F97316;            /* Persist "trader orange" for money-related surfaces */
+  --profit: #F97316;            /* Trader orange (money surfaces) */
+
+  /* Premium accent — champagne / signal gold. Used sparingly on
+     high-value surfaces (paper equity badge, brand mark accent,
+     hero underlines). Signals prestige without shouting. */
+  --gold: #E8D9A6;
+  --gold-strong: #FDE68A;
+  --gold-dim: rgba(232, 217, 166, 0.16);
 
   --accent-dim: rgba(110, 231, 255, 0.14);
   --cognition-dim: rgba(240, 171, 252, 0.14);
@@ -71,13 +83,22 @@
   --r-lg: 14px;
   --r-xl: 18px;
 
-  /* Shadows */
-  --shadow-panel: 0 20px 60px -30px rgba(0, 0, 0, 0.9),
-                  0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+  /* Shadows — deep, warm, and layered. Real premium surfaces cast
+     shadows into the room they sit in, not just straight down. */
+  --shadow-panel:
+    0 30px 80px -40px rgba(0, 0, 0, 0.95),
+    0 12px 32px -18px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+    0 1px 0 0 rgba(255, 255, 255, 0.045) inset;
+  --shadow-elev-hi:
+    0 40px 100px -30px rgba(0, 0, 0, 0.9),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
   --shadow-glow-cyan: 0 0 40px -12px var(--accent),
                       0 0 0 1px var(--accent) inset;
   --shadow-glow-magenta: 0 0 40px -12px var(--cognition),
                          0 0 0 1px var(--cognition) inset;
+  --shadow-glow-gold: 0 0 40px -14px var(--gold),
+                      0 0 0 1px rgba(232, 217, 166, 0.35) inset;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -99,12 +120,25 @@ body {
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(circle 900px at 15% -10%, rgba(110, 231, 255, 0.10), transparent 55%),
-    radial-gradient(circle 900px at 100% 100%, rgba(240, 171, 252, 0.10), transparent 55%),
-    radial-gradient(circle 700px at 50% 50%, rgba(139, 92, 246, 0.05), transparent 70%),
+    radial-gradient(circle 1100px at 12% -12%, rgba(110, 231, 255, 0.12), transparent 55%),
+    radial-gradient(circle 1100px at 100% 108%, rgba(240, 171, 252, 0.10), transparent 55%),
+    radial-gradient(circle 800px at 50% 42%,   rgba(139, 92, 246, 0.045), transparent 72%),
+    radial-gradient(circle 1400px at 100% -20%, rgba(232, 217, 166, 0.04), transparent 60%),
     var(--bg-0);
   position: relative;
   isolation: isolate;
+}
+/* Fine vignette so the edges of the OLED page recede — makes the whole
+   viewport feel deeper and more expensive. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(ellipse at 50% 50%,
+              transparent 55%,
+              rgba(0, 0, 0, 0.55) 100%);
 }
 
 /* Ambient canvas — the neural-mesh backdrop. Sits behind everything.
@@ -454,11 +488,16 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
 .panel-region    { grid-area: region; }
 .panel-thoughts  { grid-area: thoughts; }
 
-/* Glass panel — the core of the new look */
+/* Glass panel — the core of the premium look. Every panel gets:
+     * a 1px outer hairline
+     * a 1px inner-highlight edge (via inset box-shadow)
+     * a soft top-edge shine
+     * technical-drawing corner accents (top-left / bottom-right)
+     * a warm, layered shadow that sits into the OLED */
 .panel {
   background: var(--bg-glass);
-  backdrop-filter: blur(20px) saturate(130%);
-  -webkit-backdrop-filter: blur(20px) saturate(130%);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: var(--sp-4) var(--sp-5);
@@ -470,14 +509,26 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   position: relative;
 }
 .panel::before {
-  /* super-subtle inner highlight along the top edge */
   content: "";
   position: absolute;
   top: 0; left: 8%; right: 8%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.16), transparent);
   pointer-events: none;
 }
+.panel::after {
+  /* Subtle vignette inside each panel, so its centre is brighter than
+     its corners and the surface reads as slightly domed. */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 30%,
+              transparent 55%,
+              rgba(0, 0, 0, 0.25) 100%);
+  border-radius: inherit;
+}
+
 
 .panel-title {
   flex: 0 0 auto;
@@ -1872,4 +1923,358 @@ input[type=range] {
 @media (max-width: 900px) {
   .web-body { grid-template-columns: 1fr; }
   .web-shot-wrap { min-height: 160px; }
+}
+
+/* ==========================================================================
+   PREMIUM FINISH — the "very high-end" pass.
+   Every rule below is additive polish on top of the base UI: refined
+   typography, warmer shadows, a champagne gold accent for money and
+   prestige surfaces, sharper hairline borders, and micro-details that
+   register as "expensive" from the corner of the eye without ever
+   competing for the user's attention.
+   ========================================================================== */
+
+/* --- Global typographic refinement --- */
+html, body {
+  font-feature-settings: "ss01" on, "ss02" on, "cv02" on, "cv03" on, "cv04" on;
+  text-rendering: geometricPrecision;
+}
+.mono {
+  font-feature-settings: "ss01" on, "zero" on, "tnum" on;
+}
+
+/* Selection uses the cognition palette — small detail but iconic. */
+::selection {
+  background: rgba(240, 171, 252, 0.28);
+  color: #FFFFFF;
+  text-shadow: 0 0 12px rgba(240, 171, 252, 0.6);
+}
+
+/* Slim, dark scrollbar. Chromium-family only. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(110, 231, 255, 0.22) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(110, 231, 255, 0.28), rgba(240, 171, 252, 0.22));
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(110, 231, 255, 0.45), rgba(240, 171, 252, 0.35));
+  background-clip: padding-box;
+}
+
+/* Custom link focus for the tab / keyboard-accessible users. */
+a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* --- Topbar refinements --- */
+.topbar {
+  padding: 16px 28px;
+  gap: 28px;
+  background:
+    linear-gradient(180deg,
+      rgba(3, 3, 8, 0.92) 0%,
+      rgba(3, 3, 8, 0.72) 100%),
+    radial-gradient(ellipse at top left, rgba(110, 231, 255, 0.06), transparent 60%);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow:
+    0 24px 60px -40px rgba(0, 0, 0, 0.9),
+    0 1px 0 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+/* Brand title — refined display treatment with a soft champagne tint
+   for the second half of the wordmark, evoking premium wordmarks
+   (Bloomberg terminal, luxury horology dials, Rewind, Rabbit). */
+.brand-title {
+  font-weight: 600;
+  font-size: 17.5px;
+  letter-spacing: -0.02em;
+  background: linear-gradient(180deg, #FFFFFF 30%, rgba(232, 217, 166, 0.85) 130%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 22px rgba(240, 171, 252, 0.14);
+}
+.brand-sub {
+  color: #8894B4;
+  letter-spacing: 0.02em;
+  font-weight: 400;
+}
+.brand-sub .mono {
+  background: rgba(232, 217, 166, 0.06);
+  border-color: rgba(232, 217, 166, 0.2);
+  color: var(--gold);
+}
+
+/* Enhanced brand mark ring — dual counter-rotation for depth. */
+.brand-mark-ring::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 1px dashed rgba(240, 171, 252, 0.28);
+  animation: brandRing 12s linear infinite reverse;
+}
+
+/* --- Badges: tighter, more understated, gold when it matters --- */
+.badge {
+  padding: 6px 11px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg,
+              rgba(255, 255, 255, 0.03),
+              rgba(255, 255, 255, 0.005));
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.05) inset;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  transition: border-color 0.25s, background 0.25s;
+}
+.badge:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.badge .badge-icon {
+  width: 12px; height: 12px;
+  opacity: 0.85;
+}
+
+/* Paper equity badge — the "money" surface. Champagne gold treatment. */
+.badge.badge-paper {
+  border-color: rgba(232, 217, 166, 0.3);
+  background:
+    linear-gradient(180deg, rgba(232, 217, 166, 0.08), rgba(232, 217, 166, 0.015));
+  color: var(--gold);
+  box-shadow:
+    0 1px 0 0 rgba(232, 217, 166, 0.14) inset,
+    0 0 22px -10px rgba(232, 217, 166, 0.35);
+}
+.badge.badge-paper .badge-label {
+  color: var(--gold-strong);
+  text-shadow: 0 0 10px rgba(232, 217, 166, 0.4);
+}
+.badge.badge-paper .badge-icon { color: var(--gold); }
+
+/* Learning + always-learning badge — a whisper of magenta. */
+.badge.badge-learning {
+  border-color: rgba(240, 171, 252, 0.25);
+  color: var(--cognition);
+}
+.badge.badge-uptime,
+.badge.badge-browser,
+.badge.badge-mode {
+  color: #C4CDE4;
+}
+
+/* Sharper conn dot with real halo. */
+.status-item.conn {
+  padding: 6px 12px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.015);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.status-dot {
+  width: 6px; height: 6px;
+  box-shadow: 0 0 8px currentColor, 0 0 14px currentColor;
+}
+
+/* --- Layout gap: slightly tighter and more architectural --- */
+.layout {
+  gap: 14px;
+  padding: 16px;
+}
+
+/* --- Hero block: bigger, quieter --- */
+.panel-hero {
+  padding: 22px 26px;
+}
+.hero-block {
+  padding: 22px 26px;
+  border-color: rgba(255, 255, 255, 0.06);
+  background:
+    linear-gradient(180deg, rgba(18, 24, 46, 0.82), rgba(10, 14, 30, 0.7));
+  box-shadow:
+    0 20px 60px -30px rgba(0, 0, 0, 0.9),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+}
+.hero-block .hero-label {
+  color: var(--text-muted);
+  letter-spacing: 0.16em;
+  font-size: 10px;
+  font-weight: 500;
+}
+.hero-block .hero-headline {
+  font-family: var(--font-display);
+  letter-spacing: -0.03em;
+  font-weight: 500;
+  text-wrap: balance;
+}
+.hero-block.hero-thinking .hero-headline {
+  background: linear-gradient(180deg, #FFFFFF 0%, rgba(110, 231, 255, 0.85) 130%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero-underline > span {
+  background: linear-gradient(90deg,
+              transparent 0%,
+              var(--accent) 20%,
+              var(--cognition) 50%,
+              var(--gold) 80%,
+              transparent 100%);
+  opacity: 0.55;
+}
+
+/* --- Buttons: refined pressable surfaces --- */
+.btn {
+  padding: 9px 15px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.008));
+  border-color: rgba(255, 255, 255, 0.09);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.06) inset,
+    0 6px 20px -12px rgba(0, 0, 0, 0.7);
+  transition: transform 0.15s, border-color 0.2s, color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+.btn:hover {
+  border-color: rgba(110, 231, 255, 0.55);
+  color: #DFF8FF;
+  background:
+    linear-gradient(180deg, rgba(110, 231, 255, 0.14), rgba(110, 231, 255, 0.04));
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.08) inset,
+    0 10px 24px -14px rgba(110, 231, 255, 0.4),
+    0 0 28px -14px rgba(110, 231, 255, 0.55);
+}
+
+.btn-mini {
+  padding: 6px 11px;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+}
+
+/* --- Footer: sink lower into the OLED, warmer type --- */
+.footer {
+  background:
+    linear-gradient(180deg, rgba(3, 3, 8, 0.6), rgba(3, 3, 8, 0.95));
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 -1px 0 0 rgba(255, 255, 255, 0.03) inset;
+  padding: 10px 24px;
+}
+.footer-guard {
+  color: var(--gold);
+  padding: 1px 8px;
+  border-radius: 3px;
+  background: rgba(232, 217, 166, 0.06);
+  border: 1px solid rgba(232, 217, 166, 0.2);
+}
+
+/* --- Thought stream: gentler card treatment --- */
+.thought-stream .thought {
+  border-color: rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.005));
+}
+.thought-stream .thought:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* --- Trading tables --- */
+.trading-table {
+  font-size: 11.5px;
+}
+.trading-table thead th {
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  text-transform: uppercase;
+}
+.trading-table tbody tr {
+  transition: background 0.15s;
+}
+.trading-table tbody tr:hover {
+  background: linear-gradient(90deg,
+              rgba(110, 231, 255, 0.05),
+              transparent 90%);
+}
+.trading-table tbody tr:nth-child(odd) td {
+  background: rgba(255, 255, 255, 0.008);
+}
+
+/* Chain-badge premium refresh — match the money-badge treatment. */
+.chain-badge {
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+/* --- Tabs: understated with a light bar underneath the active --- */
+.tab {
+  position: relative;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  font-weight: 500;
+}
+.tab.active {
+  color: var(--text-primary);
+}
+.tab.active::after {
+  content: "";
+  position: absolute;
+  left: 12%; right: 12%; bottom: -6px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), var(--cognition), transparent);
+  opacity: 0.9;
+  filter: drop-shadow(0 0 8px var(--accent));
+}
+
+/* --- Region detail / knowledge / trading paragraphs --- */
+.region-detail-empty p {
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.65;
+  max-width: 42em;
+}
+
+/* --- Very subtle animated grain-line noise on the whole viewport ---
+   Sits between the ambient canvas and everything else. Extremely low
+   opacity so it never distracts — just gives the OLED "presence". */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    repeating-linear-gradient(0deg,
+      rgba(255, 255, 255, 0.008) 0px,
+      rgba(255, 255, 255, 0.008) 1px,
+      transparent 1px,
+      transparent 3px);
+  opacity: 0.6;
+  mix-blend-mode: overlay;
+}
+
+/* --- Media queries: keep the premium finish coherent on small viewports --- */
+@media (max-width: 960px) {
+  .topbar { padding: 12px 16px; gap: 12px; }
+  .brand-title { font-size: 15.5px; }
+  .layout { padding: 10px; gap: 10px; }
 }

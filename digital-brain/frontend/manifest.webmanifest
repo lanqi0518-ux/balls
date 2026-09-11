@@ -1,0 +1,16 @@
+{
+  "name": "Digital Human Brain",
+  "short_name": "Brain",
+  "description": "A live digital human brain — 10 anatomical regions, nine deep-learning cortices plus one real LIF spiking ring-attractor, cooperating in real time.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050612",
+  "theme_color": "#050612",
+  "orientation": "any",
+  "icons": [
+    { "src": "/static/favicon.svg",       "sizes": "any",    "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/static/icon-192.png",      "sizes": "192x192", "type": "image/png",     "purpose": "any" },
+    { "src": "/static/icon-512.png",      "sizes": "512x512", "type": "image/png",     "purpose": "any" },
+    { "src": "/static/icon-512.png",      "sizes": "512x512", "type": "image/png",     "purpose": "maskable" }
+  ]
+}

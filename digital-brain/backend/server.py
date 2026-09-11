@@ -346,11 +346,52 @@ if FRONTEND_DIR.exists():
     async def index() -> FileResponse:
         return FileResponse(FRONTEND_DIR / "index.html")
 
+    # Root-level asset paths that browsers hit implicitly. Explicit
+    # routes so the SPA fallback below never returns index.html HTML
+    # in place of an image, manifest, or robots.txt (which corrupts
+    # tab favicons, PWA installs, and search-engine indexing).
+    _ROOT_STATIC = {
+        "/favicon.ico":         "favicon.ico",
+        "/favicon.svg":         "favicon.svg",
+        "/favicon-16.png":      "favicon-16.png",
+        "/favicon-32.png":      "favicon-32.png",
+        "/favicon-96.png":      "favicon-96.png",
+        "/apple-touch-icon.png":"apple-touch-icon.png",
+        "/apple-touch-icon-precomposed.png": "apple-touch-icon.png",
+        "/icon-192.png":        "icon-192.png",
+        "/icon-512.png":        "icon-512.png",
+        "/manifest.webmanifest":"manifest.webmanifest",
+    }
+
+    def _make_root_asset_route(fs_name: str):
+        async def _handler() -> FileResponse:
+            return FileResponse(FRONTEND_DIR / fs_name)
+        return _handler
+
+    for _route, _fname in _ROOT_STATIC.items():
+        app.add_api_route(_route, _make_root_asset_route(_fname),
+                          methods=["GET"], include_in_schema=False)
+
+    # A short list of file extensions the SPA fallback must NEVER serve
+    # index.html for — those requests are asset lookups, not routes,
+    # and getting HTML back for them silently breaks tab icons, images,
+    # manifests, source maps, etc.
+    _NON_SPA_EXTS = (
+        ".ico", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg",
+        ".webmanifest", ".map", ".txt", ".xml", ".json", ".css", ".js",
+        ".woff", ".woff2", ".ttf", ".otf", ".mp4", ".mp3", ".wasm",
+    )
+
     @app.get("/{path:path}")
     async def spa(path: str) -> FileResponse:
         target = FRONTEND_DIR / path
         if target.exists() and target.is_file():
             return FileResponse(target)
+        # If the path clearly looks like a missing asset, return a real
+        # 404 rather than the SPA shell.
+        low = path.lower()
+        if low.endswith(_NON_SPA_EXTS) or low.startswith("static/"):
+            return JSONResponse({"error": "not found", "path": path}, status_code=404)
         return FileResponse(FRONTEND_DIR / "index.html")
 
 
