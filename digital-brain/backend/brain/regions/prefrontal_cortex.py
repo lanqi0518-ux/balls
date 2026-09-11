@@ -74,3 +74,19 @@ class PrefrontalCortex(BrainRegion):
         torch.nn.utils.clip_grad_norm_(list(self.parameters_iter()), 1.0)
         self.optim.step()
         return float(loss.item())
+
+    def state_dict_serializable(self) -> dict:
+        """All the learnable pieces of the PFC, ready for torch.save."""
+        return {
+            "trunk": self.trunk.state_dict(),
+            "policy_head": self.policy_head.state_dict(),
+            "value_head": self.value_head.state_dict(),
+        }
+
+    def load_state_dict_safe(self, sd: dict) -> None:
+        try:
+            self.trunk.load_state_dict(sd.get("trunk", {}), strict=False)
+            self.policy_head.load_state_dict(sd.get("policy_head", {}), strict=False)
+            self.value_head.load_state_dict(sd.get("value_head", {}), strict=False)
+        except Exception:  # noqa: BLE001
+            pass

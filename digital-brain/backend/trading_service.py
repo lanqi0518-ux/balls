@@ -132,8 +132,12 @@ class TradingService:
             self.wallets.track(addr, label, source="env")
             self.leaderboard.set_label(addr, label)
 
-        # Restore any prior state
+        # Restore any prior state. We restore the WHOLE brain (PFC,
+        # hippocampus, amygdala, NAcc, lifetime counters) plus the
+        # trader cortex + paper trader — so a pod restart is truly
+        # invisible to the brain's learning history.
         restored = self.persistence.load_into(
+            brain=self.brain,
             trader_cortex=self.brain.trader_cortex,
             paper_trader=self.paper,
         )
@@ -551,8 +555,12 @@ class TradingService:
         if len(self._explored_fresh_mints) > 4000:
             self._explored_fresh_mints = set(list(self._explored_fresh_mints)[-2000:])
 
-        # 6) Persist state every few minutes
-        if time.time() - self._last_save > 180:
+        # 6) Persist state to disk regularly so a pod restart never
+        # wipes more than ~60s of learning. Fly typically gives us 5s
+        # between SIGINT and SIGKILL on a rolling deploy, and the
+        # lifespan finally clause always calls _save_now() before we
+        # exit — so 60s here is a floor, not a ceiling, on data-loss risk.
+        if time.time() - self._last_save > 60:
             self._save_now()
 
     # ------------------------------------------------------------------
@@ -698,6 +706,7 @@ class TradingService:
     def _save_now(self) -> None:
         self._last_save = time.time()
         self.persistence.save(
+            brain=self.brain,
             trader_cortex=self.brain.trader_cortex,
             paper_trader=self.paper,
         )

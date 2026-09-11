@@ -56,3 +56,20 @@ class NucleusAccumbens(BrainRegion):
             "last_prediction_error": round(self.last_error, 3),
             "cumulative_reward": round(self.cumulative_reward, 2),
         }
+
+    def state_dict_serializable(self) -> dict:
+        return {
+            "baseline": float(self.baseline),
+            "last_reward": float(self.last_reward),
+            "last_error": float(self.last_error),
+            "cumulative_reward": float(self.cumulative_reward),
+        }
+
+    def load_state_dict_safe(self, sd: dict) -> None:
+        try:
+            self.baseline = float(sd.get("baseline", 0.0))
+            self.last_reward = float(sd.get("last_reward", 0.0))
+            self.last_error = float(sd.get("last_error", 0.0))
+            self.cumulative_reward = float(sd.get("cumulative_reward", 0.0))
+        except Exception:  # noqa: BLE001
+            pass

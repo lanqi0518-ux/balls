@@ -3,19 +3,43 @@
 Runs the Brain/Environment loop in a background asyncio task and streams
 each tick's state to any connected browser. Also serves the static
 frontend so `python -m backend.server` is all you need to try it out.
+
+Reliability model
+-----------------
+Once this process starts, the brain is designed to be **impossible to
+stop cleanly**:
+
+* The main tick loop is wrapped in a supervisor that catches every
+  exception, logs it, and immediately restarts the loop. If the brain
+  code itself is buggy, the loop is restarted with an exponential
+  backoff up to 5s; it never stops for good while the process lives.
+* We disk-persist the full brain state every 60s AND on every SIGTERM
+  handler, so a hard pod-kill never loses more than a minute of
+  learning.
+* ``/health`` returns non-200 the moment the brain stops advancing its
+  step counter for more than 30s, which triggers a Fly.io container
+  restart. Combined with ``min_machines_running = 1`` in ``fly.toml``,
+  this means even a silent asyncio freeze is auto-recovered.
+* No HTTP or WebSocket command accepts pause / stop / reset / shutdown.
+  Users can only prod the gridworld environment or add wallets — the
+  cortex keeps running regardless.
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
+import logging
 import os
+import signal
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Set
+from typing import Optional, Set
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .brain import Brain
@@ -24,6 +48,8 @@ from .knowledge import categories_public, concepts_public
 from .trading_service import TradingService
 from .web_embodiment import WebEmbodiment
 
+
+LOG = logging.getLogger("server")
 
 ROOT = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = ROOT / "frontend"
@@ -36,20 +62,29 @@ class Simulation:
         self.brain = Brain()
         self.env = GridWorld(size=9, n_food=5, n_hazard=4, max_steps=250, seed=42)
         self.clients: Set[WebSocket] = set()
-        # The simulation never pauses. We keep `running` as an always-True flag
-        # for the payload so old clients that still watch it don't get confused.
+        # The simulation never pauses. We keep `running` as an always-True
+        # flag for the payload so old clients that still watch it don't get
+        # confused. There is no code path that ever sets this to False.
         self.running: bool = True
         self.tick_hz: float = 6.0  # frames per second the brain "lives" at
         self._current_obs = self.env.reset()
         self.trading: TradingService = TradingService(self.brain)
-        # The brain's SECOND body: a real headless Chromium roaming
-        # Solana-oriented crypto sites. Disabled via env if needed.
         self.web: WebEmbodiment | None = None
         if os.getenv("WEB_EMBODIMENT", "1") != "0":
             self.web = WebEmbodiment(
                 interval_s=float(os.getenv("WEB_TOUR_INTERVAL_S", "22.0")),
             )
             self.trading.attach_web_embodiment(self.web)
+        # Watchdog / liveness state:
+        # * _last_tick_at_s — wall-clock time of the last successful brain
+        #   step. Health-check flags the pod unhealthy if this stalls.
+        # * _tick_crashes — how many times run_forever's inner loop has
+        #   raised. Never causes the loop to stop; just surfaced in UI.
+        # * _restart_count — how many times the supervisor has had to
+        #   rebuild the inner loop.
+        self._last_tick_at_s: float = time.time()
+        self._tick_crashes: int = 0
+        self._restart_count: int = 0
 
     # ------------------------------------------------------------------
 
@@ -66,9 +101,10 @@ class Simulation:
 
     async def handle_command(self, ws: WebSocket, msg: dict) -> None:
         cmd = msg.get("cmd")
-        # NOTE: `pause`, `resume`, and `reset_brain` are intentionally NOT
-        # accepted. The brain is designed to run and learn continuously; the
-        # only thing users can restart is the gridworld body it's driving.
+        # NOTE: `pause`, `resume`, `reset_brain`, `stop`, `shutdown`,
+        # `kill` are intentionally NOT accepted. The brain is designed to
+        # run and learn continuously; the only things users can touch are
+        # the toy gridworld body and their own tracked wallets.
         if cmd == "reset":
             self._current_obs = self.env.reset()
         elif cmd == "add_wallet":
@@ -82,9 +118,10 @@ class Simulation:
             self.trading._save_now()
         elif cmd == "speed":
             hz = float(msg.get("hz", 6.0))
+            # Floor of 0.5 Hz is deliberate: the brain must always be
+            # ticking, even if the operator wants it slow.
             self.tick_hz = max(0.5, min(30.0, hz))
         elif cmd == "poke_food":
-            # User manually spawns a food pellet somewhere free
             from random import randrange
             free = {tuple(self.env.agent_pos)} | set(self.env.food) | set(self.env.hazards)
             while True:
@@ -110,6 +147,9 @@ class Simulation:
             "action": action_info,
             "running": self.running,
             "tick_hz": self.tick_hz,
+            "tick_crashes": self._tick_crashes,
+            "restart_count": self._restart_count,
+            "last_tick_ago_s": round(max(0.0, time.time() - self._last_tick_at_s), 2),
             "trading": self.trading.snapshot(),
             "web": self.web.snapshot() if self.web else {"enabled": False},
         }
@@ -124,39 +164,102 @@ class Simulation:
         for ws in dead:
             self.remove_client(ws)
 
-    async def run_forever(self) -> None:
-        # No pause branch: this loop steps the brain and environment every
-        # tick, forever. The only knob is `self.tick_hz`.
+    async def _tick_once(self) -> None:
+        info = self.brain.step(self._current_obs)
+        self._current_obs = self.env.step(info["action"])
+        self._last_tick_at_s = time.time()
+        await self._broadcast(self._payload(action_info=info))
+
+    async def _inner_loop(self) -> None:
         while True:
             interval = 1.0 / max(0.5, self.tick_hz)
-            info = self.brain.step(self._current_obs)
-            self._current_obs = self.env.step(info["action"])
-            await self._broadcast(self._payload(action_info=info))
+            await self._tick_once()
             await asyncio.sleep(interval)
+
+    async def run_forever(self) -> None:
+        """Supervisor loop: never exits while the process lives.
+
+        If the inner tick loop raises anything (including a MemoryError,
+        a torch NaN, an ill-typed observation, whatever), we catch it,
+        log it, back off briefly, and rebuild the loop from scratch. The
+        brain's persistent state stays in memory across the restart —
+        we're just recovering the driver, not the cortex.
+        """
+        backoff = 0.5
+        while True:
+            try:
+                await self._inner_loop()
+            except asyncio.CancelledError:
+                # This is the ONLY way out — happens during lifespan
+                # teardown when the whole process is going down.
+                raise
+            except Exception as e:  # noqa: BLE001
+                self._tick_crashes += 1
+                self._restart_count += 1
+                LOG.exception(
+                    "brain tick loop crashed (restart #%d, backoff %.1fs): %s",
+                    self._restart_count, backoff, e,
+                )
+                try:
+                    self.trading._save_now()
+                except Exception:  # noqa: BLE001
+                    pass
+                await asyncio.sleep(backoff)
+                backoff = min(5.0, backoff * 1.8)
+            else:
+                backoff = 0.5
+
+    async def emergency_save(self) -> None:
+        """Called from SIGTERM / lifespan-shutdown. Writes the whole
+        brain state to disk before we let the process exit."""
+        try:
+            self.trading._save_now()
+        except Exception as e:  # noqa: BLE001
+            LOG.warning("emergency save failed: %s", e)
 
 
 sim = Simulation()
 
 
+def _install_signal_handlers(loop: asyncio.AbstractEventLoop) -> None:
+    """When Fly sends SIGTERM (rolling deploy, VM migration, manual
+    ``fly machine stop``), we get ~5s before SIGKILL. Use it to flush
+    the brain to disk so the next boot resumes exactly here."""
+    def _handler(signame: str) -> None:
+        LOG.warning("received %s — flushing brain to disk before shutdown", signame)
+        try:
+            asyncio.ensure_future(sim.emergency_save())
+        except Exception:
+            pass
+
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            loop.add_signal_handler(sig, _handler, sig.name)
+        except (NotImplementedError, RuntimeError):
+            # Windows or the loop already closed — best effort only.
+            pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(sim.run_forever())
+    loop = asyncio.get_running_loop()
+    _install_signal_handlers(loop)
+    task = asyncio.create_task(sim.run_forever(), name="brain-supervisor")
     await sim.trading.start()
     if sim.web is not None:
-        # Any launch failure inside the web embodiment gracefully disables
-        # itself — it never blocks the rest of the app from booting.
         await sim.web.start()
     try:
         yield
     finally:
+        # Save FIRST, then let subsystems stop. Order matters: if trading
+        # stops before we save, we lose the very-latest trader state.
+        await sim.emergency_save()
         await sim.trading.stop()
         if sim.web is not None:
             await sim.web.stop()
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass
 
 
 app = FastAPI(title="Digital Human Brain", lifespan=lifespan)
@@ -179,22 +282,46 @@ async def ws_endpoint(ws: WebSocket) -> None:
         sim.remove_client(ws)
 
 
+# Freeze detector: if the brain hasn't ticked in > FREEZE_S seconds,
+# report unhealthy so Fly restarts the container. Kept generous (30s) to
+# avoid false positives during a burst of long web-embodiment page loads.
+HEALTH_FREEZE_THRESHOLD_S = 30.0
+
+
 @app.get("/health")
-async def health() -> dict:
+async def health():
     tr = sim.trading
-    return {"ok": True, "clients": len(sim.clients), "running": sim.running,
-            "tick_hz": sim.tick_hz, "step": sim.brain.step_count,
-            "mode": sim.brain.config.mode,
-            "knowledge": len(sim.brain.hippocampus.knowledge),
-            "trading": {
-                "hot_tokens": len(tr.tokens.snapshot()),
-                "tracked_wallets": len(tr.wallets.wallets()),
-                "paper_equity_usd": tr.paper.equity_usd(
-                    {p.base_address: p.price_usd for p in tr.tokens.snapshot() if p.price_usd > 0}
-                ),
-                "bc_updates": tr.brain.trader_cortex.bc_updates,
-                "rl_updates": tr.brain.trader_cortex.rl_updates,
-            }}
+    now = time.time()
+    since_tick = now - sim._last_tick_at_s
+    brain_ok = since_tick <= HEALTH_FREEZE_THRESHOLD_S
+    body = {
+        "ok": brain_ok,
+        "clients": len(sim.clients),
+        "running": sim.running,
+        "tick_hz": sim.tick_hz,
+        "since_last_tick_s": round(since_tick, 2),
+        "step": sim.brain.step_count,
+        "lifetime_step": sim.brain.lifetime_step_count,
+        "boot_count": sim.brain.boot_count,
+        "lifetime_uptime_s": round(
+            sim.brain.lifetime_uptime_s + (now - sim.brain.process_started_at_s), 1
+        ),
+        "restart_count": sim._restart_count,
+        "tick_crashes": sim._tick_crashes,
+        "mode": sim.brain.config.mode,
+        "knowledge": len(sim.brain.hippocampus.knowledge),
+        "trading": {
+            "hot_tokens": len(tr.tokens.snapshot()),
+            "tracked_wallets": len(tr.wallets.wallets()),
+            "paper_equity_usd": tr.paper.equity_usd(
+                {p.base_address: p.price_usd for p in tr.tokens.snapshot() if p.price_usd > 0}
+            ),
+            "bc_updates": tr.brain.trader_cortex.bc_updates,
+            "rl_updates": tr.brain.trader_cortex.rl_updates,
+        },
+    }
+    status = 200 if brain_ok else 503
+    return JSONResponse(body, status_code=status)
 
 
 @app.get("/api/trading")

@@ -22,6 +22,7 @@ Two extras compared to a bare RL agent:
 
 from __future__ import annotations
 
+import os
 import random
 import time
 from collections import deque
@@ -127,6 +128,25 @@ class Brain:
 
         # Running state used for online learning.
         self.step_count: int = 0
+        # Lifetime step count — sum across ALL machine boots. This is what
+        # tells the user "the brain has been continuously learning for X
+        # ticks since first boot" and is a hard proof it was never wiped.
+        # step_count is per-process; lifetime_step_count is per-brain.
+        self.lifetime_step_count: int = 0
+        # When this brain was first created, in unix seconds. Loaded from
+        # disk on restart so it reflects true age of learned state, not
+        # process age.
+        self.first_boot_at_s: float = time.time()
+        # When this specific process (VM boot) started. Never persisted —
+        # gives us "uptime this boot" for the UI.
+        self.process_started_at_s: float = time.time()
+        # Cumulative wall-clock time this brain has been running (across
+        # all machine boots). Updated on save + on load. Different from
+        # (now - first_boot_at_s) because the machine can be down briefly
+        # during a rolling deploy.
+        self.lifetime_uptime_s: float = 0.0
+        # Count of process boots so far (across the brain's lifetime).
+        self.boot_count: int = 1
         self._last_log_prob: Optional[torch.Tensor] = None
         self._last_value: Optional[torch.Tensor] = None
         self._last_thought_vec: Optional[torch.Tensor] = None
@@ -176,6 +196,7 @@ class Brain:
         }
         """
         self.step_count += 1
+        self.lifetime_step_count += 1
         image = observation["image"]
         danger = float(observation.get("danger", 0.0))
         reward = float(observation.get("reward", 0.0))
@@ -454,8 +475,18 @@ class Brain:
 
     def snapshot(self) -> dict:
         """Everything the UI needs about the current brain state."""
+        now = time.time()
+        proc_uptime = max(0.0, now - self.process_started_at_s)
+        # Live lifetime uptime = persisted + this process's uptime so far.
+        live_lifetime = self.lifetime_uptime_s + proc_uptime
         return {
             "step": self.step_count,
+            "lifetime_step": self.lifetime_step_count,
+            "boot_count": self.boot_count,
+            "first_boot_at_s": self.first_boot_at_s,
+            "process_started_at_s": self.process_started_at_s,
+            "process_uptime_s": round(proc_uptime, 1),
+            "lifetime_uptime_s": round(live_lifetime, 1),
             "engagement": round(self.engagement, 3),
             "mode": self.config.mode,
             "config": self.config.to_public(),
@@ -468,3 +499,54 @@ class Brain:
             "central_complex_stats": self.central_complex.stats(),
             "active_concept": self.active_concept,
         }
+
+    # ------------------------------------------------------------------
+    # Full-brain persistence
+    # ------------------------------------------------------------------
+
+    def state_dict_serializable(self) -> dict:
+        """Everything worth saving for a warm restart.
+
+        We deliberately DO NOT save the ephemeral central-complex
+        neuron voltages or DMN transient state — they re-initialise in a
+        fraction of a second. Everything that took real learning to build
+        (PFC actor-critic weights, hippocampal episodes, amygdala fear
+        templates, NAcc baseline, and lifetime counters) IS saved so the
+        brain resumes exactly where it left off.
+        """
+        now = time.time()
+        proc_uptime = max(0.0, now - self.process_started_at_s)
+        return {
+            "version": 1,
+            "step_count": self.step_count,
+            "lifetime_step_count": self.lifetime_step_count,
+            "first_boot_at_s": self.first_boot_at_s,
+            "boot_count": self.boot_count,
+            "lifetime_uptime_s": self.lifetime_uptime_s + proc_uptime,
+            "engagement": self.engagement,
+            "prefrontal_cortex": self.prefrontal_cortex.state_dict_serializable(),
+            "hippocampus": self.hippocampus.state_dict_serializable(),
+            "amygdala": self.amygdala.state_dict_serializable(),
+            "nucleus_accumbens": self.nucleus_accumbens.state_dict_serializable(),
+        }
+
+    def load_state_dict_safe(self, sd: dict) -> None:
+        """Restore a previously-saved brain. All fields are best-effort:
+        anything malformed is silently skipped so we never fail a boot on
+        a stale/corrupt state file."""
+        try:
+            self.lifetime_step_count = int(sd.get("lifetime_step_count", 0))
+            self.first_boot_at_s = float(sd.get("first_boot_at_s", self.first_boot_at_s))
+            self.boot_count = int(sd.get("boot_count", 1)) + 1
+            self.lifetime_uptime_s = float(sd.get("lifetime_uptime_s", 0.0))
+            self.engagement = float(sd.get("engagement", self.engagement))
+            if "prefrontal_cortex" in sd:
+                self.prefrontal_cortex.load_state_dict_safe(sd["prefrontal_cortex"])
+            if "hippocampus" in sd:
+                self.hippocampus.load_state_dict_safe(sd["hippocampus"])
+            if "amygdala" in sd:
+                self.amygdala.load_state_dict_safe(sd["amygdala"])
+            if "nucleus_accumbens" in sd:
+                self.nucleus_accumbens.load_state_dict_safe(sd["nucleus_accumbens"])
+        except Exception:  # noqa: BLE001
+            pass

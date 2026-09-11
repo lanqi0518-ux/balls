@@ -52,6 +52,11 @@
       <div class="status-item always-learning" title="Brain never stops. No pause, no reset.">
         <span class="always-dot"></span><span>ALWAYS LEARNING</span>
       </div>
+      <div class="status-item uptime-strip" id="uptime-strip"
+           title="Continuous learning since first boot. Persisted across every VM restart.">
+        <span class="uptime-icon">⏱</span>
+        <span class="mono" id="uptime-label">uptime —</span>
+      </div>
       <div class="status-item browser-strip" id="browser-strip" title="Real headless Chromium roaming Solana sites">
         <span class="browser-icon">🌐</span>
         <span class="mono" id="browser-strip-label">browser idle</span>
@@ -177,6 +182,10 @@
       <span class="mono" id="footer-knowledge">Memory: — eps + — knowledge</span>
       <span class="mono">·</span>
       <span class="mono" id="footer-trader">Trader: 0 BC / 0 RL updates</span>
+      <span class="mono">·</span>
+      <span class="mono" id="footer-lifetime" title="Cumulative learning across every VM restart">
+        Lifetime: — ticks · boot #—
+      </span>
       <span class="mono">·</span>
       <span class="mono" style="color: var(--accent)">No LLM · Paper only</span>
     </div>

@@ -1,8 +1,24 @@
 # fly.toml — Digital Human Brain
 # Deploy target: https://fly.io/apps/balls-lanqi
+#
+# This config is deliberately hardened so the brain runs 24/7 with no
+# way for the platform to pause it and no way for a transient crash to
+# take it down for long:
+#
+#   * auto_stop_machines = "off"     — Fly never suspends the VM.
+#   * min_machines_running = 1        — at least one VM is always up.
+#   * restart.policy = "always"       — process crash → immediate respawn.
+#   * kill_signal = "SIGTERM" + generous kill_timeout — gives the brain
+#     time to flush state to disk during a rolling deploy before SIGKILL.
+#   * swap_size_mb — a safety valve so a transient memory spike from the
+#     web-embodiment Chromium doesn't OOM-kill the whole pod.
 
 app = "balls-lanqi"
 primary_region = "sjc"
+
+kill_signal = "SIGTERM"
+kill_timeout = "20s"
+swap_size_mb = 512
 
 [build]
   dockerfile = "Dockerfile"
@@ -29,21 +45,29 @@ primary_region = "sjc"
     soft_limit = 40
 
   [[http_service.checks]]
-    grace_period = "20s"
-    interval = "30s"
+    grace_period = "30s"
+    interval = "20s"
     method = "GET"
     timeout = "5s"
     path = "/health"
 
+# Restart policy: anytime the container process exits (uvicorn crash,
+# python OOM, whatever) Fly should immediately relaunch it.
+[[restart]]
+  policy = "always"
+
 [[vm]]
   # Bumped to 2GB and 2 CPUs so the headless Chromium web-embodiment
-  # subsystem (Phase 2) has memory headroom alongside PyTorch + the
-  # spiking central complex.
+  # subsystem has memory headroom alongside PyTorch + the spiking
+  # central complex.
   size = "shared-cpu-2x"
   memory = "2gb"
   cpus = 2
 
-# One volume per machine; created via `flyctl volumes create data -r sjc -s 1`
+# One volume per machine; created via `flyctl volumes create data -r sjc -s 1`.
+# The brain's cortex weights, hippocampus, and paper-book all live here so
+# a VM restart or rolling deploy is invisible to the brain's learning
+# history.
 [[mounts]]
   source = "data"
   destination = "/data"

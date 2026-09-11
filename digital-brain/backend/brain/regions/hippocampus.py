@@ -140,3 +140,46 @@ class Hippocampus(BrainRegion):
             "last_similarity": round(self.last_similarity, 3),
             "last_recalled_tag": self.last_recalled_tag,
         }
+
+    # ------------------------------------------------------------------
+    # Persistence
+    # ------------------------------------------------------------------
+    def state_dict_serializable(self) -> dict:
+        """Serialize episodic memories only — knowledge is re-seeded
+        deterministically at boot from ``backend/knowledge.py`` so we
+        don't need to write it to disk."""
+        return {
+            "memory": [
+                {
+                    "features": ep.features.cpu(),
+                    "valence": ep.valence,
+                    "fear": ep.fear,
+                    "location": list(ep.location) if ep.location else [0, 0],
+                    "step": ep.step,
+                    "tag": ep.tag,
+                }
+                for ep in self.memory
+            ],
+        }
+
+    def load_state_dict_safe(self, sd: dict) -> None:
+        try:
+            self.memory = []
+            for m in sd.get("memory", []) or []:
+                feats = m.get("features")
+                if feats is None:
+                    continue
+                if not isinstance(feats, torch.Tensor):
+                    feats = torch.tensor(feats, dtype=torch.float32)
+                self.memory.append(Episode(
+                    features=feats.detach().clone(),
+                    valence=float(m.get("valence", 0.0)),
+                    fear=float(m.get("fear", 0.0)),
+                    location=tuple(m.get("location", (0, 0))),
+                    step=int(m.get("step", -1)),
+                    tag=str(m.get("tag", "episode")),
+                ))
+            if len(self.memory) > self.capacity:
+                self.memory = self.memory[-self.capacity:]
+        except Exception:  # noqa: BLE001
+            pass

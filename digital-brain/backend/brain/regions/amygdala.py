@@ -83,3 +83,22 @@ class Amygdala(BrainRegion):
             "fear": round(self.fear, 3),
             "conditioned_templates": len(self.conditioned),
         }
+
+    def state_dict_serializable(self) -> dict:
+        return {
+            "fear": float(self.fear),
+            "conditioned": [t.cpu() for t in self.conditioned],
+        }
+
+    def load_state_dict_safe(self, sd: dict) -> None:
+        try:
+            self.fear = float(sd.get("fear", 0.0))
+            self.conditioned = []
+            for t in sd.get("conditioned", []) or []:
+                if not isinstance(t, torch.Tensor):
+                    t = torch.tensor(t, dtype=torch.float32)
+                self.conditioned.append(t.detach().clone())
+            if len(self.conditioned) > 12:
+                self.conditioned = self.conditioned[-12:]
+        except Exception:  # noqa: BLE001
+            pass

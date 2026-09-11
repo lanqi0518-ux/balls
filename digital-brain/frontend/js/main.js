@@ -54,6 +54,53 @@ const intentTraderProbs     = document.getElementById("intent-trader-probs");
 const paperEquityEl = document.getElementById("paper-equity");
 const paperPnlEl = document.getElementById("paper-pnl");
 const footerTrader = document.getElementById("footer-trader");
+const footerLifetime = document.getElementById("footer-lifetime");
+const uptimeLabel = document.getElementById("uptime-label");
+const uptimeStrip = document.getElementById("uptime-strip");
+
+// Snapshot the last brain lifetime state so the topbar clock ticks
+// smoothly every second between WebSocket frames.
+let lifetimeSnapshot = null;
+
+function fmtDurationCompact(secs) {
+  if (!Number.isFinite(secs) || secs < 0) return "—";
+  const s = Math.floor(secs);
+  const days = Math.floor(s / 86400);
+  const hours = Math.floor((s % 86400) / 3600);
+  const mins = Math.floor((s % 3600) / 60);
+  const rem = s % 60;
+  if (days > 0) return `${days}d ${hours}h ${mins}m`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  if (mins > 0) return `${mins}m ${rem}s`;
+  return `${rem}s`;
+}
+
+function fmtCount(n) {
+  if (!Number.isFinite(n)) return "—";
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
+  return String(n);
+}
+
+function renderUptime() {
+  if (!lifetimeSnapshot || !uptimeLabel) return;
+  const nowS = Date.now() / 1000;
+  const drift = nowS - lifetimeSnapshot.receivedAtWallSec;
+  const liveLifetime = lifetimeSnapshot.lifetimeUptimeS + Math.max(0, drift);
+  const liveProc = lifetimeSnapshot.processUptimeS + Math.max(0, drift);
+  uptimeLabel.textContent =
+    `uptime ${fmtDurationCompact(liveLifetime)} (this boot ${fmtDurationCompact(liveProc)})`;
+  if (uptimeStrip) {
+    uptimeStrip.classList.toggle("stale", drift > 10);
+  }
+  if (footerLifetime) {
+    footerLifetime.textContent =
+      `Lifetime: ${fmtCount(lifetimeSnapshot.lifetimeStepCount)} ticks · boot #${lifetimeSnapshot.bootCount}`;
+  }
+}
+
+setInterval(renderUptime, 1000);
 
 // ---------- Init subsystems ----------
 let selectedRegionName = null;
@@ -155,6 +202,21 @@ function handlePayload(data) {
   const knowN = brain.hippocampus_stats?.knowledge ?? 0;
   const memN = brain.hippocampus_stats?.memories ?? 0;
   footerKnowledge.textContent = `Memory: ${memN} eps + ${knowN} knowledge`;
+
+  // Capture lifetime state for the uptime strip. The clock updates
+  // every second between frames, so we snapshot the moment the frame
+  // arrived and interpolate against wall-clock drift.
+  if (brain.lifetime_uptime_s !== undefined) {
+    lifetimeSnapshot = {
+      lifetimeUptimeS: brain.lifetime_uptime_s || 0,
+      processUptimeS: brain.process_uptime_s || 0,
+      lifetimeStepCount: brain.lifetime_step ?? brain.step ?? 0,
+      bootCount: brain.boot_count ?? 1,
+      firstBootAtS: brain.first_boot_at_s || 0,
+      receivedAtWallSec: Date.now() / 1000,
+    };
+    renderUptime();
+  }
 
   if (data.trading) {
     updateTradingStrip(data.trading);
