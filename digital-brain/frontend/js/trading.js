@@ -131,6 +131,8 @@ function updateSummary(t) {
       <div class="meter-value">${p.n_trades_closed || 0}<br/><span style="font-size:10px">${Math.round((p.win_rate || 0) * 100)}%</span></div></div>
     <div class="meter"><div class="meter-label">CORTEX UPDATES</div>
       <div class="meter-value">${st.bc_updates || 0} BC<br/><span style="font-size:10px">${st.rl_updates || 0} RL</span></div></div>
+    <div class="meter" title="How often the brain formed its own opinion (independent agree + conviction) vs. copied a wallet."><div class="meter-label">AUTONOMY</div>
+      <div class="meter-value">${(st.autonomy_pct ?? 0).toFixed(1)}%<br/><span style="font-size:10px">${st.independent_agrees || 0} own · ${st.convictions || 0} conv · ${st.imitated || 0} imit</span></div></div>
   `;
   document.getElementById("trading-summary").innerHTML = html;
 }

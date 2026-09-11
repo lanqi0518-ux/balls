@@ -41,8 +41,8 @@ class TraderCortex(BrainRegion):
         zh_name="交易皮层",
         position=(35.0, 40.0, 20.0),
         color="#f97316",
-        role="Learns to trade Solana meme tokens by imitating smart money",
-        role_zh="模仿聪明钱学习 Solana meme 币交易",
+        role="Trades Solana meme tokens with its own opinions — learns from smart money only when uncertain",
+        role_zh="独立判断 Solana meme 币交易，仅在不确定时才向聪明钱学习",
     )
 
     def __init__(self, market_feature_dim: int = 16, hidden: int = 96,
@@ -73,6 +73,18 @@ class TraderCortex(BrainRegion):
         self.last_rl_loss: float = 0.0
         self.last_confidence: float = 0.0
         self.total_wallet_trades_seen: int = 0
+
+        # Autonomy accounting: for every wallet trade we observe, categorize
+        # whether the brain (a) already agreed on its own, (b) disagreed with
+        # conviction (and we respected that), or (c) was uncertain and
+        # actually learned from the wallet.
+        self.independent_agrees: int = 0
+        self.convictions: int = 0
+        self.imitated: int = 0
+        # Confidence threshold above which the brain trusts its own call
+        # over the wallet's. Lower → brain leans on wallets more, higher →
+        # brain thinks for itself more.
+        self.own_opinion_threshold: float = 0.60
 
     def _all_params(self):
         for p in self.trunk.parameters():
@@ -152,6 +164,12 @@ class TraderCortex(BrainRegion):
     # ------------------------------------------------------------------
 
     def stats(self) -> dict:
+        total_reviewed = (self.independent_agrees
+                          + self.convictions
+                          + self.imitated)
+        # Anneal BC influence as the brain sees more expert trades: at
+        # ~3000 trades seen we cap BC's remaining pull at ~10%.
+        bc_scale = max(0.1, 1.0 - self.total_wallet_trades_seen / 3000.0)
         return {
             "bc_updates": self.bc_updates,
             "rl_updates": self.rl_updates,
@@ -159,6 +177,20 @@ class TraderCortex(BrainRegion):
             "last_bc_loss": round(self.last_bc_loss, 4),
             "last_rl_loss": round(self.last_rl_loss, 4),
             "last_confidence": round(self.last_confidence, 3),
+            "independent_agrees": self.independent_agrees,
+            "convictions": self.convictions,
+            "imitated": self.imitated,
+            "autonomy_pct": (
+                round(
+                    100.0 * (self.independent_agrees + self.convictions)
+                    / max(1, total_reviewed),
+                    1,
+                )
+                if total_reviewed
+                else 0.0
+            ),
+            "bc_scale": round(bc_scale, 3),
+            "own_opinion_threshold": self.own_opinion_threshold,
         }
 
     def state_dict_serializable(self) -> dict:

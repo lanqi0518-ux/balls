@@ -508,11 +508,32 @@ class TradingService:
     # ------------------------------------------------------------------
 
     async def _imitate_wallet_trades(self, trades) -> None:
+        """Observe smart-money trades and decide, per trade, whether to learn.
+
+        The brain is not blindly cloned onto every wallet action. For each
+        observed expert trade we:
+
+          1. Ask the brain what IT would do given the same market features.
+          2. Compare its answer to the wallet's action:
+             * If the brain already agreed on its own with strong confidence,
+               skip BC entirely — it doesn't need more of a lesson it has
+               already learned. Log an "independent_agree" thought.
+             * If the brain disagreed with strong confidence, RESPECT that
+               opinion — do not overwrite it with cross-entropy. Log a
+               "conviction" thought; realized PnL later will judge who was
+               right.
+             * Otherwise the brain is uncertain — learn from the wallet as
+               before, but with an annealing factor that fades BC influence
+               as the brain matures.
+        """
         if not trades:
             return
-        # Only process trades we haven't imitated yet (dedupe by signature).
         already = getattr(self, "_imitated_sigs", set())
         hot_by_mint = {p.base_address: p for p in self.tokens.snapshot()}
+
+        tc = self.brain.trader_cortex
+        conf_gate = float(tc.own_opinion_threshold)
+
         for t in trades:
             if t.signature in already:
                 continue
@@ -520,28 +541,85 @@ class TradingService:
             pair = hot_by_mint.get(t.token_mint)
             if not pair or pair.price_usd <= 0:
                 continue
+
             feats = market_features_from_pair(pair)
             hints = torch.tensor(
                 self.paper.hint_vector_for(t.token_mint, pair.price_usd),
                 dtype=torch.float32,
             )
             expert_action = BUY if t.side == "buy" else SELL
-            weight = 1.0
-            # Weight the update by the wallet's realized PnL — more from winners.
+
+            # ---- Ask the brain FIRST (no gradient, no side-effects) ----
+            brain_action, _lp, brain_probs, _v = tc.decide(
+                feats, hints, temperature=1.0,
+            )
+            brain_conf = float(brain_probs.max().item())
+            agrees = (brain_action == expert_action)
+
+            wallet_short = t.wallet[:4]
+            side_zh = "买入" if t.side == "buy" else "卖出"
+            brain_action_name = TRADER_ACTION_NAMES[brain_action]
+            brain_action_name_zh = TRADER_ACTION_NAMES_ZH[brain_action]
+
+            # Case A: brain independently agrees with strong conviction →
+            # already learned that lesson, skip the BC step.
+            if agrees and brain_conf >= conf_gate:
+                tc.independent_agrees += 1
+                self._push_event(
+                    "independent_agree",
+                    f"independent call {t.side.upper()} of {pair.base_symbol} "
+                    f"({brain_conf * 100:.0f}%) — matches wallet {wallet_short}…, no need to imitate",
+                    f"独立判断{side_zh} {pair.base_symbol}"
+                    f"（{brain_conf * 100:.0f}%）——与钱包 {wallet_short}… 撞车，无需模仿",
+                    extra={"wallet": t.wallet, "symbol": pair.base_symbol,
+                           "side": t.side, "brain_conf": brain_conf,
+                           "mode": "independent_agree"},
+                )
+                continue
+
+            # Case B: brain disagrees with strong conviction → respect it.
+            if not agrees and brain_conf >= conf_gate:
+                tc.convictions += 1
+                self._push_event(
+                    "conviction",
+                    f"conviction: brain wants {brain_action_name.upper()} on {pair.base_symbol} "
+                    f"({brain_conf * 100:.0f}%), wallet {wallet_short}… did {t.side.upper()} — sticking with own call",
+                    f"坚持己见：大脑对 {pair.base_symbol} 主张{brain_action_name_zh}"
+                    f"（{brain_conf * 100:.0f}%），钱包 {wallet_short}… 却{side_zh}——不跟",
+                    extra={"wallet": t.wallet, "symbol": pair.base_symbol,
+                           "wallet_side": t.side,
+                           "brain_action": brain_action_name,
+                           "brain_conf": brain_conf,
+                           "mode": "conviction"},
+                )
+                continue
+
+            # Case C: brain uncertain (< own_opinion_threshold) → learn from
+            # the wallet. Weight is still tilted toward winners, then scaled
+            # down by (i) how disagreeable the brain was and (ii) global BC
+            # annealing so the brain naturally weans off imitation over time.
+            base_weight = 1.0
             board = self.leaderboard.get(t.wallet)
             if board.realized_pnl_usd > 0:
-                weight = min(2.5, 1.0 + board.realized_pnl_usd / 5000.0)
-            loss = self.brain.trader_cortex.clone_from_expert(
+                base_weight = min(2.5, 1.0 + board.realized_pnl_usd / 5000.0)
+            bc_scale = max(0.1, 1.0 - tc.total_wallet_trades_seen / 3000.0)
+            disagree_discount = 0.4 if not agrees else 1.0
+            weight = base_weight * bc_scale * disagree_discount
+
+            loss = tc.clone_from_expert(
                 feats, hints, expert_action, weight=weight,
             )
+            tc.imitated += 1
             self._push_event(
                 "imitate",
-                f"copy {t.side.upper()} of {pair.base_symbol} from wallet {t.wallet[:4]}… "
+                f"unsure ({brain_conf * 100:.0f}%) — learning {t.side.upper()} of "
+                f"{pair.base_symbol} from wallet {wallet_short}… "
                 f"(wt {weight:.2f}, bc_loss {loss:.3f})",
-                f"跟随钱包 {t.wallet[:4]}… 的{('买入' if t.side=='buy' else '卖出')} {pair.base_symbol}"
-                f"（权重 {weight:.2f}，BC 损失 {loss:.3f}）",
+                f"不确定（{brain_conf * 100:.0f}%）——向钱包 {wallet_short}… 学习"
+                f"{side_zh} {pair.base_symbol}（权重 {weight:.2f}，BC 损失 {loss:.3f}）",
                 extra={"wallet": t.wallet, "symbol": pair.base_symbol,
-                       "side": t.side, "weight": weight},
+                       "side": t.side, "weight": weight,
+                       "brain_conf": brain_conf, "mode": "imitate"},
             )
         self._imitated_sigs = already
         if len(already) > 1500:

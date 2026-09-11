@@ -160,8 +160,9 @@ function handlePayload(data) {
     updateTradingStrip(data.trading);
     updateTrading(data.trading);
     const st = data.trading.trader_cortex_stats || {};
+    const auton = (st.autonomy_pct ?? 0).toFixed(0);
     footerTrader.textContent =
-      `Trader: ${st.bc_updates || 0} BC / ${st.rl_updates || 0} RL updates`;
+      `Trader: ${st.bc_updates || 0} BC / ${st.rl_updates || 0} RL · autonomy ${auton}%`;
   }
 
   if (data.web !== undefined) {
