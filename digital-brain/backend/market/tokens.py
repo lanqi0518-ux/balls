@@ -242,16 +242,19 @@ class TrendingTokenWatcher:
                 if prev is None or p.liquidity_usd > prev.liquidity_usd:
                     best_per_base[key] = p
 
-        # Filter out mega-caps. If a pair has no FDV info we let it through
-        # (usually the case for freshly-launched pump.fun tokens whose FDV
-        # hasn't been reported yet). We DO keep it if it's on our fresh
-        # launch list — those are always in-scope regardless of FDV.
+        # Filter out mega-caps ON SOLANA. The mega-cap avoidance was
+        # designed for Solana because that ecosystem is dominated by
+        # BNB/PEPE/WIF-scale tokens every bot already competes on. On
+        # smaller chains like Robinhood Chain the big-cap movers ARE
+        # the alpha (e.g. $PONS at $400M mcap is one of the top movers
+        # on the entire chain), so we intentionally don't filter them.
         filtered: List[PairSnapshot] = []
         rejected_megacap = 0
         for p in best_per_base.values():
             is_fresh = p.base_address in self._fresh_by_mint
             fdv = p.fdv or p.market_cap or 0.0
-            if not is_fresh and fdv and fdv > self.max_fdv_usd:
+            apply_cap = (p.chain == "solana")
+            if apply_cap and not is_fresh and fdv and fdv > self.max_fdv_usd:
                 rejected_megacap += 1
                 continue
             filtered.append(p)

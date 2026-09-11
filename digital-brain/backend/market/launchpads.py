@@ -142,6 +142,14 @@ class MultiLaunchpadWatcher:
             self._robinhood_chain_search("uniswap", per_source_limit),
             self._robinhood_chain_search("meme", per_source_limit),
             self._robinhood_chain_search("robinhood", per_source_limit),
+            # Named-symbol probes. DexScreener's search endpoint returns
+            # every matching pair across every chain, so probing for
+            # well-known Robinhood-chain top-movers (whose names we
+            # know) reliably surfaces them even when they're not in
+            # boosted / profiles. Add more as the chain matures.
+            self._robinhood_chain_search("PONS", per_source_limit),
+            self._robinhood_chain_search("LONG", per_source_limit),
+            self._robinhood_chain_search("HOOD", per_source_limit),
         ]
         results: List[Tuple[str, List[FreshCoin]]] = []
         gathered = await asyncio.gather(*tasks, return_exceptions=True)
