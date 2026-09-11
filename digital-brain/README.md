@@ -4,6 +4,8 @@
 
 一个真正在"活着"的数字人脑：8 个脑区，每个都是一个**真实的神经网络模块**，共同感知、记忆、决策、产生情绪。整个系统运行在浏览器里，实时可视化，**完全不使用 LLM**。
 
+**在线 Demo** · Live: <https://balls-lanqi.fly.dev>（部署在 Fly.io，`sjc`，2 台机器）
+
 ![Digital Human Brain screenshot placeholder](docs/screenshot.png)
 
 ## 它是什么
@@ -121,6 +123,25 @@ digital-brain/
 - **后端**：Python 3.10+ · PyTorch 2.x · FastAPI · WebSockets
 - **前端**：原生 ES modules · Three.js（3D）· Canvas 2D
 - **算法**：Actor-critic (REINFORCE + value baseline) · Hopfield-like associative memory · Pavlovian conditioning
+
+## 部署到 Fly.io
+
+项目里已经包含 `Dockerfile` + `fly.toml`（app 名 `balls-lanqi`，区域 `sjc`，CPU-only PyTorch 镜像约 255 MB）。自己部署一份：
+
+```bash
+# 1. 装 flyctl
+curl -L https://fly.io/install.sh | sh
+
+# 2. 登录并创建 app（换成你自己的名字）
+flyctl auth login
+flyctl apps create <your-app-name>
+
+# 3. 修改 fly.toml 里的 app = "<your-app-name>"
+# 4. 部署
+flyctl deploy --remote-only
+```
+
+默认部署 2 台 shared-cpu-1x（1 GB）机器，开启 `auto_stop_machines`，没人访问时会挂起。
 
 ## 许可
 
