@@ -33,6 +33,7 @@ import torch.nn.functional as F
 from .config import BrainConfig
 from .regions import (
     Amygdala,
+    CentralComplex,
     DefaultModeNetwork,
     Hippocampus,
     MotorCortex,
@@ -105,6 +106,11 @@ class Brain:
         )
         self.trader_cortex = TraderCortex(market_feature_dim=MARKET_FEATURE_DIM,
                                            hidden=96)
+        # A real spiking sub-brain: fly-central-complex-style LIF ring
+        # attractor. It runs alongside the deep-learning cortex, driven by
+        # the motor cortex's last action, and produces a heading bump the
+        # rest of the brain can read as a 4-D feature vector.
+        self.central_complex = CentralComplex()
 
         self.regions: List = [
             self.visual_cortex,
@@ -116,6 +122,7 @@ class Brain:
             self.motor_cortex,
             self.default_mode,
             self.trader_cortex,
+            self.central_complex,
         ]
 
         # Running state used for online learning.
@@ -254,6 +261,22 @@ class Brain:
                           f"运动指令：{ACTION_NAMES_ZH[action]}。",
                           kind="action")
 
+        # ---- 8b. Central complex: advance the spiking ring-attractor ----
+        # The bump is our heading compass. It shifts based on the motor
+        # action we just chose, running as real LIF neurons wired to the
+        # published fly central complex topology.
+        cc_feats = self.central_complex.tick(motor_action=action,
+                                             drive_strength=self.motor_cortex.last_confidence)
+        if cc_feats["bump_amplitude"] > 0.55 and self.step_count % 12 == 0:
+            self._add_thought(
+                "central_complex",
+                f"Heading bump @ {self.central_complex.stats()['compass']} "
+                f"(amp {cc_feats['bump_amplitude']:.2f}, {cc_feats['pop_rate_hz']:.0f} Hz).",
+                f"朝向 bump 指向 {self.central_complex.stats()['compass']}"
+                f"（amp {cc_feats['bump_amplitude']:.2f}，{cc_feats['pop_rate_hz']:.0f} Hz）。",
+                kind="info",
+            )
+
         # ---- 9. Store this moment in episodic memory ----
         valence = float(torch.tanh(value.detach()).item())
         self.hippocampus.store(gated_visual, valence=valence, fear=fear,
@@ -352,5 +375,6 @@ class Brain:
             "amygdala_stats": self.amygdala.stats(),
             "reward_stats": self.nucleus_accumbens.stats(),
             "motor_stats": self.motor_cortex.stats(),
+            "central_complex_stats": self.central_complex.stats(),
             "active_concept": self.active_concept,
         }

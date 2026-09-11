@@ -336,6 +336,13 @@ function renderRegionDetail(r) {
   regionDetailEl.classList.remove("region-detail-empty");
   regionDetailEl.classList.add("region-detail");
 
+  // The central complex is a real spiking module and deserves its own
+  // visualisation (ring bump + spike raster). Route to a dedicated renderer.
+  if (r.name === "central_complex" && latestBrain && latestBrain.central_complex_stats) {
+    renderCentralComplexDetail(r, latestBrain.central_complex_stats);
+    return;
+  }
+
   // Region-specific stats to spotlight
   let extra = "";
   if (latestBrain && r.name === "hippocampus") {
@@ -357,7 +364,6 @@ function renderRegionDetail(r) {
              <div class="meter"><div class="meter-label">CONFIDENCE</div><div class="meter-value">${s.confidence}</div></div>`;
   }
 
-  // Neuron grid — visualise up to 128 "neurons"
   const total = Math.min(r.neurons_total || 128, 128);
   const active = Math.min(r.neurons_active || 0, total);
   const grid = [];
@@ -396,6 +402,198 @@ function renderRegionDetail(r) {
       <ul>${events}</ul>
     </div>
   `;
+}
+
+// ---------- Central complex: ring bump + spike raster ---------------
+// This region is the only real spiking module in the brain. It gets its
+// own view: a compass with a bump indicating heading, and a raster plot
+// of the last ~60 integration frames × 16 EPG neurons.
+function renderCentralComplexDetail(r, s) {
+  const events = (r.recent || []).map((e) => `<li>${escapeHtml(e)}</li>`).join("") ||
+    `<li style="color: var(--text-muted); font-family: var(--font-sans);">(spinning up…)</li>`;
+
+  regionDetailEl.innerHTML = `
+    <div class="region-detail-header" style="color:${r.color}">
+      <span class="swatch" style="background:${r.color}"></span>
+      <div>
+        <div class="name">${r.display_name}</div>
+      </div>
+    </div>
+    <div class="region-detail-role" style="color:${r.color}">
+      <span style="color: var(--text-secondary)">${r.role}</span>
+    </div>
+    <div class="region-detail-meters">
+      <div class="meter">
+        <div class="meter-label">BUMP HEADING</div>
+        <div class="meter-value" style="color:${r.color}">${s.compass} · ${s.bump_angle_deg}°</div>
+      </div>
+      <div class="meter">
+        <div class="meter-label">BUMP PEAKEDNESS</div>
+        <div class="meter-value">${(s.bump_amplitude * 100).toFixed(0)}%</div>
+      </div>
+      <div class="meter">
+        <div class="meter-label">POP RATE</div>
+        <div class="meter-value">${s.pop_rate_hz.toFixed(1)} Hz</div>
+      </div>
+      <div class="meter">
+        <div class="meter-label">CELLS</div>
+        <div class="meter-value">${s.num_epg}+${s.num_pen}+${s.num_peg} LIF</div>
+      </div>
+    </div>
+    <div class="cc-visuals">
+      <div class="cc-ring-wrap">
+        <div class="cc-mini-label">EPG ring · heading bump</div>
+        <canvas id="cc-ring" width="200" height="200"></canvas>
+      </div>
+      <div class="cc-raster-wrap">
+        <div class="cc-mini-label">EPG spike raster · last ${(s.raster || []).length} frames</div>
+        <canvas id="cc-raster" width="360" height="180"></canvas>
+      </div>
+    </div>
+    <div class="region-events">
+      <h4>Recent events</h4>
+      <ul>${events}</ul>
+    </div>
+  `;
+
+  drawRingBump(document.getElementById("cc-ring"), s, r.color);
+  drawSpikeRaster(document.getElementById("cc-raster"), s, r.color);
+}
+
+function drawRingBump(canvas, s, color) {
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  const cx = W / 2, cy = H / 2;
+  const rOuter = Math.min(W, H) * 0.42;
+  const rInner = rOuter * 0.58;
+  const N = s.num_epg || 16;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Compute per-wedge spike counts over the last few frames = brightness.
+  const raster = s.raster || [];
+  const window = raster.slice(-8);
+  const counts = new Array(N).fill(0);
+  for (const frame of window) {
+    for (let k = 0; k < N; k++) counts[k] += frame[k] || 0;
+  }
+  const maxCount = Math.max(1, ...counts);
+
+  // Draw wedges (each of the 16 EPG cells is a pie-slice).
+  for (let k = 0; k < N; k++) {
+    const brightness = counts[k] / maxCount;
+    const a0 = (k / N) * Math.PI * 2 - Math.PI / 2 - Math.PI / N;
+    const a1 = ((k + 1) / N) * Math.PI * 2 - Math.PI / 2 - Math.PI / N;
+    ctx.beginPath();
+    ctx.arc(cx, cy, rOuter, a0, a1);
+    ctx.arc(cx, cy, rInner, a1, a0, true);
+    ctx.closePath();
+    const alpha = 0.08 + brightness * 0.92;
+    ctx.fillStyle = hexToRgba(color, alpha);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Compass ticks + N/E/S/W labels.
+  ctx.fillStyle = "rgba(200,220,240,0.55)";
+  ctx.font = "10px 'JetBrains Mono', monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const compassLabels = ["N", "E", "S", "W"];
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 - Math.PI / 2;
+    const lx = cx + Math.cos(a) * (rOuter + 12);
+    const ly = cy + Math.sin(a) * (rOuter + 12);
+    ctx.fillText(compassLabels[i], lx, ly);
+  }
+
+  // The bump direction arrow.
+  if (s.bump_amplitude > 0.1) {
+    const ang = s.bump_angle_rad - Math.PI / 2;  // shift so 0 rad = up
+    const ex = cx + Math.cos(ang) * rInner * 0.88;
+    const ey = cy + Math.sin(ang) * rInner * 0.88;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(ex, ey);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Arrowhead.
+    const ah = 6;
+    const perp = ang + Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(ex + Math.cos(ang) * 5, ey + Math.sin(ang) * 5);
+    ctx.lineTo(ex + Math.cos(perp) * ah, ey + Math.sin(perp) * ah);
+    ctx.lineTo(ex - Math.cos(perp) * ah, ey - Math.sin(perp) * ah);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  // Center dot.
+  ctx.beginPath();
+  ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+function drawSpikeRaster(canvas, s, color) {
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  const N = s.num_epg || 16;
+  const raster = s.raster || [];
+  const F = raster.length;
+
+  ctx.fillStyle = "rgba(6, 10, 20, 0.85)";
+  ctx.fillRect(0, 0, W, H);
+
+  if (F === 0) return;
+
+  const dx = W / F;
+  const dy = H / N;
+
+  for (let f = 0; f < F; f++) {
+    const frame = raster[f];
+    for (let k = 0; k < N; k++) {
+      if (frame[k]) {
+        const x = f * dx;
+        const y = k * dy;
+        ctx.fillStyle = color;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 4;
+        ctx.fillRect(x, y + 1, Math.max(1.5, dx - 0.5), Math.max(2, dy - 2));
+      }
+    }
+  }
+  ctx.shadowBlur = 0;
+
+  // Y-axis: EPG neuron indices (every 4).
+  ctx.fillStyle = "rgba(200,220,240,0.35)";
+  ctx.font = "9px 'JetBrains Mono', monospace";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  for (let k = 0; k < N; k += 4) {
+    ctx.fillText(`E${k}`, 2, k * dy + dy / 2);
+  }
+  // X-axis label: "now" on the right.
+  ctx.textAlign = "right";
+  ctx.fillText("now →", W - 4, H - 8);
+}
+
+function hexToRgba(hex, alpha) {
+  const clean = hex.replace("#", "");
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 function escapeHtml(s) {

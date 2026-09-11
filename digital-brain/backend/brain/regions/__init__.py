@@ -7,6 +7,7 @@ from .motor_cortex import MotorCortex, ACTION_NAMES, ACTION_NAMES_ZH
 from .default_mode import DefaultModeNetwork
 from .thalamus import Thalamus
 from .trader_cortex import TraderCortex
+from .central_complex import CentralComplex
 
 __all__ = [
     "VisualCortex",
@@ -18,6 +19,7 @@ __all__ = [
     "DefaultModeNetwork",
     "Thalamus",
     "TraderCortex",
+    "CentralComplex",
     "ACTION_NAMES",
     "ACTION_NAMES_ZH",
 ]
