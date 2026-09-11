@@ -61,29 +61,69 @@
 
   <main class="layout">
 
-    <!-- LEFT: 3D BRAIN + REGIONS -->
+    <!-- LEFT-TOP: 3D BRAIN + REGIONS -->
     <section class="panel panel-brain">
       <div class="panel-title">
         <h2>3D brain</h2>
-        <span class="hint">drag to rotate · scroll to zoom · hover a region</span>
+        <span class="hint">drag · scroll · hover</span>
       </div>
       <div id="brain3d"></div>
-      <div class="thinking-ribbon" id="thinking-ribbon" data-empty="true">
-        <div class="thinking-label">thinking about</div>
-        <div class="thinking-body">
-          <div class="thinking-title" id="thinking-title">—</div>
-          <div class="thinking-desc" id="thinking-desc">brain is warming up…</div>
-        </div>
-      </div>
       <div class="brain-legend" id="brain-legend"></div>
     </section>
 
-    <!-- MIDDLE-TOP: ENVIRONMENT & VITALS -->
+    <!-- CENTER (hero): NOW THINKING + ABOUT TO DO -->
+    <section class="panel panel-hero">
+      <div class="hero-block hero-thinking" id="hero-thinking" data-empty="true">
+        <div class="hero-label">
+          <span class="hero-icon">🧠</span>
+          <span>NOW THINKING</span>
+          <span class="hero-src mono" id="hero-thinking-src"></span>
+        </div>
+        <div class="hero-headline" id="hero-thinking-headline">brain is warming up…</div>
+        <div class="hero-detail" id="hero-thinking-detail"></div>
+      </div>
+
+      <div class="hero-block hero-intent" id="hero-intent">
+        <div class="hero-label">
+          <span class="hero-icon">⚡</span>
+          <span>ABOUT TO DO</span>
+        </div>
+
+        <div class="intent-row" id="intent-row-world">
+          <div class="intent-row-head">
+            <span class="intent-tag world">GRIDWORLD</span>
+            <span class="intent-action" id="intent-world-action">—</span>
+            <span class="intent-conf mono" id="intent-world-conf">—</span>
+          </div>
+          <div class="intent-probs" id="intent-world-probs"></div>
+        </div>
+
+        <div class="intent-row" id="intent-row-trader">
+          <div class="intent-row-head">
+            <span class="intent-tag trader">TRADER</span>
+            <span class="intent-action" id="intent-trader-action">—</span>
+            <span class="intent-conf mono" id="intent-trader-conf">—</span>
+          </div>
+          <div class="intent-symbol mono" id="intent-trader-symbol"></div>
+          <div class="intent-probs" id="intent-trader-probs"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: THOUGHT STREAM -->
+    <section class="panel panel-thoughts">
+      <div class="panel-title">
+        <h2>Thought stream</h2>
+        <span class="hint mono">live from the cortex</span>
+      </div>
+      <div id="thought-stream" class="thought-stream"></div>
+    </section>
+
+    <!-- LEFT-BOTTOM: ENVIRONMENT (small) -->
     <section class="panel panel-env">
       <div class="panel-title">
-        <h2>Environment</h2>
+        <h2>Body · gridworld</h2>
         <div class="hint">
-          <span class="tag tag-agent">body</span>
           <span class="tag tag-food">food +1</span>
           <span class="tag tag-hazard">hazard −1</span>
         </div>
@@ -92,13 +132,13 @@
         <canvas id="env-canvas" width="360" height="360"></canvas>
       </div>
       <div class="env-actions">
-        <button class="btn btn-mini" id="btn-poke-food">+ Drop food</button>
-        <button class="btn btn-mini" id="btn-poke-hazard">+ Drop hazard</button>
+        <button class="btn btn-mini" id="btn-poke-food">+ food</button>
+        <button class="btn btn-mini" id="btn-poke-hazard">+ hazard</button>
       </div>
       <div class="env-stats" id="env-stats"></div>
     </section>
 
-    <!-- MIDDLE-BOTTOM: REGION DETAIL / KNOWLEDGE / TRADING -->
+    <!-- CENTER-BOTTOM: REGION / KNOWLEDGE / TRADING TABS -->
     <section class="panel panel-region">
       <div class="panel-title panel-title-tabs">
         <div class="tabs" id="detail-tabs">
@@ -111,22 +151,13 @@
         <span class="hint mono" id="region-title">—</span>
       </div>
       <div id="region-detail" class="region-detail-empty">
-        <p>Live activation, active-neuron count, and the last few events
-        of whichever brain region is currently selected. Click a coloured
-        sphere in the 3D brain (or any name in the legend below it) to
-        pin a different region.</p>
+        <p>Live activation, active-neuron count, and last events for
+        whichever brain region is currently selected. Click a coloured
+        sphere on the 3D brain (or a name in the legend) to pin a
+        different one.</p>
       </div>
       <div id="knowledge-panel" class="knowledge-panel" style="display:none"></div>
       <div id="trading-panel" class="trading-panel" style="display:none"></div>
-    </section>
-
-    <!-- RIGHT: THOUGHT STREAM -->
-    <section class="panel panel-thoughts">
-      <div class="panel-title">
-        <h2>Thought stream</h2>
-        <span class="hint mono">live from the cortex</span>
-      </div>
-      <div id="thought-stream" class="thought-stream"></div>
     </section>
 
   </main>

@@ -34,9 +34,21 @@ const tickHzLabel = document.getElementById("tick-hz-label");
 const knowledgePanel = document.getElementById("knowledge-panel");
 const tradingPanel = document.getElementById("trading-panel");
 const detailTabs = document.getElementById("detail-tabs");
-const thinkingRibbon = document.getElementById("thinking-ribbon");
-const thinkingTitle = document.getElementById("thinking-title");
-const thinkingDesc = document.getElementById("thinking-desc");
+
+// Hero panel — main-view focus: what he's thinking + what he's about to do
+const heroThinking          = document.getElementById("hero-thinking");
+const heroThinkingHeadline  = document.getElementById("hero-thinking-headline");
+const heroThinkingDetail    = document.getElementById("hero-thinking-detail");
+const heroThinkingSrc       = document.getElementById("hero-thinking-src");
+const heroIntent            = document.getElementById("hero-intent");
+const intentWorldAction     = document.getElementById("intent-world-action");
+const intentWorldConf       = document.getElementById("intent-world-conf");
+const intentWorldProbs      = document.getElementById("intent-world-probs");
+const intentTraderAction    = document.getElementById("intent-trader-action");
+const intentTraderConf      = document.getElementById("intent-trader-conf");
+const intentTraderSymbol    = document.getElementById("intent-trader-symbol");
+const intentTraderProbs     = document.getElementById("intent-trader-probs");
+
 const paperEquityEl = document.getElementById("paper-equity");
 const paperPnlEl = document.getElementById("paper-pnl");
 const footerTrader = document.getElementById("footer-trader");
@@ -152,7 +164,10 @@ function handlePayload(data) {
   envView.update(env);
   renderEnvStats(envStatsEl, env, brain);
   thoughtStream.addFromSnapshot(brain.thoughts);
-  updateThinkingRibbon(brain.active_concept);
+
+  // Main-view hero: what the brain is thinking, and what it plans to do.
+  updateHeroThinking(brain);
+  updateHeroIntent(brain.motor_stats, data.trading && data.trading.latest_intent);
 
   // If the user hasn't clicked a region yet, auto-select the most active
   // one so the detail panel is never empty. Once they DO click, respect
@@ -185,28 +200,134 @@ function updateTradingStrip(trading) {
   paperPnlEl.textContent = `${sign}${pnl.toFixed(0)} (${sign}${pnlPct.toFixed(2)}%)`;
 }
 
-function updateThinkingRibbon(active) {
+// ---------- Hero: NOW THINKING -----------------------------------------
+// The main visual: what the brain is thinking RIGHT NOW.
+// Preferred source is the current "active concept" (a knowledge-bank chip
+// the hippocampus just associated to). If nothing is lit, we fall back to
+// the most recent PFC/associate/thought text so this card is never empty.
+function updateHeroThinking(brain) {
+  const active = brain.active_concept;
   setActiveConcept(active);
-  if (!active) {
-    thinkingRibbon.dataset.empty = "true";
-    thinkingRibbon.classList.remove("lit");
-    thinkingRibbon.style.setProperty("--ribbon-color", "var(--accent)");
-    thinkingTitle.textContent = "—";
-    thinkingDesc.textContent = "brain is between associations…";
-    lastConceptId = null;
+
+  const step = brain.step;
+
+  if (active) {
+    const color = categoryColor(active.category);
+    heroThinking.dataset.empty = "false";
+    heroThinking.style.setProperty("--hero-color", color);
+    heroThinkingHeadline.textContent = active.en;
+    heroThinkingDetail.textContent = active.desc_en || "";
+    heroThinkingSrc.textContent = `#${active.category || "concept"} · t=${step}`;
+    if (active.id !== lastConceptId) {
+      heroThinking.classList.remove("lit");
+      void heroThinking.offsetWidth; // restart animation
+      heroThinking.classList.add("lit");
+      lastConceptId = active.id;
+    }
     return;
   }
-  thinkingRibbon.dataset.empty = "false";
-  const color = categoryColor(active.category);
-  thinkingRibbon.style.setProperty("--ribbon-color", color);
-  thinkingTitle.textContent = active.en;
-  thinkingDesc.textContent = active.desc_en;
-  if (active.id !== lastConceptId) {
-    thinkingRibbon.classList.remove("lit");
-    void thinkingRibbon.offsetWidth; // restart animation
-    thinkingRibbon.classList.add("lit");
-    lastConceptId = active.id;
+
+  // No lit concept — fall back to the most recent notable thought.
+  lastConceptId = null;
+  const thoughts = brain.thoughts || [];
+  // Prefer PFC / associate / plan; else newest anything.
+  const preferred = [...thoughts].reverse().find(
+    (t) => t.region === "prefrontal_cortex" ||
+           t.kind === "associate" || t.kind === "plan",
+  ) || thoughts[thoughts.length - 1];
+
+  if (preferred) {
+    heroThinking.dataset.empty = "false";
+    heroThinking.style.setProperty("--hero-color", "var(--accent)");
+    heroThinkingHeadline.textContent = truncate(preferred.text || preferred.text_zh || "…", 90);
+    heroThinkingDetail.textContent = "";
+    heroThinkingSrc.textContent = `${preferred.region || "cortex"} · t=${preferred.step}`;
+    heroThinking.classList.remove("lit");
+  } else {
+    heroThinking.dataset.empty = "true";
+    heroThinking.classList.remove("lit");
+    heroThinking.style.setProperty("--hero-color", "var(--accent)");
+    heroThinkingHeadline.textContent = "warming up…";
+    heroThinkingDetail.textContent = "the cortex hasn't associated to anything yet.";
+    heroThinkingSrc.textContent = "";
   }
+}
+
+// ---------- Hero: ABOUT TO DO ------------------------------------------
+// Two rows: gridworld motor decision, and paper-trader decision.
+// Both come from the *policy's* raw probabilities, so this shows genuine
+// intent — not just the action that ended up firing.
+function updateHeroIntent(motorStats, latestIntent) {
+  // --- GRIDWORLD row ---
+  if (motorStats && motorStats.probs && motorStats.action_names) {
+    heroIntent.setAttribute("data-flavour", "world");
+    intentWorldAction.textContent = motorStats.action_label || "—";
+    const c = motorStats.confidence != null ? motorStats.confidence : 0;
+    intentWorldConf.textContent = `conf ${(c * 100).toFixed(0)}%`;
+    intentWorldConf.className = "intent-conf mono " + (c > 0.7 ? "strong" : c < 0.4 ? "weak" : "");
+    renderProbBars(intentWorldProbs, motorStats.probs, motorStats.action_names);
+  } else {
+    intentWorldAction.textContent = "…";
+    intentWorldConf.textContent = "";
+    intentWorldProbs.innerHTML = "";
+  }
+
+  // --- TRADER row ---
+  if (latestIntent) {
+    heroIntent.setAttribute("data-flavour", "trader");
+    const actName = (latestIntent.action_name || "HOLD").toUpperCase();
+    intentTraderAction.textContent = actName;
+    const tc = latestIntent.confidence != null ? latestIntent.confidence : 0;
+    intentTraderConf.textContent = `conf ${(tc * 100).toFixed(0)}%`;
+    intentTraderConf.className = "intent-conf mono " + (tc > 0.7 ? "strong" : tc < 0.4 ? "weak" : "");
+    const sym = latestIntent.symbol || "?";
+    const price = latestIntent.price_usd;
+    const ch1 = latestIntent.price_change_h1;
+    const priceStr = price != null && price > 0 ? "$" + formatPrice(price) : "—";
+    const chStr = ch1 != null ? ` (${ch1 >= 0 ? "+" : ""}${ch1.toFixed(1)}% h1)` : "";
+    intentTraderSymbol.textContent = `$${sym} @ ${priceStr}${chStr}`;
+    renderProbBars(intentTraderProbs, latestIntent.probs, ["HOLD", "BUY", "SELL"]);
+  } else {
+    intentTraderAction.textContent = "…";
+    intentTraderConf.textContent = "";
+    intentTraderSymbol.textContent = "no candidate yet — waiting for a hot token";
+    intentTraderProbs.innerHTML = "";
+  }
+}
+
+function renderProbBars(container, probs, labels) {
+  if (!probs || !probs.length) {
+    container.innerHTML = "";
+    return;
+  }
+  // Find argmax to mark the "top" pick.
+  let topIdx = 0;
+  for (let i = 1; i < probs.length; i++) {
+    if (probs[i] > probs[topIdx]) topIdx = i;
+  }
+  const rows = probs.map((p, i) => {
+    const pct = Math.max(0, Math.min(1, p)) * 100;
+    const label = (labels && labels[i]) || `a${i}`;
+    const isTop = i === topIdx;
+    return `<div class="prob-bar ${isTop ? "top" : ""}">
+      <span class="prob-label">${escapeHtml(label)}</span>
+      <span class="prob-track"><span class="prob-fill" style="width:${pct.toFixed(1)}%"></span></span>
+      <span class="prob-value">${(p * 100).toFixed(0)}%</span>
+    </div>`;
+  });
+  container.innerHTML = rows.join("");
+}
+
+function truncate(s, n) {
+  s = String(s || "");
+  return s.length <= n ? s : s.slice(0, n - 1) + "…";
+}
+
+function formatPrice(p) {
+  if (p >= 1)     return p.toFixed(3);
+  if (p >= 0.01)  return p.toFixed(4);
+  if (p >= 0.0001) return p.toFixed(6);
+  return p.toExponential(2);
 }
 
 // ---------- Region detail ----------

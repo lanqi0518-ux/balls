@@ -46,6 +46,7 @@ class MotorCortex(BrainRegion):
         self.num_actions = num_actions
         self.last_action: int = 4
         self.last_confidence: float = 0.0
+        self.last_probs: list = [0.0] * num_actions
         self.neurons_total = num_actions * 8
 
     def act(self, logits: torch.Tensor, greedy: bool = False):
@@ -59,6 +60,7 @@ class MotorCortex(BrainRegion):
         confidence = float(probs[action].item())
         self.last_action = action
         self.last_confidence = confidence
+        self.last_probs = [round(float(p), 3) for p in probs.tolist()]
         self._set_activity(confidence, int(confidence * self.neurons_total))
         return action, log_prob, probs
 
@@ -74,4 +76,6 @@ class MotorCortex(BrainRegion):
             "action_label": self.action_label(),
             "action_label_zh": self.action_label_zh(),
             "confidence": round(self.last_confidence, 3),
+            "probs": list(self.last_probs),
+            "action_names": [ACTION_NAMES[i] for i in range(self.num_actions)],
         }

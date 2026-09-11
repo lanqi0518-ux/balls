@@ -115,6 +115,9 @@ class TradingService:
         # Anti-flapping: don't re-add a wallet we already pruned inside this
         # process for 24h.
         self._pruned_until: Dict[str, float] = {}
+        # Latest intent computed by the trader cortex for the hottest token
+        # each decision tick. Powers the "About to do" hero card.
+        self._latest_intent: Optional[dict] = None
 
         # Seed wallets (default + env-configured) — always source=env
         for addr, label in DEFAULT_SEED_WALLETS + _parse_env_wallets():
@@ -389,6 +392,7 @@ class TradingService:
             if p.liquidity_usd >= 20_000
             and abs(p.price_change_h1) >= 1.0
         ]
+        best_intent: Optional[dict] = None
         for p in candidates[:12]:
             if p.price_usd <= 0:
                 continue
@@ -401,6 +405,28 @@ class TradingService:
                 feats, hints, temperature=1.0,
             )
             conf = self.brain.trader_cortex.last_confidence
+            probs_list = [round(float(x), 3) for x in probs.tolist()]
+            action_name = TRADER_ACTION_NAMES[action]
+            # Track the strongest non-HOLD intent this cycle for the hero card.
+            candidate_intent = {
+                "symbol": p.base_symbol,
+                "mint": p.base_address,
+                "price_usd": p.price_usd,
+                "price_change_h1": p.price_change_h1,
+                "price_change_h24": p.price_change_h24,
+                "action": action,
+                "action_name": action_name,
+                "confidence": round(conf, 3),
+                "probs": probs_list,
+                "value_estimate": round(float(value.item()), 3),
+                "at_s": time.time(),
+            }
+            if (best_intent is None
+                    or (candidate_intent["action"] != HOLD and best_intent["action"] == HOLD)
+                    or (candidate_intent["action"] == best_intent["action"]
+                        and candidate_intent["confidence"] > best_intent["confidence"])):
+                best_intent = candidate_intent
+
             held = p.base_address in self.paper.positions
             # Confidence gate: don't act unless the cortex is clearly leaning
             # that way. Prevents random-scalping-into-the-ground while untrained.
@@ -423,6 +449,9 @@ class TradingService:
                 closed = self.paper.try_sell(p.base_address, p.price_usd, reason="policy_sell")
                 if closed:
                     self._on_position_closed(closed)
+
+        if best_intent is not None:
+            self._latest_intent = best_intent
 
         # 6) Persist state every few minutes
         if time.time() - self._last_save > 180:
@@ -544,6 +573,7 @@ class TradingService:
             "leaderboard": self.leaderboard.top_public(15),
             "paper": self.paper.snapshot(prices),
             "trader_cortex_stats": self.brain.trader_cortex.stats(),
+            "latest_intent": self._latest_intent,
             "events": list(self._trader_events[-60:]),
             "tuning": {
                 "decision_interval": self.decision_interval,
