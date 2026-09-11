@@ -480,12 +480,13 @@ class TradingService:
                 age_min = meta.age_minutes if meta else 0.0
                 mcap = meta.usd_market_cap if meta else (p.market_cap or 0.0)
                 short_mint = p.base_address[:4] + "…"
+                sym_display = p.base_symbol if p.base_symbol.startswith("$") else f"${p.base_symbol}"
                 self._push_event(
                     "explore",
-                    f"scanning fresh launch ${p.base_symbol} "
+                    f"scanning fresh launch {sym_display} "
                     f"({age_min:.0f}m old, ${mcap:,.0f} mcap, {short_mint}) → "
                     f"initial read: {action_name.upper()} ({conf * 100:.0f}%)",
-                    f"扫描新盘 ${p.base_symbol}"
+                    f"扫描新盘 {sym_display}"
                     f"（{age_min:.0f} 分钟前发射，市值 ${mcap:,.0f}，{short_mint}）"
                     f" → 初判：{action_name_zh}（{conf * 100:.0f}%）",
                     extra={
