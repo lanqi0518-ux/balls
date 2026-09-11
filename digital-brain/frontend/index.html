@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>数字人脑 · The Digital Human Brain</title>
+  <meta name="description" content="A live digital human brain — 8 anatomical regions, each a real neural network, cooperating in real time." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2C7.03 2 3 6.03 3 11c0 3.5 2 6.5 5 8v3h8v-3c3-1.5 5-4.5 5-8 0-4.97-4.03-9-9-9zm-3 8a2 2 0 100-4 2 2 0 000 4zm6 0a2 2 0 100-4 2 2 0 000 4z"/></svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-title">Digital Human Brain</div>
+        <div class="brand-sub">数字人脑 · 8 个真实神经网络协同工作</div>
+      </div>
+    </div>
+
+    <nav class="topbar-status">
+      <div class="status-item">
+        <span class="status-dot" id="conn-dot"></span>
+        <span id="conn-label">connecting…</span>
+      </div>
+      <div class="status-item">
+        <span class="mono" id="tick-label">t = 0</span>
+      </div>
+      <div class="status-item">
+        <span class="mono" id="reward-label">Σreward 0.00</span>
+      </div>
+    </nav>
+
+    <div class="topbar-actions">
+      <button class="btn btn-ghost" id="btn-pause">⏸ Pause</button>
+      <button class="btn btn-ghost" id="btn-reset-env">↻ New environment</button>
+      <button class="btn btn-danger" id="btn-reset-brain">💥 Reset brain</button>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <!-- LEFT: 3D BRAIN + REGIONS -->
+    <section class="panel panel-brain">
+      <div class="panel-title">
+        <h2>3D 人脑</h2>
+        <span class="hint">拖拽旋转 · 滚轮缩放 · 悬停脑区看名字</span>
+      </div>
+      <div id="brain3d"></div>
+      <div class="brain-legend" id="brain-legend"></div>
+    </section>
+
+    <!-- MIDDLE-TOP: ENVIRONMENT & VITALS -->
+    <section class="panel panel-env">
+      <div class="panel-title">
+        <h2>虚拟环境</h2>
+        <div class="hint">
+          <span class="tag tag-agent">身体</span>
+          <span class="tag tag-food">食物 +1</span>
+          <span class="tag tag-hazard">危险 −1</span>
+        </div>
+      </div>
+      <div class="env-wrap">
+        <canvas id="env-canvas" width="360" height="360"></canvas>
+      </div>
+      <div class="env-actions">
+        <button class="btn btn-mini" id="btn-poke-food">+ 加一个食物</button>
+        <button class="btn btn-mini" id="btn-poke-hazard">+ 加一个危险</button>
+      </div>
+      <div class="env-stats" id="env-stats"></div>
+    </section>
+
+    <!-- MIDDLE-BOTTOM: REGION DETAIL -->
+    <section class="panel panel-region">
+      <div class="panel-title">
+        <h2 id="region-title">脑区详情</h2>
+        <span class="hint">点上方大脑里任意脑区</span>
+      </div>
+      <div id="region-detail" class="region-detail-empty">
+        <p>👈 点一个脑区看它内部在算什么</p>
+      </div>
+    </section>
+
+    <!-- RIGHT: THOUGHT STREAM -->
+    <section class="panel panel-thoughts">
+      <div class="panel-title">
+        <h2>思考流</h2>
+        <div class="tabs">
+          <button class="tab active" data-lang="zh">中</button>
+          <button class="tab" data-lang="en">EN</button>
+        </div>
+      </div>
+      <div id="thought-stream" class="thought-stream"></div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="footer-l">
+      <span class="mono">Brain: 8 regions · ~350 parameters</span>
+      <span class="mono">·</span>
+      <span class="mono">Environment: 9×9 grid</span>
+      <span class="mono">·</span>
+      <span class="mono">Learning: online actor-critic</span>
+      <span class="mono">·</span>
+      <span class="mono" style="color: var(--accent)">No LLM used</span>
+    </div>
+    <div class="footer-r">
+      <label class="mono">
+        Speed
+        <input type="range" id="tick-hz" min="1" max="20" step="1" value="6"/>
+        <span id="tick-hz-label">6 Hz</span>
+      </label>
+    </div>
+  </footer>
+
+  <script type="module" src="/static/js/main.js"></script>
+</body>
+</html>
