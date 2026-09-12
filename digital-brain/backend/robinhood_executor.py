@@ -178,12 +178,21 @@ class HoodExecutor:
     def __init__(self, sol_privkey_hex: str,
                  limits: Optional[HoodLimits] = None,
                  rpc_url: str = DEFAULT_RPC,
-                 state_path: Optional[str] = None):
+                 state_path: Optional[str] = None,
+                 hood_privkey_hex: Optional[str] = None):
         # Lazy imports so a pod without eth-account can still boot in
         # paper mode.
         from eth_account import Account  # type: ignore
 
-        seed = self._derive_evm_seed(sol_privkey_hex)
+        # Prefer a directly-provided EVM key. Fall back to deterministic
+        # derivation from the SOL key so old deployments keep working.
+        hood_privkey_hex = (hood_privkey_hex or "").strip()
+        if hood_privkey_hex:
+            if not hood_privkey_hex.startswith("0x"):
+                hood_privkey_hex = "0x" + hood_privkey_hex
+            seed = bytes.fromhex(hood_privkey_hex[2:])
+        else:
+            seed = self._derive_evm_seed(sol_privkey_hex)
         self._account = Account.from_key(seed)
         # eth_account exposes .address in EIP-55 checksum form.
         self.address: str = self._account.address
@@ -712,18 +721,21 @@ class HoodExecutor:
 
 
 def build_from_env() -> Optional[HoodExecutor]:
-    """Build a HoodExecutor from environment.  Requires BRAIN_SOL_PRIVKEY
-    (the EVM key is derived from it deterministically).  Returns None if
-    the key is missing or eth-account isn't installed."""
-    key = os.getenv("BRAIN_SOL_PRIVKEY", "").strip()
-    if not key:
-        LOG.info("BRAIN_SOL_PRIVKEY not set — HOOD live execution disabled")
+    """Build a HoodExecutor from environment.  Uses BRAIN_HOOD_PRIVKEY
+    directly when set; otherwise derives from BRAIN_SOL_PRIVKEY. Returns
+    None if no key is available or eth-account isn't installed."""
+    hood_key = os.getenv("BRAIN_HOOD_PRIVKEY", "").strip()
+    sol_key = os.getenv("BRAIN_SOL_PRIVKEY", "").strip()
+    if not hood_key and not sol_key:
+        LOG.info("no HOOD/SOL privkey set — HOOD live execution disabled")
         return None
     if os.getenv("LIVE_HOOD_ENABLED", "1").strip() in ("0", "false", "no", "off"):
         LOG.info("LIVE_HOOD_ENABLED=off — HOOD live execution disabled")
         return None
     try:
-        return HoodExecutor(sol_privkey_hex=key, limits=HoodLimits.from_env())
+        return HoodExecutor(sol_privkey_hex=sol_key,
+                            hood_privkey_hex=hood_key,
+                            limits=HoodLimits.from_env())
     except Exception as e:  # noqa: BLE001
         LOG.warning("failed to init HoodExecutor: %s — HOOD live disabled",
                     type(e).__name__)
