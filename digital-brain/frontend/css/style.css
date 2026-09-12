@@ -120,25 +120,69 @@ body {
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(circle 1100px at 12% -12%, rgba(110, 231, 255, 0.12), transparent 55%),
-    radial-gradient(circle 1100px at 100% 108%, rgba(240, 171, 252, 0.10), transparent 55%),
-    radial-gradient(circle 800px at 50% 42%,   rgba(139, 92, 246, 0.045), transparent 72%),
-    radial-gradient(circle 1400px at 100% -20%, rgba(232, 217, 166, 0.04), transparent 60%),
+    /* Aurora: turquoise arc top-left, magenta bloom top-right,
+       violet mist center, gold sun at bottom right, and a deep-purple
+       nebula pooled at the bottom edge — five layered spectral fields
+       stacked for real depth. */
+    radial-gradient(circle 1300px at 12% -8%,  rgba(110, 231, 255, 0.18), transparent 55%),
+    radial-gradient(circle 1200px at 96% -6%,  rgba(240, 171, 252, 0.16), transparent 55%),
+    radial-gradient(circle 1400px at 50% 42%,  rgba(139, 92, 246, 0.09),  transparent 68%),
+    radial-gradient(circle 1200px at 100% 108%, rgba(232, 217, 166, 0.06), transparent 60%),
+    radial-gradient(circle 1400px at 8% 108%,   rgba(168, 85, 247, 0.10),  transparent 65%),
+    radial-gradient(circle 1800px at 50% 118%,  rgba(56, 189, 248, 0.05),  transparent 60%),
     var(--bg-0);
   position: relative;
   isolation: isolate;
 }
-/* Fine vignette so the edges of the OLED page recede — makes the whole
-   viewport feel deeper and more expensive. */
+/* --- Aurora sheet ---
+   A slowly drifting spectral curtain painted on ::before. Uses
+   conic + radial gradients tinted cyan / magenta / violet and
+   animated with a very slow translate + rotate. Enough motion to
+   feel alive, small enough to never distract. */
 body::before {
+  content: "";
+  position: fixed;
+  inset: -20% -20% -20% -20%;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 60% 40% at 30% 20%, rgba(110, 231, 255, 0.14), transparent 65%),
+    radial-gradient(ellipse 55% 42% at 78% 30%, rgba(240, 171, 252, 0.11), transparent 65%),
+    radial-gradient(ellipse 70% 50% at 50% 90%, rgba(168, 85, 247, 0.10),  transparent 65%),
+    conic-gradient(from 210deg at 50% 50%,
+      rgba(110, 231, 255, 0.03) 0deg,
+      rgba(240, 171, 252, 0.05) 90deg,
+      rgba(168, 85, 247, 0.04) 180deg,
+      rgba(232, 217, 166, 0.03) 270deg,
+      rgba(110, 231, 255, 0.03) 360deg);
+  filter: blur(60px) saturate(120%);
+  opacity: 0.85;
+  mix-blend-mode: screen;
+  will-change: transform;
+  animation: auroraDrift 42s ease-in-out infinite alternate;
+}
+/* Deep vignette on ::after so the aurora fades toward the corners. */
+body::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: -1;
-  background: radial-gradient(ellipse at 50% 50%,
-              transparent 55%,
-              rgba(0, 0, 0, 0.55) 100%);
+  background:
+    radial-gradient(ellipse 100% 80% at 50% 45%, transparent 55%, rgba(0, 0, 0, 0.58) 100%),
+    /* God-ray hint — two slanted stripes of near-invisible light
+       diagonally across the page. Very subtle. */
+    linear-gradient(112deg,
+      transparent 30%,
+      rgba(240, 171, 252, 0.03) 45%,
+      transparent 55%,
+      rgba(110, 231, 255, 0.025) 70%,
+      transparent 82%);
+}
+@keyframes auroraDrift {
+  0%   { transform: translate3d(-2%, -1%, 0) rotate(-1deg); }
+  50%  { transform: translate3d( 2%,  2%, 0) rotate( 1.5deg); }
+  100% { transform: translate3d(-1%,  1%, 0) rotate(-0.5deg); }
 }
 
 /* Ambient canvas — the neural-mesh backdrop. Sits behind everything.
@@ -558,6 +602,31 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   color: var(--text-faint);
   letter-spacing: 0.1em;
   font-weight: 500;
+  position: relative;
+  padding: 1px 5px;
+  border: 1px solid rgba(232, 217, 166, 0.28);
+  border-radius: 2px;
+  color: rgba(232, 217, 166, 0.8);
+  background: rgba(232, 217, 166, 0.03);
+  text-shadow: 0 0 6px rgba(232, 217, 166, 0.35);
+}
+/* Animated hairline sweep across every panel top edge — feels like a
+   scanner passing over each specimen plate. Subtle enough not to
+   distract, magical enough to feel alive. */
+.panel::before {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 20%,
+    rgba(240, 171, 252, 0.35) 50%,
+    rgba(110, 231, 255, 0.35) 65%,
+    rgba(255, 255, 255, 0.06) 80%,
+    transparent 100%);
+  animation: panelScan 9s ease-in-out infinite alternate;
+  background-size: 200% 100%;
+}
+@keyframes panelScan {
+  0%   { background-position:   0% 0%; }
+  100% { background-position: 100% 0%; }
 }
 
 .panel-title .hint {
@@ -579,19 +648,44 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   min-height: 0;
   border-radius: var(--r-md);
   background:
-    radial-gradient(circle at 30% 25%, rgba(240, 171, 252, 0.16), transparent 55%),
-    radial-gradient(circle at 72% 78%, rgba(110, 231, 255, 0.16), transparent 55%),
-    radial-gradient(ellipse at 50% 100%, rgba(255, 145, 197, 0.10), transparent 65%),
-    linear-gradient(180deg, rgba(4, 5, 12, 0.92) 0%, rgba(9, 6, 22, 0.9) 100%);
+    radial-gradient(circle at 30% 25%, rgba(240, 171, 252, 0.18), transparent 55%),
+    radial-gradient(circle at 72% 78%, rgba(110, 231, 255, 0.18), transparent 55%),
+    radial-gradient(ellipse at 50% 100%, rgba(255, 145, 197, 0.12), transparent 65%),
+    radial-gradient(ellipse at 50% 45%, rgba(168, 85, 247, 0.08), transparent 70%),
+    linear-gradient(180deg, rgba(4, 5, 12, 0.96) 0%, rgba(11, 6, 26, 0.94) 100%);
   position: relative;
   overflow: hidden;
   cursor: grab;
   border: 1px solid var(--border);
   box-shadow:
-    inset 0 0 90px -20px rgba(200, 150, 240, 0.12),
-    inset 0 0 22px -6px rgba(110, 231, 255, 0.08);
+    inset 0 0 110px -20px rgba(200, 150, 240, 0.16),
+    inset 0 0 26px -6px rgba(110, 231, 255, 0.10);
 }
 #brain3d:active { cursor: grabbing; }
+/* Corner registration marks — like an anatomical plate. Painted with
+   pseudo-elements on the panel-brain so they anchor around the viz
+   rather than over it. Subtle, gold-toned. */
+.panel-brain > #brain3d::before,
+.panel-brain > #brain3d::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(232, 217, 166, 0.55);
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(232, 217, 166, 0.35));
+  z-index: 2;
+}
+.panel-brain > #brain3d::before {
+  top: 8px; left: 8px;
+  border-right: none;
+  border-bottom: none;
+}
+.panel-brain > #brain3d::after {
+  bottom: 8px; right: 8px;
+  border-left: none;
+  border-top: none;
+}
 
 /* Fomofly-style specimen header + figcaption around the brain viz.
    Small caps, monospaced numerics, hairline dividers. Reads like a
@@ -618,6 +712,22 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   text-transform: uppercase;
   font-family: var(--font-mono);
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.specimen-meta-label::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(240, 171, 252, 0.9);
+  box-shadow: 0 0 6px rgba(240, 171, 252, 0.75);
+  animation: specimenPulse 1.7s ease-in-out infinite;
+}
+@keyframes specimenPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(1.4); }
 }
 .specimen-meta-stat {
   color: var(--text-secondary);
@@ -2352,15 +2462,14 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
   max-width: 42em;
 }
 
-/* --- Very subtle animated grain-line noise on the whole viewport ---
-   Sits between the ambient canvas and everything else. Extremely low
-   opacity so it never distracts — just gives the OLED "presence". */
-body::after {
+/* Scanlines: rendered as a hairline repeating pattern applied to the
+   grain overlay via ::before so we don't fight for the body::after slot
+   (used by the aurora vignette / god-ray layer above). */
+.grain-overlay::before {
   content: "";
-  position: fixed;
+  position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: -1;
   background:
     repeating-linear-gradient(0deg,
       rgba(255, 255, 255, 0.008) 0px,

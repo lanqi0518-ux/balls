@@ -1,6 +1,9 @@
 .DS_Store
 Thumbs.db
 *.log
+
+artifacts/
+canvas_data.json
 node_modules/
 dist
 .env

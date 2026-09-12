@@ -15,12 +15,36 @@ const CONNECT_DIST = 170;         // px within which two nodes draw a line
 const DRIFT_SPEED = 0.15;         // px/frame base speed
 const PULSE_DECAY = 0.94;         // how fast a tick-pulse fades
 
+/* Mystical dust — a second, sparser layer of tiny floating motes with
+   long-tail glows. Not connected to anything; they just drift like
+   particles in a cathedral shaft of light. Cheap: each is a single
+   radial gradient per frame, and there are only ~90 of them. */
+const DUST_TARGET = 90;
+const DUST_MIN = 55;
+const DUST_DRIFT = 0.05;
+
+/* Fireflies — 6 rare, larger glowing motes that pulse slowly and
+   drift with a gentle sine wobble. Each carries its own hue so
+   the mesh reads as a real spectrum rather than a monochrome blur. */
+const FIREFLY_TARGET = 6;
+const FIREFLY_MIN = 4;
+
 const COLORS = {
   node:   [110, 231, 255],        // #6EE7FF electric cyan
   edge:   [110, 231, 255],        // #6EE7FF electric cyan
   spark:  [240, 171, 252],        // #F0ABFC magenta cognition pulse
   bright: [232, 253, 255],        // near-white flash with cyan tint
+  dust:   [200, 220, 255],        // soft near-white blue for the dust field
 };
+
+const FIREFLY_HUES = [
+  [110, 231, 255],   // cyan
+  [240, 171, 252],   // magenta
+  [232, 217, 166],   // gold
+  [168, 85, 247],    // violet
+  [252, 176, 148],   // warm coral (rare)
+  [110, 231, 255],   // cyan again — bias the mix
+];
 
 function rgba(triplet, a) {
   return `rgba(${triplet[0]}, ${triplet[1]}, ${triplet[2]}, ${a})`;
@@ -32,6 +56,8 @@ export class AmbientMesh {
     this.ctx = canvas.getContext("2d");
     this.dpr = Math.min(2, window.devicePixelRatio || 1);
     this.nodes = [];
+    this.dust = [];
+    this.fireflies = [];
     this.pulse = 0;                    // 0..1 — decays every frame
     this.lastFrame = 0;
     this.running = true;
@@ -42,6 +68,8 @@ export class AmbientMesh {
     document.addEventListener("visibilitychange", this._visBound);
     this._resize();
     this._seedNodes();
+    this._seedDust();
+    this._seedFireflies();
     requestAnimationFrame((t) => this._loop(t));
   }
 
@@ -89,10 +117,54 @@ export class AmbientMesh {
     }
   }
 
+  _seedDust() {
+    const count = window.innerWidth < 900 ? DUST_MIN : DUST_TARGET;
+    this.dust = [];
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = DUST_DRIFT * (0.3 + Math.random() * 1.4);
+      this.dust.push({
+        x: Math.random() * this.w,
+        y: Math.random() * this.h,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 0.02,   // very faint upward drift
+        r: 0.5 + Math.random() * 1.1,
+        phase: Math.random() * Math.PI * 2,
+        alpha: 0.18 + Math.random() * 0.35,
+      });
+    }
+  }
+
+  _seedFireflies() {
+    const count = window.innerWidth < 900 ? FIREFLY_MIN : FIREFLY_TARGET;
+    this.fireflies = [];
+    for (let i = 0; i < count; i++) {
+      const hue = FIREFLY_HUES[i % FIREFLY_HUES.length];
+      this.fireflies.push({
+        x: Math.random() * this.w,
+        y: Math.random() * this.h,
+        baseVx: (Math.random() - 0.5) * 0.10,
+        baseVy: (Math.random() - 0.5) * 0.08,
+        r: 2.2 + Math.random() * 1.6,
+        hue,
+        phase: Math.random() * Math.PI * 2,
+        wobbleAmp: 0.35 + Math.random() * 0.45,
+      });
+    }
+  }
+
   _retargetNodesToBounds() {
     for (const n of this.nodes) {
       if (n.x > this.w) n.x = Math.random() * this.w;
       if (n.y > this.h) n.y = Math.random() * this.h;
+    }
+    for (const d of this.dust) {
+      if (d.x > this.w) d.x = Math.random() * this.w;
+      if (d.y > this.h) d.y = Math.random() * this.h;
+    }
+    for (const f of this.fireflies) {
+      if (f.x > this.w) f.x = Math.random() * this.w;
+      if (f.y > this.h) f.y = Math.random() * this.h;
     }
   }
 
@@ -124,10 +196,31 @@ export class AmbientMesh {
     for (const n of this.nodes) {
       n.x += n.vx * scale;
       n.y += n.vy * scale;
-      // Soft bounce off edges (keeps the drift bounded without teleport pops)
       if (n.x < 0 || n.x > this.w) n.vx *= -1;
       if (n.y < 0 || n.y > this.h) n.vy *= -1;
       n.phase += 0.008 * scale;
+    }
+    for (const d of this.dust) {
+      d.x += d.vx * scale;
+      d.y += d.vy * scale;
+      d.phase += 0.006 * scale;
+      // wrap around (dust reads as endless field, not bouncing)
+      if (d.x < -10) d.x = this.w + 10;
+      if (d.x > this.w + 10) d.x = -10;
+      if (d.y < -10) d.y = this.h + 10;
+      if (d.y > this.h + 10) d.y = -10;
+    }
+    for (const f of this.fireflies) {
+      f.phase += 0.012 * scale;
+      // Gentle sine wobble around the base velocity
+      const vx = f.baseVx + Math.sin(f.phase) * 0.05 * f.wobbleAmp;
+      const vy = f.baseVy + Math.cos(f.phase * 0.7) * 0.05 * f.wobbleAmp;
+      f.x += vx * scale;
+      f.y += vy * scale;
+      if (f.x < -20) f.x = this.w + 20;
+      if (f.x > this.w + 20) f.x = -20;
+      if (f.y < -20) f.y = this.h + 20;
+      if (f.y > this.h + 20) f.y = -20;
     }
     this.pulse *= PULSE_DECAY;
   }
@@ -137,6 +230,23 @@ export class AmbientMesh {
     ctx.save();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
+
+    // ---- dust motes ----
+    // Painted first so nodes and fireflies float on top.  These are the
+    // tiny near-white specks that give the whole page a "cathedral shaft
+    // of light" quality without ever demanding attention.
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (const d of this.dust) {
+      const breathe = 0.55 + 0.45 * Math.sin(d.phase);
+      const a = d.alpha * breathe;
+      if (a < 0.02) continue;
+      ctx.fillStyle = rgba(COLORS.dust, a * 0.9);
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
 
     // ---- edges (lines) ----
     // We draw the connections first so nodes float on top of them.
@@ -188,6 +298,31 @@ export class AmbientMesh {
       ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
       ctx.fill();
     }
+
+    // ---- fireflies ----
+    // Handful of larger, hue-shifted, slow-pulsing points that read as
+    // roaming souls / lightning bugs across the whole page.  Painted
+    // with additive blending so they bloom into whatever they cross.
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (const f of this.fireflies) {
+      const breathe = 0.55 + 0.45 * Math.sin(f.phase * 0.6);
+      const bright = 0.35 + 0.65 * breathe + 0.3 * this.pulse;
+      const glowR = f.r * (5.5 + breathe * 2.5);
+      const grad = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, glowR);
+      grad.addColorStop(0.0, rgba(f.hue, bright * 0.55));
+      grad.addColorStop(0.4, rgba(f.hue, bright * 0.2));
+      grad.addColorStop(1.0, rgba(f.hue, 0));
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, glowR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = rgba(COLORS.bright, Math.min(1, bright));
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, f.r * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
 
     ctx.restore();
   }
