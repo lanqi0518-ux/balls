@@ -16,6 +16,11 @@ const REGION_LABELS = {
   motor_cortex: "Motor cortex",
   default_mode: "Default mode network",
   trader_cortex: "Trader cortex",
+  central_complex: "Central complex",
+  cerebellum: "Cerebellum",
+  basal_ganglia: "Basal ganglia",
+  insular_cortex: "Insular cortex",
+  locus_coeruleus: "Locus coeruleus",
 };
 
 export class ThoughtStream {
