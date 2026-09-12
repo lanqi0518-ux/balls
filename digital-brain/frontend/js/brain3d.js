@@ -64,8 +64,12 @@ export class BrainScene {
     this.camera.position.set(170, 90, 220);
     this.camera.lookAt(0, 0, 0);
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Mobile is much happier at 1x DPR — retina phones otherwise render
+    // at ~9x pixel budget which pins the GPU and stalls scrolling.
+    this._isMobile = window.matchMedia("(max-width: 800px)").matches;
+    const maxDpr = this._isMobile ? 1 : 2;
+    this.renderer = new THREE.WebGLRenderer({ antialias: !this._isMobile, alpha: true });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxDpr));
     this.renderer.setClearColor(0x000000, 0);
     this.container.appendChild(this.renderer.domElement);
 
@@ -772,7 +776,7 @@ export class BrainScene {
     // This is what makes the vessels + region cores actually feel magical
     // instead of just "colored spheres in the dark".
     this.composer = new EffectComposer(this.renderer);
-    this.composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.composer.setPixelRatio(Math.min(window.devicePixelRatio, this._isMobile ? 1 : 2));
     this.composer.addPass(new RenderPass(this.scene, this.camera));
 
     const w = this.container.clientWidth || 800;
@@ -1144,6 +1148,13 @@ export class BrainScene {
 
   _animate() {
     requestAnimationFrame(() => this._animate());
+    // Cap mobile to ~30fps — halves GPU/CPU cost with zero perceptible
+    // difference on the ambient brain motion.
+    if (this._isMobile) {
+      const now = performance.now();
+      if (this._lastFrameAt && now - this._lastFrameAt < 33) return;
+      this._lastFrameAt = now;
+    }
     const t = performance.now() * 0.001;
 
     for (const entry of this.regions.values()) {

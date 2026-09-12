@@ -63,7 +63,7 @@ swap_size_mb = 512
   # Bumped to 2GB and 2 CPUs so the headless Chromium web-embodiment
   # subsystem has memory headroom alongside PyTorch + the spiking
   # central complex.
-  size = "shared-cpu-4x"
+  size = "performance-2x"
   memory = "4gb"
   cpus = 2
 

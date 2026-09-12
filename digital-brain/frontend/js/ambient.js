@@ -54,7 +54,9 @@ export class AmbientMesh {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
-    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    this._isMobile = window.matchMedia("(max-width: 800px)").matches;
+    this.dpr = Math.min(this._isMobile ? 1 : 2, window.devicePixelRatio || 1);
+    this._minFrameMs = this._isMobile ? 40 : 0;
     this.nodes = [];
     this.dust = [];
     this.fireflies = [];
@@ -181,7 +183,7 @@ export class AmbientMesh {
     }
     // Cap at ~30 fps for cheapness. Even at 30 fps the drift is smooth
     // because we're moving at < 0.5 px per frame.
-    if (t - this.lastFrame < 33) {
+    if (t - this.lastFrame < Math.max(33, this._minFrameMs)) {
       requestAnimationFrame((tt) => this._loop(tt));
       return;
     }
