@@ -32,21 +32,6 @@ export function initTrading(panelEl, opts = {}) {
 
     <div class="trading-block">
       <div class="trading-block-title">
-        <span>Equity curve</span>
-        <span class="count" id="eqcurve-hint">—</span>
-      </div>
-      <div class="equity-curve-wrap"><svg id="eq-curve" preserveAspectRatio="none"></svg></div>
-    </div>
-
-    <div class="trading-block">
-      <div class="trading-block-title">
-        <span>Positions</span><span class="count" id="pos-count">0</span>
-      </div>
-      <div id="pos-body"></div>
-    </div>
-
-    <div class="trading-block">
-      <div class="trading-block-title">
         <span>Fresh launches · Solana + Robinhood-chain</span>
         <span class="count" id="fresh-count">0</span>
       </div>
@@ -82,12 +67,6 @@ export function initTrading(panelEl, opts = {}) {
       </div>
     </div>
 
-    <div class="trading-block">
-      <div class="trading-block-title">
-        <span>Recent closes</span><span class="count" id="closed-count">0</span>
-      </div>
-      <div id="closed-body"></div>
-    </div>
   `;
 
   document.getElementById("w-track").addEventListener("click", () => {
@@ -124,14 +103,11 @@ export function updateTrading(trading) {
   updateSummary(trading);
   updateLive(trading.live);
   updateHood(trading.hood);
-  updateEquityCurve(trading.paper.equity_curve || [], trading.paper.start_usd);
-  updatePositions(trading.paper.positions || []);
   updateFresh(trading.fresh_launches || []);
   updateHot(trading.hot_tokens || []);
   updateLeaderboard(trading.leaderboard || []);
   updateWallets(trading.tracked_wallets || [], trading.discovery_status || {},
                 trading.tuning || {});
-  updateClosed(trading.paper.closed_recent || []);
 }
 
 function updateLive(live) {
@@ -307,18 +283,25 @@ function updateHood(hood) {
 }
 
 function updateSummary(t) {
-  const p = t.paper || {};
   const st = t.trader_cortex_stats || {};
-  const eq = p.equity_usd || 0;
-  const pnl = p.total_pnl_usd || 0;
-  const pnlPct = p.total_pnl_pct || 0;
+  const live = t.live || {};
+  const hood = t.hood || {};
+  const solBal = Number(live.sol_balance || 0);
+  const ethBal = Number(hood.eth_balance || 0);
+  const liveTrades = (live.recent_trades || []).filter((r) => r.status === "confirmed").length
+                    + (hood.recent_trades || []).filter((r) => r.status === "confirmed").length;
+  const openPos = Number(live.open_positions_count || 0) + Number(hood.open_positions_count || 0);
+  const armed = (live.wallet && !live.halted && !live.dry_run)
+             || (hood.wallet && !hood.halted && !hood.dry_run);
   const html = `
-    <div class="meter"><div class="meter-label">EQUITY</div>
-      <div class="meter-value">${fmtUsd(eq)}</div></div>
-    <div class="meter"><div class="meter-label">TOTAL PnL</div>
-      <div class="meter-value ${clsSign(pnl)}">${fmtUsd(pnl)}<br/><span style="font-size:10px">${fmtPct(pnlPct)}</span></div></div>
-    <div class="meter"><div class="meter-label">TRADES · WIN%</div>
-      <div class="meter-value">${p.n_trades_closed || 0}<br/><span style="font-size:10px">${Math.round((p.win_rate || 0) * 100)}%</span></div></div>
+    <div class="meter"><div class="meter-label">STATUS</div>
+      <div class="meter-value ${armed ? 'pos' : 'warn'}">${armed ? 'LIVE' : 'STANDBY'}<br/><span style="font-size:10px">on-chain body</span></div></div>
+    <div class="meter"><div class="meter-label">SOL WALLET</div>
+      <div class="meter-value mono">${solBal.toFixed(4)}<br/><span style="font-size:10px">${live.wallet ? live.wallet.slice(0,4) + '…' + live.wallet.slice(-4) : '—'}</span></div></div>
+    <div class="meter"><div class="meter-label">ETH WALLET</div>
+      <div class="meter-value mono">${ethBal.toFixed(6)}<br/><span style="font-size:10px">${hood.wallet ? hood.wallet.slice(0,4) + '…' + hood.wallet.slice(-4) : '—'}</span></div></div>
+    <div class="meter"><div class="meter-label">ON-CHAIN TRADES · OPEN</div>
+      <div class="meter-value">${liveTrades}<br/><span style="font-size:10px">${openPos} open</span></div></div>
     <div class="meter"><div class="meter-label">CORTEX UPDATES</div>
       <div class="meter-value">${st.bc_updates || 0} BC<br/><span style="font-size:10px">${st.rl_updates || 0} RL</span></div></div>
     <div class="meter" title="How often the brain formed its own opinion (independent agree + conviction) vs. copied a wallet."><div class="meter-label">AUTONOMY</div>

@@ -38,8 +38,8 @@ USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"          # USDC
 
 LAMPORTS_PER_SOL = 1_000_000_000
 
-JUP_QUOTE_URL = os.getenv("JUPITER_QUOTE_URL", "https://quote-api.jup.ag/v6/quote")
-JUP_SWAP_URL = os.getenv("JUPITER_SWAP_URL", "https://quote-api.jup.ag/v6/swap")
+JUP_QUOTE_URL = os.getenv("JUPITER_QUOTE_URL", "https://lite-api.jup.ag/swap/v1/quote")
+JUP_SWAP_URL = os.getenv("JUPITER_SWAP_URL", "https://lite-api.jup.ag/swap/v1/swap")
 DEFAULT_RPC = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
 
 

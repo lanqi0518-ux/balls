@@ -274,8 +274,10 @@ function handlePayload(data) {
     footerTrader.textContent =
       `Trader: ${st.bc_updates || 0} BC / ${st.rl_updates || 0} RL · autonomy ${auton}%`;
     if (walletLabel) {
-      const mode = String(data.trading.mode || "paper").toLowerCase();
-      walletLabel.textContent = mode === "live" ? "LIVE" : "WALLET";
+      const live = data.trading.live || {};
+      const hood = data.trading.hood || {};
+      const funded = Number(live.sol_balance || 0) > 0 || Number(hood.eth_balance || 0) > 0;
+      walletLabel.textContent = funded ? "LIVE" : "STANDBY";
     }
   }
 
@@ -337,26 +339,17 @@ function handlePayload(data) {
 }
 
 function updateTradingStrip(trading) {
-  const p = trading.paper || {};
-  const live = trading.live;
-  // Prefer the LIVE wallet balance when the live executor is armed.
-  // We show SOL for on-chain equity (that's what the wallet actually holds);
-  // paper equity is the fallback so the strip is never blank at boot.
-  let displayText;
-  if (live && Number.isFinite(live.sol_balance)) {
-    const sol = live.sol_balance;
-    displayText = sol.toFixed(sol < 0.1 ? 4 : 3) + " SOL";
-  } else {
-    const eq = p.equity_usd || 0;
-    displayText = "$" + eq.toLocaleString(undefined, { maximumFractionDigits: 0 });
-  }
-  paperEquityEl.textContent = displayText;
-  const pnl = p.total_pnl_usd || 0;
-  const pnlPct = p.total_pnl_pct || 0;
-  const cls = pnl > 0 ? "up" : (pnl < 0 ? "down" : "");
-  paperPnlEl.className = "mono " + cls;
-  const sign = pnl >= 0 ? "+" : "";
-  paperPnlEl.textContent = `${sign}${pnl.toFixed(0)} (${sign}${pnlPct.toFixed(2)}%)`;
+  const live = trading.live || {};
+  const hood = trading.hood || {};
+  const sol = Number(live.sol_balance || 0);
+  const eth = Number(hood.eth_balance || 0);
+  paperEquityEl.textContent = sol.toFixed(sol < 0.1 ? 4 : 3) + " SOL";
+  const confirmed = (live.recent_trades || []).filter((r) => r.status === "confirmed").length
+                  + (hood.recent_trades || []).filter((r) => r.status === "confirmed").length;
+  const open = Number(live.open_positions_count || 0) + Number(hood.open_positions_count || 0);
+  const armed = sol > 0 || eth > 0;
+  paperPnlEl.className = "mono " + (armed ? "up" : "");
+  paperPnlEl.textContent = `${confirmed} tx · ${open} open`;
 }
 
 // ---------- Hero: NOW THINKING -----------------------------------------
