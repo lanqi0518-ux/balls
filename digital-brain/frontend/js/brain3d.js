@@ -422,92 +422,115 @@ export class BrainScene {
     const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
     // -- ARTERIES (bright rose-red, more prominent) --------------------
+    // Coordinates chosen so tubes sit ON the outer cortical surface —
+    // visible from every camera angle rather than buried inside the mesh.
+    // Cerebrum bbox ≈ x±50 · y±55 · z-84..+95.
     const arteries = [
       // Basilar artery — vertical along brainstem, feeding upward.
       {
-        color: 0xff5675, radius: 0.65, kind: "artery",
+        color: 0xff5675, radius: 0.75, kind: "artery",
         points: [
           V( 0, -70, -34), V( 0, -60, -34), V( 0, -50, -34),
-          V( 0, -40, -32), V( 0, -30, -30),
+          V( 0, -42, -30), V( 0, -34, -26),
         ],
       },
-      // Anterior Cerebral Artery, LEFT — up through the longitudinal fissure.
+      // Anterior Cerebral Artery, LEFT — up through longitudinal fissure
+      // then over the top of the frontal lobe.
       {
-        color: 0xff5675, radius: 0.55, kind: "artery",
+        color: 0xff5675, radius: 0.7, kind: "artery",
         points: [
-          V( 0, -30, -28), V(-1, -20, -14), V(-1.5, -5, 6),
-          V(-1.8, 12, 30), V(-2.0, 24, 46), V(-2.2, 28, 58),
+          V( 0, -34, -26), V(-2, -20, -8), V(-3, -2, 14),
+          V(-4, 20, 34), V(-5, 40, 50), V(-4, 52, 60),
         ],
       },
       // Anterior Cerebral Artery, RIGHT — mirrored.
       {
-        color: 0xff5675, radius: 0.55, kind: "artery",
+        color: 0xff5675, radius: 0.7, kind: "artery",
         points: [
-          V( 0, -30, -28), V( 1, -20, -14), V( 1.5, -5, 6),
-          V( 1.8, 12, 30), V( 2.0, 24, 46), V( 2.2, 28, 58),
+          V( 0, -34, -26), V( 2, -20, -8), V( 3, -2, 14),
+          V( 4, 20, 34), V( 5, 40, 50), V( 4, 52, 60),
         ],
       },
-      // Middle Cerebral Artery, LEFT — sweeping laterally over the temporal lobe.
+      // Middle Cerebral Artery, LEFT — sylvian fissure sweep across the
+      // lateral surface, up the temporal lobe.
       {
-        color: 0xff4a72, radius: 0.6, kind: "artery",
+        color: 0xff4a72, radius: 0.8, kind: "artery",
         points: [
-          V( 0, -30, -26), V(-8, -32, -18), V(-18, -30, -6),
-          V(-30, -22,  8), V(-42, -10, 18), V(-48,  4, 24),
-          V(-46, 18, 22),
+          V( 0, -34, -24), V(-10, -32, -14), V(-24, -26,  0),
+          V(-40, -14, 12), V(-52,  0, 20), V(-54, 16, 22),
+          V(-46, 30, 22), V(-30, 40, 20),
         ],
       },
       // Middle Cerebral Artery, RIGHT — mirrored.
       {
-        color: 0xff4a72, radius: 0.6, kind: "artery",
+        color: 0xff4a72, radius: 0.8, kind: "artery",
         points: [
-          V( 0, -30, -26), V( 8, -32, -18), V( 18, -30, -6),
-          V( 30, -22,  8), V( 42, -10, 18), V( 48,  4, 24),
-          V( 46, 18, 22),
+          V( 0, -34, -24), V( 10, -32, -14), V( 24, -26,  0),
+          V( 40, -14, 12), V( 52,  0, 20), V( 54, 16, 22),
+          V( 46, 30, 22), V( 30, 40, 20),
         ],
       },
-      // Posterior Cerebral Artery, LEFT — wrapping around toward occipital.
+      // Posterior Cerebral Artery, LEFT — wrapping toward occipital.
       {
-        color: 0xff5675, radius: 0.5, kind: "artery",
+        color: 0xff5675, radius: 0.65, kind: "artery",
         points: [
-          V( 0, -30, -30), V(-6, -28, -40), V(-14, -22, -52),
-          V(-22, -10, -60), V(-28,  4, -62), V(-30, 16, -60),
+          V( 0, -34, -26), V(-8, -30, -42), V(-18, -20, -58),
+          V(-26,  -4, -68), V(-30, 14, -66), V(-28, 30, -60),
         ],
       },
       // Posterior Cerebral Artery, RIGHT — mirrored.
       {
-        color: 0xff5675, radius: 0.5, kind: "artery",
+        color: 0xff5675, radius: 0.65, kind: "artery",
         points: [
-          V( 0, -30, -30), V( 6, -28, -40), V( 14, -22, -52),
-          V( 22, -10, -60), V( 28,  4, -62), V( 30, 16, -60),
+          V( 0, -34, -26), V( 8, -30, -42), V( 18, -20, -58),
+          V( 26,  -4, -68), V( 30, 14, -66), V( 28, 30, -60),
         ],
       },
     ];
 
     // -- VENOUS SINUSES (deeper violet-crimson, thicker) ---------------
     const veins = [
-      // Superior sagittal sinus — runs along the top midline, front→back.
+      // Superior sagittal sinus — runs along the crown midline, front→back.
       {
-        color: 0x9b3c7b, radius: 0.85, kind: "vein",
+        color: 0x9b3c7b, radius: 1.0, kind: "vein",
         points: [
-          V( 0, 28, 58), V( 0, 34, 40), V( 0, 38, 20),
-          V( 0, 40, 0), V( 0, 40, -20), V( 0, 36, -40), V( 0, 30, -56),
+          V( 0, 52, 60), V( 0, 58, 40), V( 0, 62, 18),
+          V( 0, 64, -2), V( 0, 62, -22), V( 0, 56, -42), V( 0, 46, -58),
         ],
       },
       // Transverse sinus, LEFT — wrapping around back-of-head from midline.
       {
-        color: 0x9b3c7b, radius: 0.75, kind: "vein",
+        color: 0x9b3c7b, radius: 0.9, kind: "vein",
         points: [
-          V( 0, 30, -56), V(-10, 20, -60), V(-24, 8, -60),
-          V(-34, -6, -54), V(-38, -20, -44),
+          V( 0, 46, -58), V(-12, 32, -64), V(-28, 14, -68),
+          V(-38, -6, -60), V(-42, -22, -46),
         ],
       },
       // Transverse sinus, RIGHT — mirrored.
       {
-        color: 0x9b3c7b, radius: 0.75, kind: "vein",
+        color: 0x9b3c7b, radius: 0.9, kind: "vein",
         points: [
-          V( 0, 30, -56), V( 10, 20, -60), V( 24, 8, -60),
-          V( 34, -6, -54), V( 38, -20, -44),
+          V( 0, 46, -58), V( 12, 32, -64), V( 28, 14, -68),
+          V( 38, -6, -60), V( 42, -22, -46),
         ],
+      },
+      // A few visible cortical veins draping down each side — pure
+      // "MRA render" decoration but sells the effect of a vascular tree.
+      {
+        color: 0x8b3670, radius: 0.55, kind: "vein",
+        points: [ V(-42, 34, 20), V(-40, 12, 24), V(-36, -6, 22), V(-30, -22, 16) ],
+      },
+      {
+        color: 0x8b3670, radius: 0.55, kind: "vein",
+        points: [ V( 42, 34, 20), V( 40, 12, 24), V( 36, -6, 22), V( 30, -22, 16) ],
+      },
+      {
+        color: 0x8b3670, radius: 0.5, kind: "vein",
+        points: [ V(-28, 44, 42), V(-32, 32, 30), V(-38, 20, 12), V(-40,  6, -6) ],
+      },
+      {
+        color: 0x8b3670, radius: 0.5, kind: "vein",
+        points: [ V( 28, 44, 42), V( 32, 32, 30), V( 38, 20, 12), V( 40,  6, -6) ],
       },
     ];
 
@@ -518,49 +541,68 @@ export class BrainScene {
 
     const addVessel = (v) => {
       const curve = new THREE.CatmullRomCurve3(v.points, false, "catmullrom", 0.5);
-      const tubeGeo = new THREE.TubeGeometry(curve, 96, v.radius, 10, false);
+      // Effective radius: arteries thicker + more visible than veins.
+      const R = v.radius * (v.kind === "artery" ? 1.8 : 1.7);
+      // Inner opaque core — the actual vessel body.
+      const tubeGeo = new THREE.TubeGeometry(curve, 128, R, 12, false);
       const mat = new THREE.MeshBasicMaterial({
         color: v.color,
         transparent: true,
-        opacity: v.kind === "artery" ? 0.78 : 0.55,
+        opacity: v.kind === "artery" ? 0.92 : 0.72,
       });
       const tube = new THREE.Mesh(tubeGeo, mat);
+      tube.renderOrder = 2;
       vesselGroup.add(tube);
 
-      // Emissive outer sleeve — additive-blended for a hot bloom halo.
-      const haloGeo = new THREE.TubeGeometry(curve, 96, v.radius * 2.6, 10, false);
-      const haloMat = new THREE.MeshBasicMaterial({
-        color: v.color,
-        transparent: true,
-        opacity: v.kind === "artery" ? 0.12 : 0.08,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-      const halo = new THREE.Mesh(haloGeo, haloMat);
-      vesselGroup.add(halo);
+      // Emissive middle sleeve — additive-blended for a warm halo (this
+      // is what bloom will pick up and turn into a soft red glow).
+      const halo1 = new THREE.Mesh(
+        new THREE.TubeGeometry(curve, 128, R * 2.2, 12, false),
+        new THREE.MeshBasicMaterial({
+          color: v.color, transparent: true,
+          opacity: v.kind === "artery" ? 0.28 : 0.18,
+          blending: THREE.AdditiveBlending, depthWrite: false,
+        }),
+      );
+      halo1.renderOrder = 1;
+      vesselGroup.add(halo1);
 
-      this.vesselCurves.push({ curve, kind: v.kind, radius: v.radius, color: v.color });
+      // Outer soft glow — very wide, low opacity for atmospheric bleed.
+      const halo2 = new THREE.Mesh(
+        new THREE.TubeGeometry(curve, 96, R * 4.5, 8, false),
+        new THREE.MeshBasicMaterial({
+          color: v.color, transparent: true,
+          opacity: v.kind === "artery" ? 0.08 : 0.05,
+          blending: THREE.AdditiveBlending, depthWrite: false,
+        }),
+      );
+      halo2.renderOrder = 0;
+      vesselGroup.add(halo2);
 
-      // Seed 2–4 pulses per vessel — small emissive spheres that will be
-      // ticked along the curve every frame.
-      const N = v.kind === "artery" ? 3 : 2;
+      this.vesselCurves.push({ curve, kind: v.kind, radius: R, color: v.color });
+
+      // Seed 3–5 pulses per vessel — hot bright emissive spheres that
+      // travel along the curve. These are what the eye reads as "living
+      // blood cells being pumped through arteries."
+      const N = v.kind === "artery" ? 4 : 2;
       for (let i = 0; i < N; i++) {
-        const pulseColor = v.kind === "artery" ? 0xffe1ea : 0xf5b6d6;
-        const size = v.radius * (v.kind === "artery" ? 1.7 : 1.4);
-        const geo = new THREE.SphereGeometry(size, 12, 10);
+        const pulseColor = v.kind === "artery" ? 0xfff0f5 : 0xffcce6;
+        const size = R * (v.kind === "artery" ? 1.9 : 1.5);
+        const geo = new THREE.SphereGeometry(size, 14, 10);
         const mat = new THREE.MeshBasicMaterial({
           color: pulseColor,
           transparent: true,
-          opacity: 0.95,
+          opacity: 1.0,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         });
         const mesh = new THREE.Mesh(geo, mat);
+        mesh.renderOrder = 3;
         vesselGroup.add(mesh);
         this.vesselPulses.push({
           curve,
           mesh,
-          speed: (v.kind === "artery" ? 0.14 : 0.09) + Math.random() * 0.05,
+          speed: (v.kind === "artery" ? 0.16 : 0.10) + Math.random() * 0.05,
           phase: i / N + Math.random() * 0.02,
           size,
         });
@@ -711,11 +753,14 @@ export class BrainScene {
       }
       const entry = this.regions.get(r.name);
       entry.data = r;
-      const size = 7 + Math.pow(r.activation, 0.6) * 7;
+      // Region cores sit INSIDE the cerebrum as small luminous cortex
+      // markers, not as giant balls that eclipse the anatomy. Scale
+      // range is now roughly 3–6 units against a ~100-unit brain.
+      const size = 3.0 + Math.pow(r.activation, 0.7) * 3.0;
       entry.core.scale.setScalar(size / entry.baseSize);
-      entry.core.material.opacity = 0.85 + r.activation * 0.15;
-      entry.glow.material.opacity = 0.15 + r.activation * 0.45;
-      entry.glow.scale.setScalar((size * 2.4) / entry.baseSize);
+      entry.core.material.opacity = 0.9 + r.activation * 0.1;
+      entry.glow.material.opacity = 0.20 + r.activation * 0.35;
+      entry.glow.scale.setScalar((size * 2.2) / entry.baseSize);
       entry.pulseTarget = r.activation;
     }
     this._updateLegend(regionStates);
@@ -723,26 +768,27 @@ export class BrainScene {
 
   _addRegion(meta) {
     const color = new THREE.Color(meta.color);
-    // Bloom-friendly amplified color for the emissive core — passing a
-    // >1.0 value to MeshBasicMaterial doesn't work, so we push the hue
-    // toward white/saturated to guarantee the threshold catches it.
-    const hot = color.clone().lerp(new THREE.Color(0xffffff), 0.25);
+    // Slightly boost hue for bloom — but only 8% toward white so the
+    // color still reads as the region's own hue rather than overblowing.
+    const hot = color.clone().lerp(new THREE.Color(0xffffff), 0.08);
     const scenePos = this._backendToScene(meta.position);
 
-    const baseSize = 10;
-    const coreGeo = new THREE.SphereGeometry(baseSize, 24, 20);
+    // baseSize of 4 = 8-unit diameter cores inside a ~100-unit cerebrum.
+    // Small enough to read as cortical markers, big enough to notice.
+    const baseSize = 4;
+    const coreGeo = new THREE.SphereGeometry(baseSize, 20, 16);
     const coreMat = new THREE.MeshBasicMaterial({
-      color: hot, transparent: true, opacity: 1.0,
+      color: hot, transparent: true, opacity: 0.95,
     });
     const core = new THREE.Mesh(coreGeo, coreMat);
 
-    const glowGeo = new THREE.SphereGeometry(baseSize, 24, 20);
+    const glowGeo = new THREE.SphereGeometry(baseSize, 20, 16);
     const glowMat = new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity: 0.35,
+      color, transparent: true, opacity: 0.30,
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
     const glow = new THREE.Mesh(glowGeo, glowMat);
-    glow.scale.setScalar(2.6);
+    glow.scale.setScalar(2.2);
 
     const group = new THREE.Group();
     group.add(glow);
