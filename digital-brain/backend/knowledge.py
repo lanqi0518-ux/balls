@@ -48,19 +48,24 @@ CATEGORIES: dict = {
         "en": "Crypto culture / slang",
         "color": "#a78bfa",
     },
+    # (These three categories were seeded from a well-known 20th-century
+    # theoretical physicist's canon.  The internal ids are kept so the
+    # persisted knowledge bank stays stable across restarts, but the
+    # display labels are neutralized so the brand doesn't advertise its
+    # source persona.)
     "einstein_physics": {
-        "zh": "爱因斯坦 · 物理",
-        "en": "Einstein · Physics",
+        "zh": "理论物理",
+        "en": "Theoretical Physics",
         "color": "#facc15",
     },
     "einstein_math": {
-        "zh": "爱因斯坦 · 数学",
-        "en": "Einstein · Math",
+        "zh": "数学基础",
+        "en": "Mathematical Foundations",
         "color": "#fb923c",
     },
     "einstein_life": {
-        "zh": "爱因斯坦 · 生平与思想",
-        "en": "Einstein · Life & thought",
+        "zh": "科学史与思想",
+        "en": "Scientific History & Thought",
         "color": "#a3e635",
     },
     # Categories the brain grows into at runtime as it encounters new
@@ -247,14 +252,14 @@ CONCEPTS: List[Concept] = [
             "1905 年论文，把光解释为光量子（光子），据此拿到 1921 年诺贝尔物理学奖。",
             "1905 paper explaining light as quanta (photons); this — not relativity — earned him the 1921 Nobel Prize in Physics."),
     Concept("photon", "einstein_physics", "光子", "Photon",
-            "光的量子化粒子，既是波又是粒子；爱因斯坦的这一步为量子力学开路。",
-            "The quantized particle of light; both wave and particle. Einstein's step here opened the road to quantum mechanics."),
+            "光的量子化粒子，既是波又是粒子；这一步为量子力学开路。",
+            "The quantized particle of light; both wave and particle. This step opened the road to quantum mechanics."),
     Concept("black_hole", "einstein_physics", "黑洞", "Black hole",
             "广义相对论方程的极端解：时空曲率大到光都逃不出的区域。",
             "An extremal solution of the general-relativity equations: a region where spacetime curves so hard even light cannot escape."),
     Concept("cosmological_constant", "einstein_physics", "宇宙常数 Λ", "Cosmological constant",
-            "爱因斯坦为稳态宇宙加进的项，他后来称其为'一生最大的错误'——但暗能量让它复活。",
-            "The term Einstein added for a static universe; he later called it 'the biggest blunder of my life' — until dark energy resurrected it."),
+            "为稳态宇宙加进的项，一度被称为'一生最大的错误'——但暗能量让它复活。",
+            "A term originally added for a static universe; long called 'the biggest blunder of the century' — until dark energy resurrected it."),
 
     # ---------------- einstein_math (5) ----------------
     Concept("tensor", "einstein_math", "张量", "Tensor",
@@ -263,32 +268,32 @@ CONCEPTS: List[Concept] = [
     Concept("lorentz", "einstein_math", "洛伦兹变换", "Lorentz transformation",
             "狭义相对论中不同惯性观察者之间坐标的正确变换，替代了伽利略变换。",
             "The correct coordinate transform between inertial observers in special relativity; replaces the Galilean one."),
-    Concept("field_eq", "einstein_math", "爱因斯坦场方程", "Einstein field equations",
+    Concept("field_eq", "einstein_math", "场方程", "Field equations",
             "Gμν + Λ gμν = 8πG/c⁴ · Tμν —— 十个非线性偏微分方程，规定物质与时空曲率如何互相塑造。",
             "Gμν + Λ gμν = 8πG/c⁴ · Tμν — ten coupled nonlinear PDEs prescribing how matter and spacetime curvature shape each other."),
     Concept("riemann", "einstein_math", "黎曼几何", "Riemannian geometry",
-            "描述弯曲空间的几何学，由黎曼建立，爱因斯坦用它写下广义相对论。",
-            "Geometry of curved spaces, developed by Riemann; Einstein used it to write down general relativity."),
+            "描述弯曲空间的几何学，由黎曼建立，是广义相对论的数学骨架。",
+            "Geometry of curved spaces, developed by Riemann; the mathematical skeleton of general relativity."),
     Concept("thought_experiment", "einstein_math", "思想实验", "Thought experiment",
-            "在脑子里跑一个理想化的物理场景，靠一致性倒推物理定律——爱因斯坦最标志性的工具。",
-            "Running an idealized physical scenario in your head and back-inferring the laws from self-consistency — Einstein's signature tool."),
+            "在脑子里跑一个理想化的物理场景，靠一致性倒推物理定律——理论物理的标志性工具。",
+            "Running an idealized physical scenario in your head and back-inferring the laws from self-consistency — a signature tool of theoretical physics."),
 
     # ---------------- einstein_life (5) ----------------
     Concept("patent_office", "einstein_life", "伯尔尼专利局", "Bern patent office",
-            "1902-1909 年爱因斯坦的日常工作岗位，正是在那里的空闲时间里他写出了 1905 年的四篇论文。",
-            "Einstein's day job 1902-1909; the four 1905 papers were written in the slack time of that office."),
+            "1902-1909 年，一份普通的日常工作岗位——1905 年那四篇论文是在这里的空闲时间里写出来的。",
+            "An ordinary day job, 1902-1909; the four 1905 papers were written in the slack time of that office."),
     Concept("annus_mirabilis", "einstein_life", "奇迹年 1905", "Annus Mirabilis 1905",
-            "一年内 26 岁的他发表了光电效应、布朗运动、狭义相对论、质能方程四篇论文。",
-            "In one year, at 26, he published four papers: photoelectric effect, Brownian motion, special relativity, and mass–energy equivalence."),
+            "一年内一位 26 岁的青年物理学家发表了光电效应、布朗运动、狭义相对论、质能方程四篇论文。",
+            "In one year, at 26, a young physicist published four papers: photoelectric effect, Brownian motion, special relativity, and mass–energy equivalence."),
     Concept("god_dice", "einstein_life", "上帝不掷骰子", "God does not play dice",
-            "他对量子力学随机性的著名反对，与玻尔的争论跨越几十年。",
-            "His famous objection to the randomness of quantum mechanics; the debate with Bohr spanned decades."),
+            "对量子力学随机性的著名反对，与哥本哈根学派的争论跨越几十年。",
+            "A famous objection to the randomness of quantum mechanics; the debate with the Copenhagen school spanned decades."),
     Concept("princeton", "einstein_life", "普林斯顿高等研究院", "Princeton IAS",
-            "1933 年从纳粹德国出走后，他在这里度过了余生，继续追求统一场论。",
-            "Where he spent the rest of his life after fleeing Nazi Germany in 1933, still chasing a unified field theory."),
+            "1933 年从纳粹德国出走后，此地成为一位思想家余生追求统一场论的实验室。",
+            "After fleeing Nazi Germany in 1933, this became the lab where one thinker spent the rest of a life chasing a unified field theory."),
     Concept("imagination", "einstein_life", "想象力比知识更重要", "Imagination > knowledge",
-            "他的名言：'想象力比知识更重要，因为知识是有限的，而想象力概括一切。'",
-            "His line: 'Imagination is more important than knowledge, for knowledge is limited whereas imagination embraces the entire world.'"),
+            "'想象力比知识更重要，因为知识是有限的，而想象力概括一切。'",
+            "'Imagination is more important than knowledge, for knowledge is limited whereas imagination embraces the entire world.'"),
 ]
 
 

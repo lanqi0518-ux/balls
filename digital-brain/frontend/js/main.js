@@ -211,7 +211,7 @@ function handlePayload(data) {
   rewardLabel.style.color = cum > 0 ? "var(--good)" : (cum < 0 ? "var(--bad)" : "var(--text-secondary)");
 
   if (!modeInitialized && brain.mode) {
-    modeLabel.textContent = brain.mode === "einstein" ? "◈ EINSTEIN" : "◇ DEFAULT";
+    modeLabel.textContent = brain.mode === "einstein" ? "◈ PRIME" : "◇ DEFAULT";
     modeBadge.classList.toggle("mode-default", brain.mode !== "einstein");
     modeInitialized = true;
   }
