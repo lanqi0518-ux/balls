@@ -608,8 +608,10 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-size: 10px;
-  letter-spacing: 0.12em;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  flex-wrap: wrap;
+  align-items: baseline;
 }
 .specimen-meta-label {
   color: var(--text-muted);
@@ -620,13 +622,18 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
 .specimen-meta-stat {
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
-  font-size: 10px;
+  font-size: 9.5px;
+  white-space: nowrap;
 }
 .specimen-meta-decision {
-  color: rgba(240, 171, 252, 0.85);
-  font-size: 9.5px;
-  letter-spacing: 0.14em;
+  color: rgba(240, 171, 252, 0.9);
+  font-size: 9px;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 .brain-figcaption {
   display: grid;

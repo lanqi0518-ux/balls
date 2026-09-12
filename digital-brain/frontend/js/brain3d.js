@@ -85,9 +85,9 @@ export class BrainScene {
     const bottom = new THREE.DirectionalLight(0x60a5fa, 0.32);
     bottom.position.set(0, -320, 0);
     this.scene.add(bottom);
-    // Warm point-source planted inside the brain — makes the transmission
-    // material actually glow from within instead of reading as gray glass.
-    const core = new THREE.PointLight(0xffb6e8, 1.3, 220, 1.4);
+    // Warm point-source planted inside the brain — subtle so the exterior
+    // gyri/sulci still read as folds instead of a soft glowing cloud.
+    const core = new THREE.PointLight(0xffb6e8, 0.55, 160, 1.6);
     core.position.set(0, -6, 0);
     this.scene.add(core);
     this.coreLight = core;
@@ -193,29 +193,27 @@ export class BrainScene {
     }
     geo.computeVertexNormals();
 
-    // Wet-glass cerebrum — physical material with high transmission so
-    // you can see the vessels + region cores glowing through the surface.
-    // Combined with the bloom pass this gives the whole brain a
-    // "holographic organ in a jar" feel.
+    // Cortex material — a translucent tissue look. We deliberately keep
+    // opacity moderate and transmission low so the mesh reads AS the
+    // brain surface (with visible gyri/sulci and vessel channels), not as
+    // a blurry cloud. Sheen and clearcoat provide the wet-tissue rim.
     const mat = new THREE.MeshPhysicalMaterial({
-      color: 0xcbb8de,
-      emissive: 0x1c1230,
-      emissiveIntensity: 0.42,
-      roughness: 0.28,
-      metalness: 0.05,
-      transmission: 0.55,      // lets background/vessels bleed through
-      thickness: 4.5,
-      ior: 1.35,
+      color: 0xa89ab8,
+      emissive: 0x2a1a3f,
+      emissiveIntensity: 0.35,
+      roughness: 0.55,
+      metalness: 0.02,
+      transmission: 0.15,
+      thickness: 2.5,
+      ior: 1.4,
       transparent: true,
-      opacity: 0.55,
+      opacity: 0.42,
       side: THREE.DoubleSide,
-      clearcoat: 0.6,
-      clearcoatRoughness: 0.25,
-      sheen: 0.8,
-      sheenRoughness: 0.5,
-      sheenColor: new THREE.Color(0xffb1e6),
-      attenuationDistance: 40,
-      attenuationColor: new THREE.Color(0xff9fd6),
+      clearcoat: 0.75,
+      clearcoatRoughness: 0.35,
+      sheen: 0.4,
+      sheenRoughness: 0.7,
+      sheenColor: new THREE.Color(0xffa8d6),
     });
     const cerebrum = new THREE.Mesh(geo, mat);
     this.scene.add(cerebrum);
@@ -261,10 +259,12 @@ export class BrainScene {
         uniform vec3 uWarm;
         uniform vec3 uCool;
         void main() {
-          float rim = pow(1.0 - abs(vN.z), 2.2);
-          float pulse = 0.72 + 0.28 * sin(uTime * 0.9 + vPos.y * 0.05);
+          // Fresnel-only inner glow — only shows at grazing angles so
+          // the front face still shows crisp exterior detail.
+          float rim = pow(1.0 - abs(vN.z), 3.5);
+          float pulse = 0.6 + 0.4 * sin(uTime * 0.9 + vPos.y * 0.05);
           vec3 col = mix(uCool, uWarm, 0.5 + 0.5 * sin(uTime * 0.4 + vPos.x * 0.04));
-          gl_FragColor = vec4(col, rim * pulse * 0.55);
+          gl_FragColor = vec4(col, rim * pulse * 0.28);
         }
       `,
     });
@@ -656,8 +656,10 @@ export class BrainScene {
           float band2 = sin(lon * 2.0 + uTime * 0.10) * 0.5 + 0.5;
           vec3 mixCol = mix(uColorA, uColorB, band1);
           mixCol = mix(mixCol, uColorC, band2 * 0.35);
-          float rim = pow(1.0 - abs(vNormal.z), 1.4);
-          gl_FragColor = vec4(mixCol, rim * 0.28);
+          // Tightened rim so the aura sits close to the horizon and
+          // doesn't wash the whole scene into a pastel fog.
+          float rim = pow(1.0 - abs(vNormal.z), 2.6);
+          gl_FragColor = vec4(mixCol, rim * 0.16);
         }
       `,
     });
@@ -676,11 +678,14 @@ export class BrainScene {
 
     const w = this.container.clientWidth || 800;
     const h = this.container.clientHeight || 600;
+    // Bloom kept intentionally moderate — enough to make vessels and region
+    // cores glow, low enough that cortical folds and vessel geometry
+    // aren't washed out into a soft cotton-ball haze.
     this.bloomPass = new UnrealBloomPass(
       new THREE.Vector2(w, h),
-      /* strength */  0.95,
-      /* radius   */  0.85,
-      /* threshold*/  0.12,
+      /* strength */  0.55,
+      /* radius   */  0.55,
+      /* threshold*/  0.42,
     );
     this.composer.addPass(this.bloomPass);
     this.composer.addPass(new OutputPass());
