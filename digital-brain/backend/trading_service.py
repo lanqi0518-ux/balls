@@ -447,6 +447,18 @@ class TradingService:
                        "error": rec.error},
             )
 
+    def _filter_chain_data(self, rows):
+        """Drop rows for chains that don't have a live executor attached,
+        so the wire never lies to the UI about what's actually tradable."""
+        keep = set()
+        if self.live is not None:
+            keep.add("solana")
+        if self.hood is not None:
+            keep.add("robinhood")
+        if not keep:
+            return rows
+        return [r for r in (rows or []) if r.get("chain") in keep]
+
     async def _hood_auto_sell_loop(self) -> None:
         """Background: every ~15 s the brain re-examines each open HOOD
         position with FRESH market features and its OWN policy head. If
@@ -1211,11 +1223,17 @@ class TradingService:
             "tokens_status": self.tokens.status(),
             "wallets_status": self.wallets.status(),
             "discovery_status": self.discovery.status(),
-            "hot_tokens": self.tokens.snapshot_public(),
-            "fresh_launches": self.tokens.fresh_launches_public(),
-            "tracked_wallets": self.wallets.wallets_public(),
-            "recent_wallet_trades": self.wallets.recent_trades_public(limit=30),
-            "leaderboard": self.leaderboard.top_public(15),
+            # Strip Solana-side data from the wire whenever the SOL
+            # executor is disabled — the brain isn't trading it, so the UI
+            # should not pretend it is.
+            "hot_tokens": self._filter_chain_data(self.tokens.snapshot_public()),
+            "fresh_launches": self._filter_chain_data(self.tokens.fresh_launches_public()),
+            "tracked_wallets": ([] if self.live is None
+                                 else self.wallets.wallets_public()),
+            "recent_wallet_trades": ([] if self.live is None
+                                       else self.wallets.recent_trades_public(limit=30)),
+            "leaderboard": ([] if self.live is None
+                             else self.leaderboard.top_public(15)),
             "paper": self.paper.snapshot(prices),
             "live": self.live.snapshot() if self.live is not None else None,
             "hood": self.hood.snapshot() if self.hood is not None else None,

@@ -339,19 +339,25 @@ function handlePayload(data) {
 }
 
 function updateTradingStrip(trading) {
-  const live = trading.live || {};
+  const live = trading.live || null;
   const hood = trading.hood || {};
-  const sol = Number(live.sol_balance || 0);
   const eth = Number(hood.eth_balance || 0);
-  const solStr = sol.toFixed(sol < 0.1 ? 4 : 3) + " SOL";
-  const ethStr = eth.toFixed(eth < 0.01 ? 5 : 4) + " ETH";
-  paperEquityEl.textContent = `${solStr} · ${ethStr}`;
-  const confirmed = (live.recent_trades || []).filter((r) => r.status === "confirmed").length
-                  + (hood.recent_trades || []).filter((r) => r.status === "confirmed").length;
-  const open = Number(live.open_positions_count || 0) + Number(hood.open_positions_count || 0);
-  const armed = sol > 0 || eth > 0;
-  paperPnlEl.className = "mono " + (armed ? "up" : "");
-  paperPnlEl.textContent = `${confirmed} tx · ${open} open`;
+  const parts = [];
+  if (live && Number(live.sol_balance || 0) > 0) {
+    const sol = Number(live.sol_balance || 0);
+    parts.push(sol.toFixed(sol < 0.1 ? 4 : 3) + " SOL");
+  }
+  parts.push(eth.toFixed(eth < 0.01 ? 5 : 4) + " ETH");
+  paperEquityEl.textContent = parts.join(" · ");
+  const liveTx = live ? (live.recent_trades || []).filter((r) => r.status === "confirmed").length : 0;
+  const hoodTx = (hood.recent_trades || []).filter((r) => r.status === "confirmed").length;
+  const confirmed = liveTx + hoodTx;
+  const open = Number((live && live.open_positions_count) || 0) + Number(hood.open_positions_count || 0);
+  const pnl = (hood.pnl && hood.pnl.total_pnl_eth) || 0;
+  const armed = eth > 0 || (live && Number(live.sol_balance || 0) > 0);
+  paperPnlEl.className = "mono " + (pnl > 0 ? "up" : pnl < 0 ? "down" : (armed ? "up" : ""));
+  const pnlStr = pnl !== 0 ? `${pnl >= 0 ? "+" : ""}${pnl.toFixed(4)} ETH` : `${confirmed} tx · ${open} open`;
+  paperPnlEl.textContent = pnlStr;
 }
 
 // ---------- Hero: NOW THINKING -----------------------------------------

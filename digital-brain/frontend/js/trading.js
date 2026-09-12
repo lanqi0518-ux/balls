@@ -16,7 +16,7 @@ export function initTrading(panelEl, opts = {}) {
 
     <div class="trading-block trading-block-live" id="live-block" style="display:none">
       <div class="trading-block-title">
-        <span>Live on-chain wallet · Solana</span>
+        <span>Live on-chain wallet · Solana (disabled)</span>
         <span class="count" id="live-status">—</span>
       </div>
       <div id="live-body"></div>
@@ -32,7 +32,7 @@ export function initTrading(panelEl, opts = {}) {
 
     <div class="trading-block">
       <div class="trading-block-title">
-        <span>Fresh launches · Solana + Robinhood-chain</span>
+        <span>Fresh launches · Robinhood Chain</span>
         <span class="count" id="fresh-count">0</span>
       </div>
       <div id="fresh-body"></div>
@@ -46,14 +46,14 @@ export function initTrading(panelEl, opts = {}) {
       <div id="hot-body"></div>
     </div>
 
-    <div class="trading-block">
+    <div class="trading-block" id="lb-block" style="display:none">
       <div class="trading-block-title">
         <span>Smart-money leaderboard · rolling 24h realized PnL</span>
       </div>
       <div id="lb-body"></div>
     </div>
 
-    <div class="trading-block">
+    <div class="trading-block" id="wallets-block" style="display:none">
       <div class="trading-block-title">
         <span>Tracked wallets</span>
         <span class="count" id="w-count">0</span>
@@ -61,7 +61,7 @@ export function initTrading(panelEl, opts = {}) {
       </div>
       <div id="wallets-body"></div>
       <div class="trading-add-wallet">
-        <input id="w-addr" placeholder="Solana wallet address…" spellcheck="false"/>
+        <input id="w-addr" placeholder="wallet address…" spellcheck="false"/>
         <input id="w-label" class="label" placeholder="Label (optional)"/>
         <button class="btn btn-mini" id="w-track">+ Track</button>
       </div>
@@ -341,24 +341,31 @@ function updateHood(hood) {
 
 function updateSummary(t) {
   const st = t.trader_cortex_stats || {};
-  const live = t.live || {};
+  const live = t.live || null;
   const hood = t.hood || {};
-  const solBal = Number(live.sol_balance || 0);
   const ethBal = Number(hood.eth_balance || 0);
-  const liveTrades = (live.recent_trades || []).filter((r) => r.status === "confirmed").length
-                    + (hood.recent_trades || []).filter((r) => r.status === "confirmed").length;
-  const openPos = Number(live.open_positions_count || 0) + Number(hood.open_positions_count || 0);
-  const armed = (live.wallet && !live.halted && !live.dry_run)
-             || (hood.wallet && !hood.halted && !hood.dry_run);
+  const pnl = (hood.pnl && hood.pnl.total_pnl_eth) || 0;
+  const pnlCls = pnl > 0 ? "pos" : pnl < 0 ? "neg" : "";
+  const hoodTrades = (hood.recent_trades || []).filter((r) => r.status === "confirmed").length;
+  const liveTrades = live ? (live.recent_trades || []).filter((r) => r.status === "confirmed").length : 0;
+  const openPos = Number(hood.open_positions_count || 0)
+                + Number((live && live.open_positions_count) || 0);
+  const armed = (hood.wallet && !hood.halted && !hood.dry_run)
+             || (live && live.wallet && !live.halted && !live.dry_run);
+  const solMeter = (live && Number(live.sol_balance || 0) > 0)
+    ? `<div class="meter"><div class="meter-label">SOL WALLET</div>
+      <div class="meter-value mono">${Number(live.sol_balance).toFixed(4)}<br/><span style="font-size:10px">${live.wallet ? live.wallet.slice(0,4) + '…' + live.wallet.slice(-4) : '—'}</span></div></div>`
+    : "";
   const html = `
     <div class="meter"><div class="meter-label">STATUS</div>
       <div class="meter-value ${armed ? 'pos' : 'warn'}">${armed ? 'LIVE' : 'STANDBY'}<br/><span style="font-size:10px">on-chain body</span></div></div>
-    <div class="meter"><div class="meter-label">SOL WALLET</div>
-      <div class="meter-value mono">${solBal.toFixed(4)}<br/><span style="font-size:10px">${live.wallet ? live.wallet.slice(0,4) + '…' + live.wallet.slice(-4) : '—'}</span></div></div>
     <div class="meter"><div class="meter-label">ETH WALLET</div>
       <div class="meter-value mono">${ethBal.toFixed(6)}<br/><span style="font-size:10px">${hood.wallet ? hood.wallet.slice(0,4) + '…' + hood.wallet.slice(-4) : '—'}</span></div></div>
+    <div class="meter"><div class="meter-label">TOTAL P&L</div>
+      <div class="meter-value ${pnlCls}">${(pnl >= 0 ? '+' : '') + pnl.toFixed(4)}<br/><span style="font-size:10px">ETH · realized + open</span></div></div>
+    ${solMeter}
     <div class="meter"><div class="meter-label">ON-CHAIN TRADES · OPEN</div>
-      <div class="meter-value">${liveTrades}<br/><span style="font-size:10px">${openPos} open</span></div></div>
+      <div class="meter-value">${liveTrades + hoodTrades}<br/><span style="font-size:10px">${openPos} open</span></div></div>
     <div class="meter"><div class="meter-label">CORTEX UPDATES</div>
       <div class="meter-value">${st.bc_updates || 0} BC<br/><span style="font-size:10px">${st.rl_updates || 0} RL</span></div></div>
     <div class="meter" title="How often the brain formed its own opinion (independent agree + conviction) vs. copied a wallet."><div class="meter-label">AUTONOMY</div>
@@ -487,7 +494,7 @@ function updateFresh(fresh) {
   const el = document.getElementById("fresh-body");
   if (!fresh.length) {
     el.innerHTML = `<div class="trading-empty">
-      polling every Solana launchpad for freshly-minted tokens…
+      polling Robinhood-chain launchpads for freshly-minted tokens…
     </div>`;
     return;
   }
@@ -526,11 +533,14 @@ function updateFresh(fresh) {
 }
 
 function updateLeaderboard(rows) {
+  const block = document.getElementById("lb-block");
   const el = document.getElementById("lb-body");
   if (!rows.length) {
-    el.innerHTML = `<div class="trading-empty">no PnL yet — waiting for tracked wallets to trade</div>`;
+    if (block) block.style.display = "none";
+    el.innerHTML = "";
     return;
   }
+  if (block) block.style.display = "";
   el.innerHTML = `<table class="trading-table"><thead><tr>
       <th>WALLET</th><th>LABEL</th><th>REALIZED PnL</th><th>TRADES</th><th>WIN%</th>
     </tr></thead><tbody>
@@ -547,6 +557,12 @@ function updateLeaderboard(rows) {
 }
 
 function updateWallets(wallets, discoveryStatus, tuning) {
+  const block = document.getElementById("wallets-block");
+  if (!wallets.length && !(discoveryStatus && discoveryStatus.seen_wallet_count)) {
+    if (block) block.style.display = "none";
+    return;
+  }
+  if (block) block.style.display = "";
   document.getElementById("w-count").textContent = wallets.length;
   const target = tuning.target_tracked_wallets || 20;
   const note = document.getElementById("w-auto-note");
