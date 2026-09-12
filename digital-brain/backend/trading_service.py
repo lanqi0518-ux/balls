@@ -23,7 +23,7 @@ import asyncio
 import logging
 import os
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import torch
 
@@ -219,6 +219,9 @@ class TradingService:
         if self.hood is not None:
             self._tasks.append(asyncio.create_task(
                 self._hood_balance_loop(), name="td-hood-balance",
+            ))
+            self._tasks.append(asyncio.create_task(
+                self._hood_auto_sell_loop(), name="td-hood-autosell",
             ))
             self._push_event(
                 "live_ready",
@@ -442,6 +445,61 @@ class TradingService:
                        "chain": "robinhood", "side": rec.side,
                        "error": rec.error},
             )
+
+    async def _hood_auto_sell_loop(self) -> None:
+        """Background: the brain auto-exits open HOOD positions when they
+        hit take-profit, stop-loss, or get stale. Independent of scan
+        cycle so a position always has an eye on it."""
+        if self.hood is None:
+            return
+        TAKE_PROFIT_PCT = float(os.getenv("HOOD_TP_PCT", "40.0"))
+        STOP_LOSS_PCT   = float(os.getenv("HOOD_SL_PCT", "-25.0"))
+        MAX_AGE_S       = float(os.getenv("HOOD_MAX_AGE_S", "1800"))
+        while not self._stop.is_set():
+            try:
+                # Refresh marks before deciding
+                await self.hood.refresh_open_position_values()
+                now = time.time()
+                to_sell: List[Tuple[str, str, str, int]] = []
+                for addr, pos in list(self.hood.open_positions.items()):
+                    eth_in = float(pos.get("eth_spent") or 0.0)
+                    cur = float(pos.get("current_eth_value") or 0.0)
+                    age = now - float(pos.get("opened_at_s") or now)
+                    amt = int(pos.get("amount_out_raw") or 0)
+                    if eth_in <= 0 or amt <= 0:
+                        continue
+                    if cur > 0:
+                        pnl_pct = (cur - eth_in) / eth_in * 100.0
+                        if pnl_pct >= TAKE_PROFIT_PCT:
+                            to_sell.append((addr, pos.get("symbol", "?"),
+                                             f"take_profit_{pnl_pct:+.1f}%", amt))
+                            continue
+                        if pnl_pct <= STOP_LOSS_PCT:
+                            to_sell.append((addr, pos.get("symbol", "?"),
+                                             f"stop_loss_{pnl_pct:+.1f}%", amt))
+                            continue
+                    if age >= MAX_AGE_S:
+                        to_sell.append((addr, pos.get("symbol", "?"),
+                                         f"stale_{int(age)}s", amt))
+                for addr, sym, reason, amt in to_sell:
+                    self._push_event(
+                        "hood_autosell",
+                        f"[hood] auto-sell {sym} · {reason}",
+                        f"[HOOD] 自动卖出 {sym} · {reason}",
+                        extra={"symbol": sym, "mint": addr,
+                                "chain": "robinhood", "reason": reason},
+                    )
+                    rec = await self.hood.sell(
+                        input_token=addr, symbol=sym,
+                        amount_in_wei=amt, liquidity_usd=1_000_000.0,
+                    )
+                    self._push_hood_event(rec)
+            except Exception as e:  # noqa: BLE001
+                LOG.debug("hood auto-sell loop iteration failed: %s", e)
+            try:
+                await asyncio.wait_for(self._stop.wait(), timeout=25.0)
+            except asyncio.TimeoutError:
+                pass
 
     async def _hood_balance_loop(self) -> None:
         """Poll the HOOD wallet's ETH balance every ~30 s so the UI has a
