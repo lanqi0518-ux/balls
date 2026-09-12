@@ -33,6 +33,11 @@ from .brain.regions.trader_cortex import (
     ACTION_NAMES_ZH as TRADER_ACTION_NAMES_ZH,
     BUY, HOLD, SELL,
 )
+from .brain.trading_playbook import (
+    PLAYBOOK_BY_ID as PLAYBOOK_BY_ID,
+    PlaybookScorer,
+    detect_signals as detect_playbook_signals,
+)
 from .market import (
     DexScreenerClient,
     TrendingTokenWatcher,
@@ -125,6 +130,19 @@ class TradingService:
         self.hood_launchpad_only = os.getenv(
             "HOOD_LAUNCHPAD_ONLY", "1",
         ).strip() not in ("0", "false", "no", "off")
+
+        # Trading playbook: the brain's growing library of memecoin tactics.
+        # Every decision tick we detect which patterns fire; every buy is
+        # attributed to the patterns live at entry; every close credits /
+        # debits those patterns' rolling EV. High-EV patterns lower the
+        # brain's buy gate (easier to enter); high-loss patterns raise it.
+        self.playbook = PlaybookScorer()
+        # Cool-down on how often we announce "playbook edge" in the thought
+        # stream — one line every ~2 minutes is enough context.
+        self._last_playbook_thought_s = 0.0
+        # Notification when a pattern crosses to a materially different EV
+        # than what we last announced — the brain "notices" its own edge.
+        self._playbook_last_top_id: Optional[str] = None
 
         self.decision_interval = decision_interval
         self.discovery_interval = discovery_interval
@@ -869,6 +887,12 @@ class TradingService:
             if p.price_usd <= 0:
                 continue
             is_fresh = self.tokens.is_fresh_launch(p.base_address)
+            fresh_meta = self.tokens.fresh_launch_meta(p.base_address) if is_fresh else None
+            # Compute which trading-playbook patterns are firing on this
+            # snapshot BEFORE we ask the cortex — so the gate we apply
+            # below reflects the current on-chain setup.
+            firing_signals = detect_playbook_signals(p, fresh_meta)
+            gate_delta, gate_info = self.playbook.gate_adjustment(firing_signals)
             feats = market_features_from_pair(p)
             hints = torch.tensor(
                 self.paper.hint_vector_for(p.base_address, p.price_usd),
@@ -950,7 +974,36 @@ class TradingService:
             # untrained. Fresh pump.fun launches get a stricter gate — the
             # noise floor on brand-new tokens is much higher and rug risk
             # is real, so we demand more conviction before opening.
-            buy_gate = 0.55 if is_fresh else 0.40
+            buy_gate_base = 0.55 if is_fresh else 0.40
+            # Bounded: the playbook can shift the gate but not eliminate it.
+            buy_gate = max(0.20, min(0.90, buy_gate_base + gate_delta))
+            # Occasionally surface the playbook edge in the thought stream
+            # so the user sees WHY the brain is more/less eager.
+            now_s = time.time()
+            top_bull = gate_info.get("bull") if isinstance(gate_info, dict) else None
+            if (top_bull is not None
+                    and (now_s - self._last_playbook_thought_s) > 120
+                    and abs(gate_delta) >= 0.03
+                    and top_bull.get("id") != self._playbook_last_top_id):
+                pid = top_bull["id"]
+                pb_meta = PLAYBOOK_BY_ID.get(pid) or {}
+                ev = top_bull.get("ev", 0.0)
+                n = top_bull.get("n", 0)
+                self._push_event(
+                    "playbook_edge",
+                    f"playbook: '{pb_meta.get('name_en', pid)}' firing on "
+                    f"{p.base_symbol} — live EV {ev * 100:+.1f}% over {n} trades, "
+                    f"gate {buy_gate_base:.2f} → {buy_gate:.2f}",
+                    f"手法库：{pb_meta.get('name_zh', pid)} 在 {p.base_symbol} 上触发 —— "
+                    f"实盘 EV {ev * 100:+.1f}%（{n} 次样本），门槛 {buy_gate_base:.2f} → {buy_gate:.2f}",
+                    extra={"symbol": p.base_symbol, "mint": p.base_address,
+                           "pattern_id": pid, "pattern_ev": ev,
+                           "pattern_samples": n,
+                           "gate_base": round(buy_gate_base, 3),
+                           "gate_effective": round(buy_gate, 3)},
+                )
+                self._last_playbook_thought_s = now_s
+                self._playbook_last_top_id = pid
             if action == BUY and conf >= buy_gate:
                 # Paper trader: decision journal. It has its own max_positions
                 # cap; when full it returns None. Live/HOOD executors have
@@ -963,6 +1016,10 @@ class TradingService:
                         features=feats.tolist(), hints=hints.tolist(),
                     )
                     if pos:
+                        try:
+                            self.playbook.record_entry(p.base_address, firing_signals)
+                        except Exception:  # noqa: BLE001
+                            pass
                         self._push_event(
                             "trade",
                             f"BUY {p.base_symbol} @ ${p.price_usd:.6f} · "
@@ -1147,6 +1204,32 @@ class TradingService:
 
     def _on_position_closed(self, closed) -> None:
         pnl_frac = closed.pnl_pct
+        # Credit / debit each playbook pattern that was firing when this
+        # position was opened. This is how the brain builds a live
+        # empirical view of which tactics actually make it money.
+        try:
+            credited = self.playbook.record_close(closed.token_mint, pnl_frac)
+            if credited:
+                names = ", ".join(
+                    (PLAYBOOK_BY_ID.get(pid) or {}).get("name_en", pid)
+                    for pid in credited[:3]
+                )
+                names_zh = "、".join(
+                    (PLAYBOOK_BY_ID.get(pid) or {}).get("name_zh", pid)
+                    for pid in credited[:3]
+                )
+                self._push_event(
+                    "playbook_learn",
+                    f"playbook update: {pnl_frac * 100:+.1f}% on {closed.token_symbol} "
+                    f"credited to {len(credited)} tactic(s) — {names}",
+                    f"手法库更新：{closed.token_symbol} {pnl_frac * 100:+.1f}% 记入 "
+                    f"{len(credited)} 条手法 —— {names_zh}",
+                    extra={"symbol": closed.token_symbol,
+                           "pnl_pct": pnl_frac,
+                           "credited_patterns": credited},
+                )
+        except Exception:  # noqa: BLE001
+            pass
         self._push_event(
             "close",
             f"[paper] SELL {closed.token_symbol} @ ${closed.exit_price_usd:.6f} · "
@@ -1308,6 +1391,7 @@ class TradingService:
             "hood_launchpad_labels": (self.hood_launchpads.token_labels()
                                        if self.hood_launchpads is not None else {}),
             "hood_launchpad_only": bool(self.hood_launchpad_only),
+            "playbook": self.playbook.snapshot(top_n=6),
             "trader_cortex_stats": self.brain.trader_cortex.stats(),
             "latest_intent": self._latest_intent,
             "events": list(self._trader_events[-60:]),

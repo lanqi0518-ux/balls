@@ -38,6 +38,15 @@ export function initTrading(panelEl, opts = {}) {
       <div id="fresh-body"></div>
     </div>
 
+    <div class="trading-block" id="playbook-block" style="display:none">
+      <div class="trading-block-title">
+        <span>Playbook · self-learned trading tactics</span>
+        <span class="count" id="pb-count">0</span>
+        <span class="trading-block-note" id="pb-summary">building edge…</span>
+      </div>
+      <div id="playbook-body"></div>
+    </div>
+
     <div class="trading-block">
       <div class="trading-block-title">
         <span>Candidate pool · fresh + small-cap · mega-caps filtered</span>
@@ -109,6 +118,7 @@ export function updateTrading(trading) {
   updateLive(trading.live);
   updateHood(trading.hood);
   updateFresh(trading.fresh_launches || []);
+  updatePlaybook(trading.playbook || null);
   updateHot(trading.hot_tokens || []);
   updateLeaderboard(trading.leaderboard || []);
   updateWallets(trading.tracked_wallets || [], trading.discovery_status || {},
@@ -551,6 +561,67 @@ function updateFresh(fresh) {
       </tr>`;
     }).join("")}
     </tbody></table>`;
+}
+
+function updatePlaybook(pb) {
+  const block = document.getElementById("playbook-block");
+  if (!block) return;
+  if (!pb || !pb.n_patterns) {
+    block.style.display = "none";
+    return;
+  }
+  block.style.display = "";
+  const count = document.getElementById("pb-count");
+  if (count) count.textContent = pb.n_total_attributions || 0;
+  const note = document.getElementById("pb-summary");
+  if (note) {
+    const cum = (pb.cumulative_pnl_pct || 0) * 100;
+    const cls = cum >= 0 ? "pos" : "neg";
+    note.innerHTML = `cumulative attributed PnL <span class="${cls}">${cum >= 0 ? "+" : ""}${cum.toFixed(1)}%</span>`;
+  }
+  const rowFor = (r) => {
+    const evPct = (r.live_ev || 0) * 100;
+    const evCls = evPct >= 0 ? "pos" : "neg";
+    const wr = (r.win_rate || 0) * 100;
+    const warmup = r.n_samples < 8;
+    const flavor = warmup
+      ? `<span class="mono-sm" style="color:var(--text-muted)">seed</span>`
+      : `<span class="mono-sm">live</span>`;
+    return `<tr>
+      <td>
+        <div class="pb-name">${escapeHtml(r.name_zh)}</div>
+        <div class="pb-desc mono-sm">${escapeHtml(r.name_en)} · ${escapeHtml(r.category)}</div>
+      </td>
+      <td class="mono num ${evCls}">${evPct >= 0 ? "+" : ""}${evPct.toFixed(2)}%</td>
+      <td class="mono num">${wr.toFixed(0)}%</td>
+      <td class="mono num">${r.n_wins}/${r.n_samples}</td>
+      <td>${flavor}</td>
+    </tr>`;
+  };
+  const bull = (pb.top_bull || []).map(rowFor).join("");
+  const bear = (pb.top_bear || []).map(rowFor).join("");
+  const body = document.getElementById("playbook-body");
+  if (!body) return;
+  body.innerHTML = `
+    <div class="pb-columns">
+      <div class="pb-col">
+        <div class="pb-col-title pos">EDGE · top bullish tactics</div>
+        <table class="trading-table"><thead><tr>
+          <th>手法 / Tactic</th><th>EV</th><th>胜率</th><th>W/N</th><th></th>
+        </tr></thead><tbody>
+          ${bull || `<tr><td colspan="5" class="empty">no bull tactics traded yet</td></tr>`}
+        </tbody></table>
+      </div>
+      <div class="pb-col">
+        <div class="pb-col-title neg">RISK · top warning patterns</div>
+        <table class="trading-table"><thead><tr>
+          <th>手法 / Tactic</th><th>EV</th><th>胜率</th><th>W/N</th><th></th>
+        </tr></thead><tbody>
+          ${bear || `<tr><td colspan="5" class="empty">no warnings triggered yet</td></tr>`}
+        </tbody></table>
+      </div>
+    </div>
+  `;
 }
 
 function updateLeaderboard(rows) {
