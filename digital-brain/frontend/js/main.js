@@ -343,7 +343,9 @@ function updateTradingStrip(trading) {
   const hood = trading.hood || {};
   const sol = Number(live.sol_balance || 0);
   const eth = Number(hood.eth_balance || 0);
-  paperEquityEl.textContent = sol.toFixed(sol < 0.1 ? 4 : 3) + " SOL";
+  const solStr = sol.toFixed(sol < 0.1 ? 4 : 3) + " SOL";
+  const ethStr = eth.toFixed(eth < 0.01 ? 5 : 4) + " ETH";
+  paperEquityEl.textContent = `${solStr} · ${ethStr}`;
   const confirmed = (live.recent_trades || []).filter((r) => r.status === "confirmed").length
                   + (hood.recent_trades || []).filter((r) => r.status === "confirmed").length;
   const open = Number(live.open_positions_count || 0) + Number(hood.open_positions_count || 0);
