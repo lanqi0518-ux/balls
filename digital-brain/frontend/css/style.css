@@ -2044,7 +2044,7 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   body { min-height: 100vh; }
   .layout {
     grid-template-columns: 1fr;
-    grid-template-rows: 420px auto auto auto auto;
+    grid-template-rows: minmax(520px, 62vh) auto auto auto auto;
     grid-template-areas:
       "brain"
       "hero"
@@ -2056,6 +2056,13 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   .topbar-status { order: 3; width: 100%; }
   .topbar-actions { padding-left: 0; border-left: none; }
   .hero-thinking .hero-headline { font-size: clamp(24px, 6vw, 34px); }
+  /* Reclaim room inside the brain panel for the 3D canvas — the
+     figcaption + specimen meta together eat half the panel on phones. */
+  .panel-brain .brain-figcaption { display: none; }
+  .panel-brain .specimen-meta { padding: 4px 2px; gap: 2px; }
+  .panel-brain .specimen-meta-row { font-size: 9px; }
+  #brain3d { min-height: 300px; }
+  .brand-plate { flex-wrap: wrap; row-gap: 4px; }
 }
 
 /* ---------- Web view: the brain's second body ---------------------------- */

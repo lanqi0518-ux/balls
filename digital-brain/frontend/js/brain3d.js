@@ -44,6 +44,15 @@ export class BrainScene {
     this._addInteraction();
     this._resize();
     window.addEventListener("resize", () => this._resize());
+    window.addEventListener("orientationchange", () => setTimeout(() => this._resize(), 100));
+    if (typeof ResizeObserver !== "undefined") {
+      try {
+        const ro = new ResizeObserver(() => this._resize());
+        ro.observe(this.container);
+      } catch {}
+    }
+    setTimeout(() => this._resize(), 300);
+    setTimeout(() => this._resize(), 1200);
     this._animate();
   }
 
