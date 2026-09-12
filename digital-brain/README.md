@@ -4,7 +4,7 @@
 
 一个真正在"活着"的数字人脑：8 个脑区，每个都是一个**真实的神经网络模块**，共同感知、记忆、决策、产生情绪。整个系统运行在浏览器里，实时可视化，**完全不使用 LLM**。
 
-**在线 Demo** · Live: <https://balls-lanqi.fly.dev>（部署在 Fly.io，`sjc`，1 台 + 1GB volume）
+**在线 Demo** · Live: <https://brainonchain.online>（部署在 Fly.io，`sjc`，performance-16x + 10GB volume）
 
 > 当前默认为 **Einstein 模式**：更宽的前额叶（192-wide）、更长的海马体（400 槽）、更活跃的默认网络，
 > 且启动时向海马体灌入 **60 个语义种子**——30+ 个加密货币概念（BTC / ETH / SOL / DOGE / PEPE / WIF / HODL / rug pull / gas ...）
@@ -239,7 +239,7 @@ Cortex 权重和 paper 账本每 3 分钟保存一次到 `$DATA_DIR/state.pt`。
 
 ## 部署到 Fly.io
 
-项目里已经包含 `Dockerfile` + `fly.toml`（app 名 `balls-lanqi`，区域 `sjc`，CPU-only PyTorch 镜像约 255 MB）。自己部署一份：
+项目里已经包含 `Dockerfile` + `fly.toml`（Fly 内部 app id 是遗留标识符，区域 `sjc`，CPU-only PyTorch 镜像约 255 MB，绑定 `brainonchain.online`）。自己部署一份：
 
 ```bash
 # 1. 装 flyctl

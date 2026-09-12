@@ -804,8 +804,8 @@ export class BrainScene {
       const entry = this.regions.get(r.name);
       entry.data = r;
       // Region cores sit INSIDE the cerebrum as small luminous cortex
-      // markers, not as giant balls that eclipse the anatomy. Scale
-      // range is now roughly 3–6 units against a ~100-unit brain.
+      // markers, not as giant spheres that eclipse the anatomy. Scale
+      // range is now roughly 3-6 units against a ~100-unit brain.
       const size = 3.0 + Math.pow(r.activation, 0.7) * 3.0;
       entry.core.scale.setScalar(size / entry.baseSize);
       entry.core.material.opacity = 0.9 + r.activation * 0.1;

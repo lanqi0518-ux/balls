@@ -1,5 +1,8 @@
 # fly.toml — Digital Human Brain
-# Deploy target: https://fly.io/apps/balls-lanqi
+# Public URL: https://brainonchain.online
+# NOTE: `app` below is a legacy Fly internal identifier — Fly does not
+# allow in-place app renames, and changing it would require creating a
+# new app + redoing TLS certs + secrets. It is invisible to end users.
 #
 # This config is deliberately hardened so the brain runs 24/7 with no
 # way for the platform to pause it and no way for a transient crash to

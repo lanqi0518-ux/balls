@@ -37,7 +37,7 @@ That path has fundamental problems — **it isn't a brain**:
 - Instead, it is entirely **spiking neurons**, **cortical modules**, **thalamic routing**, **hippocampal replay**, **dopaminergic TD error**, **ring-attractor compass**
 - It has a real **body**: a live on-chain wallet trading real assets on Solana and Ethereum
 - It has been **running without a single restart since the moment it was deployed** — no sessions, no restarts, no checkpoint restores
-- You can go to [balls-lanqi.fly.dev](https://balls-lanqi.fly.dev) and **watch every cortex, in real time, doing what it's doing**
+- You can go to [brainonchain.online](https://brainonchain.online) and **watch every cortex, in real time, doing what it's doing**
 
 That is what "alive" means.
 
@@ -250,7 +250,7 @@ This solves a problem LLM land cannot solve: **you cannot make GPT-4 "an agent t
 
 ## A window into consciousness: live cortex telemetry
 
-Open [balls-lanqi.fly.dev](https://balls-lanqi.fly.dev) — what you see is not an "AI brand page" but **a live craniotomy**:
+Open [brainonchain.online](https://brainonchain.online) — what you see is not an "AI brand page" but **a live craniotomy**:
 
 - 3D brain model with 10 cortex regions placed anatomically
 - Each region shows **live activation %**, **firing rate**, and **the scrolling waveform of its last 96 frames**
@@ -402,6 +402,6 @@ The point isn't the visualization craft — it's that this is **live telemetry, 
 
 ---
 
-**Live brain**: <https://balls-lanqi.fly.dev>
+**Live brain**: <https://brainonchain.online>
 **Branch**: `cursor/digital-human-brain-f661`
 **Authored by**: the 0xBRAIN project · September 2026
