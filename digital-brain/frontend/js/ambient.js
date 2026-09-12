@@ -18,16 +18,16 @@ const PULSE_DECAY = 0.94;         // how fast a tick-pulse fades
 /* Mystical dust — a second, sparser layer of tiny floating motes with
    long-tail glows. Not connected to anything; they just drift like
    particles in a cathedral shaft of light. Cheap: each is a single
-   radial gradient per frame, and there are only ~90 of them. */
-const DUST_TARGET = 90;
-const DUST_MIN = 55;
+   radial gradient per frame, and there are only ~120 of them. */
+const DUST_TARGET = 120;
+const DUST_MIN = 70;
 const DUST_DRIFT = 0.05;
 
-/* Fireflies — 6 rare, larger glowing motes that pulse slowly and
-   drift with a gentle sine wobble. Each carries its own hue so
-   the mesh reads as a real spectrum rather than a monochrome blur. */
-const FIREFLY_TARGET = 6;
-const FIREFLY_MIN = 4;
+/* Fireflies — 9 larger glowing motes that pulse slowly and drift
+   with a gentle sine wobble. Each carries its own hue so the mesh
+   reads as a real spectrum rather than a monochrome blur. */
+const FIREFLY_TARGET = 9;
+const FIREFLY_MIN = 6;
 
 const COLORS = {
   node:   [110, 231, 255],        // #6EE7FF electric cyan
@@ -307,19 +307,30 @@ export class AmbientMesh {
     ctx.globalCompositeOperation = "lighter";
     for (const f of this.fireflies) {
       const breathe = 0.55 + 0.45 * Math.sin(f.phase * 0.6);
-      const bright = 0.35 + 0.65 * breathe + 0.3 * this.pulse;
-      const glowR = f.r * (5.5 + breathe * 2.5);
-      const grad = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, glowR);
-      grad.addColorStop(0.0, rgba(f.hue, bright * 0.55));
-      grad.addColorStop(0.4, rgba(f.hue, bright * 0.2));
-      grad.addColorStop(1.0, rgba(f.hue, 0));
-      ctx.fillStyle = grad;
+      const bright = 0.45 + 0.75 * breathe + 0.35 * this.pulse;
+      const glowR = f.r * (9 + breathe * 4);
+      // Outer wide halo — feels like a witch's lantern
+      const outer = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, glowR);
+      outer.addColorStop(0.0, rgba(f.hue, bright * 0.65));
+      outer.addColorStop(0.35, rgba(f.hue, bright * 0.28));
+      outer.addColorStop(1.0, rgba(f.hue, 0));
+      ctx.fillStyle = outer;
       ctx.beginPath();
       ctx.arc(f.x, f.y, glowR, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = rgba(COLORS.bright, Math.min(1, bright));
+      // Inner tight core — the visible mote itself
+      const inner = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r * 3.2);
+      inner.addColorStop(0.0, rgba(COLORS.bright, Math.min(1, bright)));
+      inner.addColorStop(0.5, rgba(f.hue, bright * 0.6));
+      inner.addColorStop(1.0, rgba(f.hue, 0));
+      ctx.fillStyle = inner;
       ctx.beginPath();
-      ctx.arc(f.x, f.y, f.r * 0.7, 0, Math.PI * 2);
+      ctx.arc(f.x, f.y, f.r * 3.2, 0, Math.PI * 2);
+      ctx.fill();
+      // Bright pinpoint
+      ctx.fillStyle = rgba(COLORS.bright, Math.min(1, bright * 1.15));
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, f.r * 0.85, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();

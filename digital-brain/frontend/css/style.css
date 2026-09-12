@@ -103,7 +103,7 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body {
+html {
   height: 100vh;
   background: var(--bg-0);
   color: var(--text-primary);
@@ -117,51 +117,56 @@ html, body {
 }
 
 body {
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  background:
-    /* Aurora: turquoise arc top-left, magenta bloom top-right,
-       violet mist center, gold sun at bottom right, and a deep-purple
-       nebula pooled at the bottom edge — five layered spectral fields
-       stacked for real depth. */
-    radial-gradient(circle 1300px at 12% -8%,  rgba(110, 231, 255, 0.18), transparent 55%),
-    radial-gradient(circle 1200px at 96% -6%,  rgba(240, 171, 252, 0.16), transparent 55%),
-    radial-gradient(circle 1400px at 50% 42%,  rgba(139, 92, 246, 0.09),  transparent 68%),
-    radial-gradient(circle 1200px at 100% 108%, rgba(232, 217, 166, 0.06), transparent 60%),
-    radial-gradient(circle 1400px at 8% 108%,   rgba(168, 85, 247, 0.10),  transparent 65%),
-    radial-gradient(circle 1800px at 50% 118%,  rgba(56, 189, 248, 0.05),  transparent 60%),
-    var(--bg-0);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  overflow: hidden;
+  letter-spacing: -0.005em;
+  /* Deliberately no `background` — we want the ambient canvas and the
+     ::before aurora sheet (which live at negative z-indexes below body)
+     to remain visible. All backdrop paint is layered separately below. */
   position: relative;
   isolation: isolate;
 }
-/* --- Aurora sheet ---
-   A slowly drifting spectral curtain painted on ::before. Uses
-   conic + radial gradients tinted cyan / magenta / violet and
-   animated with a very slow translate + rotate. Enough motion to
-   feel alive, small enough to never distract. */
+/* --- Aurora sheet (deepest painted layer) ---
+   A slowly drifting spectral curtain of aurora radials + conic
+   gradient at z-index -3, so it sits behind the ambient canvas
+   (fireflies + dust motes at -2) yet in front of the html bg. */
 body::before {
   content: "";
   position: fixed;
   inset: -20% -20% -20% -20%;
   pointer-events: none;
-  z-index: -1;
+  z-index: -3;
   background:
-    radial-gradient(ellipse 60% 40% at 30% 20%, rgba(110, 231, 255, 0.14), transparent 65%),
-    radial-gradient(ellipse 55% 42% at 78% 30%, rgba(240, 171, 252, 0.11), transparent 65%),
-    radial-gradient(ellipse 70% 50% at 50% 90%, rgba(168, 85, 247, 0.10),  transparent 65%),
+    /* Base aurora fields */
+    radial-gradient(circle 1300px at 12% -8%,  rgba(110, 231, 255, 0.22), transparent 55%),
+    radial-gradient(circle 1200px at 96% -6%,  rgba(240, 171, 252, 0.20), transparent 55%),
+    radial-gradient(circle 1400px at 50% 42%,  rgba(139, 92, 246, 0.12),  transparent 68%),
+    radial-gradient(circle 1200px at 100% 108%, rgba(232, 217, 166, 0.09), transparent 60%),
+    radial-gradient(circle 1400px at 8% 108%,   rgba(168, 85, 247, 0.14),  transparent 65%),
+    radial-gradient(circle 1800px at 50% 118%,  rgba(56, 189, 248, 0.07),  transparent 60%),
+    /* Drifting spectral curtain — soft, blurred */
+    radial-gradient(ellipse 60% 40% at 30% 20%, rgba(110, 231, 255, 0.16), transparent 65%),
+    radial-gradient(ellipse 55% 42% at 78% 30%, rgba(240, 171, 252, 0.13), transparent 65%),
+    radial-gradient(ellipse 70% 50% at 50% 90%, rgba(168, 85, 247, 0.12),  transparent 65%),
     conic-gradient(from 210deg at 50% 50%,
-      rgba(110, 231, 255, 0.03) 0deg,
-      rgba(240, 171, 252, 0.05) 90deg,
-      rgba(168, 85, 247, 0.04) 180deg,
-      rgba(232, 217, 166, 0.03) 270deg,
-      rgba(110, 231, 255, 0.03) 360deg);
-  filter: blur(60px) saturate(120%);
-  opacity: 0.85;
-  mix-blend-mode: screen;
+      rgba(110, 231, 255, 0.04) 0deg,
+      rgba(240, 171, 252, 0.06) 90deg,
+      rgba(168, 85, 247, 0.05) 180deg,
+      rgba(232, 217, 166, 0.04) 270deg,
+      rgba(110, 231, 255, 0.04) 360deg);
+  filter: blur(40px) saturate(125%);
+  opacity: 0.95;
   will-change: transform;
   animation: auroraDrift 42s ease-in-out infinite alternate;
 }
-/* Deep vignette on ::after so the aurora fades toward the corners. */
+/* Deep vignette + god-ray hint on ::after. Sits in front of the
+   ambient canvas so it darkens the edges of the whole viewport. */
 body::after {
   content: "";
   position: fixed;
@@ -169,14 +174,14 @@ body::after {
   pointer-events: none;
   z-index: -1;
   background:
-    radial-gradient(ellipse 100% 80% at 50% 45%, transparent 55%, rgba(0, 0, 0, 0.58) 100%),
+    radial-gradient(ellipse 100% 80% at 50% 45%, transparent 55%, rgba(0, 0, 0, 0.62) 100%),
     /* God-ray hint — two slanted stripes of near-invisible light
        diagonally across the page. Very subtle. */
     linear-gradient(112deg,
       transparent 30%,
-      rgba(240, 171, 252, 0.03) 45%,
+      rgba(240, 171, 252, 0.035) 45%,
       transparent 55%,
-      rgba(110, 231, 255, 0.025) 70%,
+      rgba(110, 231, 255, 0.03) 70%,
       transparent 82%);
 }
 @keyframes auroraDrift {
@@ -185,15 +190,16 @@ body::after {
   100% { transform: translate3d(-1%,  1%, 0) rotate(-0.5deg); }
 }
 
-/* Ambient canvas — the neural-mesh backdrop. Sits behind everything.
-   The grain overlay adds a subtle static film so the OLED black isn't
-   a flat void. Both are aria-hidden. */
+/* Ambient canvas — the neural-mesh backdrop + fireflies + dust motes.
+   Sits ABOVE the aurora sheet but BEHIND all UI panels, so its glowing
+   points visibly drift over the aurora and through the transparent
+   gaps between panels. */
 #ambient-canvas {
   position: fixed;
   inset: 0;
   z-index: -2;
   pointer-events: none;
-  opacity: 0.85;
+  opacity: 0.9;
 }
 .grain-overlay {
   position: fixed;
