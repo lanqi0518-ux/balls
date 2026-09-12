@@ -448,57 +448,71 @@ class TradingService:
             )
 
     async def _hood_auto_sell_loop(self) -> None:
-        """Background: the brain auto-exits open HOOD positions when they
-        hit take-profit, stop-loss, or get stale. Independent of scan
-        cycle so a position always has an eye on it."""
+        """Background: every ~15 s the brain re-examines each open HOOD
+        position with FRESH market features and its OWN policy head. If
+        trader_cortex outputs SELL for that token, we sell. No hard-coded
+        take-profit, stop-loss, or age rule — the brain decides."""
         if self.hood is None:
             return
-        TAKE_PROFIT_PCT = float(os.getenv("HOOD_TP_PCT", "40.0"))
-        STOP_LOSS_PCT   = float(os.getenv("HOOD_SL_PCT", "-25.0"))
-        MAX_AGE_S       = float(os.getenv("HOOD_MAX_AGE_S", "1800"))
         while not self._stop.is_set():
             try:
-                # Refresh marks before deciding
                 await self.hood.refresh_open_position_values()
-                now = time.time()
-                to_sell: List[Tuple[str, str, str, int]] = []
+                # Build a snapshot of currently-known pairs by address for
+                # fast lookup. Symbols can drift; we always match on addr.
+                pairs_by_addr = {}
+                try:
+                    for p in self.tokens.snapshot():
+                        pairs_by_addr[p.base_address.lower()] = p
+                except Exception:
+                    pairs_by_addr = {}
+                tc = self.brain.trader_cortex
                 for addr, pos in list(self.hood.open_positions.items()):
-                    eth_in = float(pos.get("eth_spent") or 0.0)
-                    cur = float(pos.get("current_eth_value") or 0.0)
-                    age = now - float(pos.get("opened_at_s") or now)
                     amt = int(pos.get("amount_out_raw") or 0)
-                    if eth_in <= 0 or amt <= 0:
+                    if amt <= 0:
                         continue
-                    if cur > 0:
-                        pnl_pct = (cur - eth_in) / eth_in * 100.0
-                        if pnl_pct >= TAKE_PROFIT_PCT:
-                            to_sell.append((addr, pos.get("symbol", "?"),
-                                             f"take_profit_{pnl_pct:+.1f}%", amt))
-                            continue
-                        if pnl_pct <= STOP_LOSS_PCT:
-                            to_sell.append((addr, pos.get("symbol", "?"),
-                                             f"stop_loss_{pnl_pct:+.1f}%", amt))
-                            continue
-                    if age >= MAX_AGE_S:
-                        to_sell.append((addr, pos.get("symbol", "?"),
-                                         f"stale_{int(age)}s", amt))
-                for addr, sym, reason, amt in to_sell:
-                    self._push_event(
-                        "hood_autosell",
-                        f"[hood] auto-sell {sym} · {reason}",
-                        f"[HOOD] 自动卖出 {sym} · {reason}",
-                        extra={"symbol": sym, "mint": addr,
-                                "chain": "robinhood", "reason": reason},
-                    )
-                    rec = await self.hood.sell(
-                        input_token=addr, symbol=sym,
-                        amount_in_wei=amt, liquidity_usd=1_000_000.0,
-                    )
-                    self._push_hood_event(rec)
+                    sym = pos.get("symbol", "?")
+                    pair = pairs_by_addr.get(addr.lower())
+                    # If discovery hasn't refreshed this token yet, feed the
+                    # brain what we KNOW from the position mark. Better a
+                    # decision on partial info than none at all.
+                    if pair is not None:
+                        feats = market_features_from_pair(pair)
+                        hints = torch.tensor(
+                            self.paper.hint_vector_for(addr, pair.price_usd),
+                            dtype=torch.float32,
+                        )
+                    else:
+                        # Synthesize minimal features from position mark only.
+                        eth_in = float(pos.get("eth_spent") or 0.0)
+                        cur = float(pos.get("current_eth_value") or 0.0)
+                        pnl_frac = (cur - eth_in) / eth_in if eth_in > 0 else 0.0
+                        market_dim = tc.input_dim - 6  # HINT_DIM
+                        feats = torch.zeros(market_dim, dtype=torch.float32)
+                        # Stuff PnL fraction into slot 0 as a weak proxy.
+                        if feats.numel() > 0:
+                            feats[0] = float(max(-1.0, min(1.0, pnl_frac)))
+                        hints = torch.zeros(6, dtype=torch.float32)
+                    action, _lp, probs, _v = tc.decide(feats, hints,
+                                                        temperature=1.0)
+                    conf = float(probs[action].item())
+                    if action == SELL:
+                        self._push_event(
+                            "hood_autosell",
+                            f"[hood] brain says SELL {sym} · conf {conf:.2f}",
+                            f"[HOOD] 大脑决定卖出 {sym} · 置信 {conf:.2f}",
+                            extra={"symbol": sym, "mint": addr,
+                                    "chain": "robinhood",
+                                    "brain_confidence": round(conf, 3)},
+                        )
+                        rec = await self.hood.sell(
+                            input_token=addr, symbol=sym,
+                            amount_in_wei=amt, liquidity_usd=1_000_000.0,
+                        )
+                        self._push_hood_event(rec)
             except Exception as e:  # noqa: BLE001
                 LOG.debug("hood auto-sell loop iteration failed: %s", e)
             try:
-                await asyncio.wait_for(self._stop.wait(), timeout=25.0)
+                await asyncio.wait_for(self._stop.wait(), timeout=15.0)
             except asyncio.TimeoutError:
                 pass
 
