@@ -44,6 +44,7 @@ from .market import (
 from .paper_trader import PaperTrader
 from .persistence import Persistence
 from .solana_executor import build_from_env as build_live_executor
+from .robinhood_executor import build_from_env as build_hood_executor
 
 
 LOG = logging.getLogger("trading_service")
@@ -106,6 +107,11 @@ class TradingService:
         # If the key is missing or malformed, `live` stays None and the
         # rest of the service happily runs in paper-only mode.
         self.live = build_live_executor()
+        # Robinhood-Chain live executor.  Same key material (the EVM key
+        # is deterministically derived from BRAIN_SOL_PRIVKEY inside the
+        # executor), separate wallet, separate hard limits, separate
+        # ledger.  Runs in parallel to `self.live` on HOOD-chain tokens.
+        self.hood = build_hood_executor()
 
         self.decision_interval = decision_interval
         self.discovery_interval = discovery_interval
@@ -210,6 +216,10 @@ class TradingService:
             self._tasks.append(asyncio.create_task(
                 self._live_balance_loop(), name="td-live-balance",
             ))
+        if self.hood is not None:
+            self._tasks.append(asyncio.create_task(
+                self._hood_balance_loop(), name="td-hood-balance",
+            ))
             self._push_event(
                 "live_ready",
                 f"live executor armed · wallet {self.live.pubkey_str[:4]}…"
@@ -237,6 +247,11 @@ class TradingService:
         if self.live is not None:
             try:
                 await self.live.close()
+            except Exception:  # noqa: BLE001
+                pass
+        if self.hood is not None:
+            try:
+                await self.hood.close()
             except Exception:  # noqa: BLE001
                 pass
         self._save_now()
@@ -329,6 +344,96 @@ class TradingService:
                 await self.live.refresh_sol_balance()
             except Exception as e:  # noqa: BLE001
                 LOG.debug("live balance refresh failed: %s", e)
+            try:
+                await asyncio.wait_for(self._stop.wait(), timeout=30.0)
+            except asyncio.TimeoutError:
+                pass
+
+    # ------------------------------------------------------------------
+    # Robinhood-Chain live execution mirror (EVM L2 via Uniswap V3).
+    # ------------------------------------------------------------------
+
+    async def _hood_buy(self, token_addr: str, symbol: str,
+                          liquidity_usd: float, confidence: float) -> None:
+        if self.hood is None:
+            return
+        rec = await self.hood.buy(
+            output_token=token_addr, symbol=symbol,
+            eth_amount=self.hood.limits.max_trade_eth,
+            liquidity_usd=liquidity_usd, confidence=confidence,
+        )
+        self._push_hood_event(rec)
+
+    async def _hood_sell(self, token_addr: str, symbol: str,
+                           liquidity_usd: float) -> None:
+        if self.hood is None:
+            return
+        pos = self.hood.open_positions.get(token_addr.lower())
+        if not pos:
+            return
+        raw = int(pos.get("amount_out_raw") or 0)
+        if raw <= 0:
+            self._push_event(
+                "hood_skip_sell",
+                f"[hood] skipped SELL {symbol}: no amount recorded",
+                f"[HOOD] 跳过卖出 {symbol}：未记录持仓数量",
+            )
+            self.hood.open_positions.pop(token_addr.lower(), None)
+            return
+        rec = await self.hood.sell(
+            input_token=token_addr, symbol=symbol,
+            amount_in_wei=raw, liquidity_usd=liquidity_usd,
+        )
+        self._push_hood_event(rec)
+
+    def _push_hood_event(self, rec) -> None:
+        sig_short = (rec.tx_hash[:6] + "…" + rec.tx_hash[-4:]) if rec.tx_hash else "—"
+        if rec.status == "confirmed":
+            self._push_event(
+                "hood_trade",
+                f"[hood] {rec.side.upper()} {rec.token_symbol} · tx {sig_short}",
+                f"[HOOD] {'买入' if rec.side == 'buy' else '卖出'} {rec.token_symbol} · 交易 {sig_short}",
+                extra={"symbol": rec.token_symbol, "mint": rec.token_addr,
+                       "chain": "robinhood", "side": rec.side,
+                       "tx_hash": rec.tx_hash, "eth_amount": rec.eth_amount},
+            )
+        elif rec.status == "blocked":
+            self._push_event(
+                "hood_blocked",
+                f"[hood] blocked {rec.side.upper()} {rec.token_symbol} · {rec.error}",
+                f"[HOOD] 拦截 {'买入' if rec.side == 'buy' else '卖出'} {rec.token_symbol} · {rec.error}",
+                extra={"symbol": rec.token_symbol, "mint": rec.token_addr,
+                       "chain": "robinhood", "side": rec.side,
+                       "reason": rec.error},
+            )
+        elif rec.status == "dry_run":
+            self._push_event(
+                "hood_dry_run",
+                f"[hood·dry] would {rec.side.upper()} {rec.token_symbol}",
+                f"[HOOD·演练] 计划{'买入' if rec.side == 'buy' else '卖出'} {rec.token_symbol}",
+                extra={"symbol": rec.token_symbol, "mint": rec.token_addr,
+                       "chain": "robinhood", "side": rec.side},
+            )
+        elif rec.status == "failed":
+            self._push_event(
+                "hood_failed",
+                f"[hood] failed {rec.side.upper()} {rec.token_symbol}: {rec.error}",
+                f"[HOOD] 失败 {'买入' if rec.side == 'buy' else '卖出'} {rec.token_symbol}：{rec.error}",
+                extra={"symbol": rec.token_symbol, "mint": rec.token_addr,
+                       "chain": "robinhood", "side": rec.side,
+                       "error": rec.error},
+            )
+
+    async def _hood_balance_loop(self) -> None:
+        """Poll the HOOD wallet's ETH balance every ~30 s so the UI has a
+        fresh number to render."""
+        if self.hood is None:
+            return
+        while not self._stop.is_set():
+            try:
+                await self.hood.refresh_eth_balance()
+            except Exception as e:  # noqa: BLE001
+                LOG.debug("hood balance refresh failed: %s", e)
             try:
                 await asyncio.wait_for(self._stop.wait(), timeout=30.0)
             except asyncio.TimeoutError:
@@ -673,12 +778,18 @@ class TradingService:
                         extra={"symbol": p.base_symbol, "mint": p.base_address,
                                "side": "buy", "price_usd": p.price_usd},
                     )
-                    # Mirror to real chain when live executor is present.
-                    # The executor enforces its own hard confidence gate
-                    # (`min_confidence`, default 0.75) — this is stricter
-                    # than the paper gate on purpose.
-                    if self.live is not None:
+                    # Mirror to real chain when the matching live executor
+                    # is present.  Each chain has its own executor with
+                    # its own hard confidence gate (`min_confidence`,
+                    # default 0.75) — stricter than the paper gate on
+                    # purpose.
+                    if p.chain == "solana" and self.live is not None:
                         asyncio.create_task(self._live_buy(
+                            p.base_address, p.base_symbol,
+                            p.liquidity_usd or 0.0, conf,
+                        ))
+                    elif p.chain == "robinhood" and self.hood is not None:
+                        asyncio.create_task(self._hood_buy(
                             p.base_address, p.base_symbol,
                             p.liquidity_usd or 0.0, conf,
                         ))
@@ -686,8 +797,15 @@ class TradingService:
                 closed = self.paper.try_sell(p.base_address, p.price_usd, reason="policy_sell")
                 if closed:
                     self._on_position_closed(closed)
-                    if self.live is not None and p.base_address in self.live.open_positions:
+                    if (p.chain == "solana" and self.live is not None
+                            and p.base_address in self.live.open_positions):
                         asyncio.create_task(self._live_sell(
+                            p.base_address, p.base_symbol,
+                            p.liquidity_usd or 0.0,
+                        ))
+                    elif (p.chain == "robinhood" and self.hood is not None
+                            and p.base_address.lower() in self.hood.open_positions):
+                        asyncio.create_task(self._hood_sell(
                             p.base_address, p.base_symbol,
                             p.liquidity_usd or 0.0,
                         ))
@@ -969,7 +1087,7 @@ class TradingService:
         for mint, pos in self.paper.positions.items():
             prices.setdefault(mint, pos.entry_price_usd)
         return {
-            "mode": "live" if self.live is not None else "paper",
+            "mode": "live" if (self.live is not None or self.hood is not None) else "paper",
             "tokens_status": self.tokens.status(),
             "wallets_status": self.wallets.status(),
             "discovery_status": self.discovery.status(),
@@ -980,6 +1098,7 @@ class TradingService:
             "leaderboard": self.leaderboard.top_public(15),
             "paper": self.paper.snapshot(prices),
             "live": self.live.snapshot() if self.live is not None else None,
+            "hood": self.hood.snapshot() if self.hood is not None else None,
             "trader_cortex_stats": self.brain.trader_cortex.stats(),
             "latest_intent": self._latest_intent,
             "events": list(self._trader_events[-60:]),

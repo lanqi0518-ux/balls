@@ -16,10 +16,18 @@ export function initTrading(panelEl, opts = {}) {
 
     <div class="trading-block trading-block-live" id="live-block" style="display:none">
       <div class="trading-block-title">
-        <span>Live on-chain wallet</span>
+        <span>Live on-chain wallet · Solana</span>
         <span class="count" id="live-status">—</span>
       </div>
       <div id="live-body"></div>
+    </div>
+
+    <div class="trading-block trading-block-hood" id="hood-block" style="display:none">
+      <div class="trading-block-title">
+        <span>Live on-chain wallet · Robinhood Chain</span>
+        <span class="count" id="hood-status">—</span>
+      </div>
+      <div id="hood-body"></div>
     </div>
 
     <div class="trading-block">
@@ -115,6 +123,7 @@ export function updateTrading(trading) {
   if (!trading) return;
   updateSummary(trading);
   updateLive(trading.live);
+  updateHood(trading.hood);
   updateEquityCurve(trading.paper.equity_curve || [], trading.paper.start_usd);
   updatePositions(trading.paper.positions || []);
   updateFresh(trading.fresh_launches || []);
@@ -198,6 +207,101 @@ function updateLive(live) {
           <tbody>${rowsHtml}</tbody>
         </table>
       ` : `<div class="empty">No on-chain trades yet. The brain will fire real swaps once it clears the ${((L.min_confidence || 0) * 100).toFixed(0)}% confidence gate on a candidate with ≥ $${(L.min_liquidity_usd || 0).toLocaleString()} liquidity.</div>`}
+    `;
+  }
+}
+
+function updateHood(hood) {
+  const block = document.getElementById("hood-block");
+  if (!block) return;
+  if (!hood) {
+    block.style.display = "none";
+    return;
+  }
+  block.style.display = "";
+  const st = document.getElementById("hood-status");
+  if (st) {
+    const funded = (hood.eth_balance || 0) > 0;
+    const label = hood.halted    ? "HALTED"
+                : hood.dry_run   ? "DRY-RUN"
+                : !funded        ? "AWAITING ETH"
+                : "ARMED";
+    st.textContent = label;
+    st.className = "count " + (hood.halted ? "neg"
+                            : hood.dry_run  ? "warn"
+                            : !funded       ? "warn"
+                            : "pos");
+  }
+  const explorerAddr = hood.explorer_addr
+    || `https://robinhoodchain.blockscout.com/address/${hood.wallet}`;
+  const L = hood.limits || {};
+  const rowsHtml = (hood.recent_trades || []).slice().reverse().map((r) => {
+    const cls = r.status === "confirmed" ? "pos"
+              : r.status === "blocked"   ? "neg"
+              : r.status === "failed"    ? "neg"
+              : "";
+    const sigCell = r.tx_hash
+      ? `<a class="mono" href="https://robinhoodchain.blockscout.com/tx/${r.tx_hash}" target="_blank" rel="noopener">${short(r.tx_hash, 6)}</a>`
+      : "—";
+    return `<tr>
+      <td class="mono">${new Date(r.t * 1000).toLocaleTimeString()}</td>
+      <td class="${r.side === 'buy' ? 'pos' : 'neg'}">${(r.side || '').toUpperCase()}</td>
+      <td>${escapeHtml(r.token_symbol || "—")}</td>
+      <td class="mono num">${Math.abs(r.eth_amount || 0).toFixed(6)}</td>
+      <td class="mono ${cls}">${(r.status || '').toUpperCase()}</td>
+      <td>${sigCell}</td>
+    </tr>`;
+  }).join("");
+  const body = document.getElementById("hood-body");
+  if (body) {
+    body.innerHTML = `
+      <div class="live-header">
+        <div class="live-header-cell">
+          <div class="live-header-label">WALLET · chainId ${hood.chain_id || 4663}</div>
+          <div class="live-header-value mono">
+            <a href="${explorerAddr}" target="_blank" rel="noopener">${short(hood.wallet, 6)}</a>
+          </div>
+        </div>
+        <div class="live-header-cell">
+          <div class="live-header-label">ETH BALANCE</div>
+          <div class="live-header-value mono">${(hood.eth_balance || 0).toFixed(6)}</div>
+        </div>
+        <div class="live-header-cell">
+          <div class="live-header-label">HOURLY / DAILY</div>
+          <div class="live-header-value mono">
+            ${(hood.spent_last_hour_eth || 0).toFixed(6)} /
+            ${(hood.spent_last_day_eth || 0).toFixed(6)} ETH
+          </div>
+        </div>
+        <div class="live-header-cell">
+          <div class="live-header-label">CAPS · trade / hr / day / positions</div>
+          <div class="live-header-value mono">
+            ${(L.max_trade_eth || 0).toFixed(6)} ·
+            ${(L.max_hourly_eth || 0).toFixed(6)} ·
+            ${(L.max_daily_eth || 0).toFixed(6)} ·
+            ${L.max_positions || 0}
+          </div>
+        </div>
+      </div>
+      ${rowsHtml ? `
+        <table class="trading-table live-tx-table">
+          <thead><tr>
+            <th>TIME</th><th>SIDE</th><th>TOKEN</th><th>ETH</th><th>STATUS</th><th>TX</th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      ` : `<div class="empty">
+        Robinhood-Chain executor is armed.  It routes through Uniswap V3
+        (SwapRouter02 <span class="mono">${short(hood.router || "", 6)}</span>).
+        ${(hood.eth_balance || 0) <= 0
+          ? `Send some ETH on Robinhood Chain (chainId 4663) to
+             <span class="mono">${short(hood.wallet, 6)}</span> to arm live
+             swaps; until then the brain trades HOOD-chain tokens in paper
+             only.`
+          : `Waiting for a HOOD-chain candidate to clear the
+             ${((L.min_confidence || 0) * 100).toFixed(0)}% confidence gate
+             with ≥ $${(L.min_liquidity_usd || 0).toLocaleString()} liquidity.`}
+      </div>`}
     `;
   }
 }

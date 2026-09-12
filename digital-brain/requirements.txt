@@ -12,3 +12,8 @@ pillow>=10.0.0
 solders>=0.21.0
 httpx>=0.27.0
 base58>=2.1.1
+# Live Robinhood-Chain execution: eth-account + eth-abi give us a
+# secp256k1 signer + Uniswap-V3 calldata encoder without pulling in the
+# full 8 MB web3.py stack. RPC calls go over httpx (already present).
+eth-account>=0.13.0
+eth-abi>=5.1.0

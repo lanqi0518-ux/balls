@@ -2620,6 +2620,19 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
 .trading-block-live .count.pos { color: #6EE7B7; }
 .trading-block-live .count.neg { color: #FCA5A5; }
 .trading-block-live .count.warn { color: var(--gold-strong); }
+
+/* Robinhood live wallet: mirror the gold treatment but tint it toward
+   Robinhood's mint-green so the two live surfaces are visually
+   distinct at a glance. */
+.trading-block-hood {
+  border: 1px solid rgba(110, 231, 183, 0.24);
+  background:
+    linear-gradient(180deg, rgba(110, 231, 183, 0.03), rgba(0, 0, 0, 0.15));
+}
+.trading-block-hood .trading-block-title { color: #A7F3D0; }
+.trading-block-hood .count.pos  { color: #6EE7B7; }
+.trading-block-hood .count.neg  { color: #FCA5A5; }
+.trading-block-hood .count.warn { color: #FCD34D; }
 .live-header {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
