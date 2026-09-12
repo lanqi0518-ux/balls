@@ -1095,63 +1095,109 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
 .hero-intent[data-flavour="trader"] .prob-bar.top { color: var(--profit); }
 .hero-intent[data-flavour="trader"] .prob-bar.top .prob-label { color: var(--profit); }
 
-/* ---------- Brain legend -------------------------------------------------- */
+/* ---------- Brain legend → live cortex activity tiles -------------------- */
 .brain-legend {
   flex: 0 0 auto;
   padding-top: var(--sp-3);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
   border-top: 1px solid var(--border);
   margin-top: var(--sp-2);
 }
 
-.legend-item {
+.cortex-tile {
+  --tile-color: #9aa6c8;
+  --tile-glow: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 8px 5px;
+  background:
+    linear-gradient(180deg,
+      rgba(255, 255, 255, calc(0.03 + var(--tile-glow) * 0.02)) 0%,
+      rgba(255, 255, 255, 0.015) 100%);
+  border: 1px solid rgba(255, 255, 255, calc(0.04 + var(--tile-glow) * 0.12));
+  border-radius: 5px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  box-shadow: 0 0 calc(var(--tile-glow) * 14px) -6px var(--tile-color);
+}
+.cortex-tile:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.cortex-tile.selected {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--tile-color);
+  color: var(--text-primary);
+}
+.cortex-tile.cortex-tile-hot {
+  animation: cortexHotPulse 1.4s ease-in-out infinite;
+}
+@keyframes cortexHotPulse {
+  0%, 100% { box-shadow: 0 0 8px -6px var(--tile-color); }
+  50%      { box-shadow: 0 0 22px -4px var(--tile-color); }
+}
+
+.cortex-tile-head {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid transparent;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.15s;
-  font-size: 11px;
-  color: var(--text-secondary);
+  line-height: 1.15;
 }
-.legend-item:hover { background: rgba(255, 255, 255, 0.05); }
-.legend-item.selected {
-  background: var(--accent-dim);
-  border-color: var(--accent);
-  color: var(--text-primary);
-}
-
-.legend-swatch {
-  width: 8px; height: 8px; border-radius: 50%;
-  flex-shrink: 0;
+.cortex-tile-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  flex: 0 0 auto;
   box-shadow: 0 0 6px currentColor;
 }
-
-.legend-name {
-  flex: 1;
+.cortex-tile-name {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 10.5px;
+  color: var(--text-primary);
+}
+.cortex-tile-pct {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--tile-color);
+  text-shadow: 0 0 6px color-mix(in oklab, var(--tile-color) 40%, transparent);
+  font-variant-numeric: tabular-nums;
 }
 
-.legend-bar {
-  width: 30px; height: 3px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 2px;
-  overflow: hidden;
-  flex-shrink: 0;
+.cortex-tile-spark {
+  display: block;
+  width: 100%;
+  height: 26px;
+  border-radius: 3px;
+  background:
+    radial-gradient(120% 100% at 50% 100%,
+      rgba(255, 255, 255, 0.03) 0%,
+      rgba(255, 255, 255, 0.0) 65%);
 }
-.legend-bar-fill {
-  height: 100%;
-  background: currentColor;
-  transition: width 0.15s;
-  box-shadow: 0 0 6px currentColor;
+
+.cortex-tile-metric {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  line-height: 1.1;
+  min-height: 11px;
+}
+
+@media (max-width: 1400px) {
+  .brain-legend { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 1080px) {
+  .brain-legend { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .brain-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* ---------- Panel: environment -------------------------------------------- */
@@ -1264,6 +1310,45 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   border-radius: 0 var(--r-sm) var(--r-sm) 0;
   margin-bottom: 12px;
   line-height: 1.55;
+}
+
+.region-detail-live {
+  --rd-color: #9aa6c8;
+  margin: 0 0 14px;
+  padding: 8px 10px 6px;
+  background:
+    linear-gradient(180deg,
+      rgba(255, 255, 255, 0.04) 0%,
+      rgba(255, 255, 255, 0.01) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 2px solid var(--rd-color);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  box-shadow: 0 0 22px -14px var(--rd-color);
+}
+.region-detail-live-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+.region-detail-live-pct {
+  color: var(--rd-color);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 8px color-mix(in oklab, var(--rd-color) 45%, transparent);
+}
+.region-detail-spark {
+  display: block;
+  width: 100%;
+  height: 64px;
+  border-radius: 4px;
+  background:
+    linear-gradient(90deg,
+      rgba(255, 255, 255, 0.02) 0%,
+      rgba(255, 255, 255, 0.05) 50%,
+      rgba(255, 255, 255, 0.02) 100%);
 }
 
 .region-detail-meters {

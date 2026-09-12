@@ -297,7 +297,7 @@ function handlePayload(data) {
     updateWebTopbarStrip(data.web);
   }
 
-  brainScene.updateRegions(brain.regions);
+  brainScene.updateRegions(brain.regions, buildRegionLiveMetrics(brain, data));
   // Drive the vessel heartbeat from the brain's live engagement signal.
   // Falls back to tick_hz-derived proxy when engagement isn't published.
   let engagementForVessels = null;
@@ -489,6 +489,70 @@ function formatPrice(p) {
   return p.toExponential(2);
 }
 
+// ---------- Per-region live micro-metric ----------
+// For each region, dig into the richer per-cortex stats the backend
+// publishes each tick (hippocampus_stats, amygdala_stats, motor_stats,
+// central_complex_stats, reward_stats, latest_intent) and expose one
+// compact `{label, value}` pair the cortex tile can print next to its
+// sparkline.  Purely a UI layer — the backend already has the numbers.
+function buildRegionLiveMetrics(brain, data) {
+  const out = {};
+  if (!brain) return out;
+  const trading = data && data.trading ? data.trading : null;
+  const trader = brain.trader_cortex_stats || (trading && trading.trader_cortex_stats) || null;
+  const intent = trading && trading.latest_intent;
+
+  const hs = brain.hippocampus_stats;
+  if (hs) out.hippocampus = { label: "recall", value: (+hs.last_similarity || 0).toFixed(2) };
+
+  const as = brain.amygdala_stats;
+  if (as) {
+    const fearPct = Math.round((+as.fear || 0) * 100);
+    out.amygdala = { label: "fear", value: `${fearPct}%` };
+  }
+
+  const rs = brain.reward_stats;
+  if (rs) {
+    const dr = +rs.last_prediction_error || 0;
+    const sign = dr >= 0 ? "+" : "−";
+    out.nucleus_accumbens = { label: "Δrew", value: `${sign}${Math.abs(dr).toFixed(2)}` };
+  }
+
+  const ms = brain.motor_stats;
+  if (ms) {
+    const confPct = Math.round((+ms.confidence || 0) * 100);
+    const label = ms.action_label ? String(ms.action_label).slice(0, 6) : "act";
+    out.motor_cortex = { label, value: `${confPct}%` };
+  }
+
+  const cc = brain.central_complex_stats;
+  if (cc) out.central_complex = { label: cc.compass || "ring", value: `${(+cc.pop_rate_hz || 0).toFixed(1)}Hz` };
+
+  if (intent) {
+    const confPct = Math.round((+intent.confidence || 0) * 100);
+    const sym = intent.symbol ? String(intent.symbol).slice(0, 6) : "—";
+    out.trader_cortex = { label: sym, value: `${confPct}%` };
+  } else if (trader) {
+    const confPct = Math.round((+trader.last_confidence || 0) * 100);
+    out.trader_cortex = { label: "conf", value: `${confPct}%` };
+  }
+
+  if (intent) {
+    const pfcConf = Math.round((+intent.confidence || 0) * 100);
+    const pfcVal = (+intent.value_estimate || 0).toFixed(2);
+    out.prefrontal_cortex = { label: `V ${pfcVal}`, value: `${pfcConf}%` };
+  }
+
+  const eng = typeof brain.engagement === "number" ? brain.engagement : null;
+  if (eng != null) {
+    out.default_mode = { label: "eng", value: `${Math.round(eng * 100)}%` };
+    out.thalamus = { label: "gate", value: `${Math.round(eng * 100)}%` };
+  }
+  const vis = (brain.regions || []).find((r) => r.name === "visual_cortex");
+  if (vis) out.visual_cortex = { label: "V1-V4", value: `${vis.neurons_active}` };
+  return out;
+}
+
 // ---------- Region detail ----------
 function renderRegionDetail(r) {
   regionTitleEl.textContent = r.display_name;
@@ -544,6 +608,13 @@ function renderRegionDetail(r) {
     <div class="region-detail-role" style="color:${r.color}">
       <span style="color: var(--text-secondary)">${r.role}</span>
     </div>
+    <div class="region-detail-live" style="--rd-color:${r.color}">
+      <div class="region-detail-live-head">
+        <span class="mono">ACTIVATION · LIVE</span>
+        <span class="mono region-detail-live-pct" id="region-detail-pct">${(r.activation * 100).toFixed(0)}%</span>
+      </div>
+      <canvas id="region-detail-spark" class="region-detail-spark"></canvas>
+    </div>
     <div class="region-detail-meters">
       <div class="meter">
         <div class="meter-label">ACTIVATION</div>
@@ -561,6 +632,83 @@ function renderRegionDetail(r) {
       <ul>${events}</ul>
     </div>
   `;
+  _drawRegionDetailSparkline(r);
+}
+
+// Ring buffer for the currently-selected region's activation waveform.
+let _regionDetailBuf = null;
+let _regionDetailName = null;
+function _drawRegionDetailSparkline(r) {
+  const N = 180;
+  if (_regionDetailName !== r.name) {
+    _regionDetailBuf = new Float32Array(N);
+    _regionDetailName = r.name;
+  }
+  const buf = _regionDetailBuf;
+  buf.copyWithin(0, 1);
+  buf[N - 1] = r.activation;
+
+  const canvas = document.getElementById("region-detail-spark");
+  if (!canvas) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cssW = canvas.clientWidth || 320;
+  const cssH = canvas.clientHeight || 64;
+  const tw = Math.max(1, Math.round(cssW * dpr));
+  const th = Math.max(1, Math.round(cssH * dpr));
+  if (canvas.width !== tw || canvas.height !== th) {
+    canvas.width = tw;
+    canvas.height = th;
+  }
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.lineWidth = 1;
+  for (let i = 1; i <= 3; i++) {
+    const y = (h * i) / 4;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+
+  const step = w / (N - 1);
+  const yFor = (v) => h - 3 - Math.max(0, Math.min(1, v)) * (h - 6);
+  ctx.beginPath();
+  ctx.moveTo(0, h);
+  for (let i = 0; i < N; i++) ctx.lineTo(i * step, yFor(buf[i]));
+  ctx.lineTo(w, h);
+  ctx.closePath();
+  const hex = r.color || "#9aa6c8";
+  const [rr, gg, bb] = _hexToRgb(hex);
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, `rgba(${rr},${gg},${bb},0.6)`);
+  grad.addColorStop(1, `rgba(${rr},${gg},${bb},0.02)`);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.beginPath();
+  for (let i = 0; i < N; i++) {
+    const x = i * step, y = yFor(buf[i]);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = hex;
+  ctx.lineWidth = 1.8 * dpr;
+  ctx.shadowColor = hex;
+  ctx.shadowBlur = 8 * dpr;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  const hy = yFor(buf[N - 1]);
+  ctx.fillStyle = hex;
+  ctx.beginPath(); ctx.arc(w - 2 * dpr, hy, 2.6 * dpr, 0, Math.PI * 2); ctx.fill();
+}
+function _hexToRgb(hex) {
+  if (!hex || hex[0] !== "#") return [200, 200, 255];
+  const s = hex.length === 4 ? hex.slice(1).split("").map((c) => c + c).join("") : hex.slice(1);
+  return [
+    parseInt(s.slice(0, 2), 16),
+    parseInt(s.slice(2, 4), 16),
+    parseInt(s.slice(4, 6), 16),
+  ];
 }
 
 // ---------- Central complex: ring bump + spike raster ---------------

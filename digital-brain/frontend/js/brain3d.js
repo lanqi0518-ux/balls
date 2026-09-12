@@ -794,7 +794,7 @@ export class BrainScene {
     return new THREE.Vector3(x * 0.9, z * 0.9, y * 0.9);
   }
 
-  updateRegions(regionStates) {
+  updateRegions(regionStates, extraMetrics) {
     let sumAct = 0;
     let nAct = 0;
     for (const r of regionStates) {
@@ -815,7 +815,7 @@ export class BrainScene {
       sumAct += r.activation;
       nAct++;
     }
-    this._updateLegend(regionStates);
+    this._updateLegend(regionStates, extraMetrics || {});
 
     // Fallback engagement drive when the backend hasn't published a
     // `engagement` scalar of its own — use mean cortical activation.
@@ -907,32 +907,140 @@ export class BrainScene {
     return sprite;
   }
 
-  _updateLegend(regionStates) {
+  _updateLegend(regionStates, extraMetrics) {
     const legendEl = document.getElementById("brain-legend");
     if (!legendEl) return;
+    if (!this._sparkBuffers) this._sparkBuffers = new Map();
+    const SPARK_LEN = 96;
+
     if (legendEl.children.length === 0) {
       for (const r of regionStates) {
         const item = document.createElement("div");
-        item.className = "legend-item";
+        item.className = "cortex-tile";
         item.dataset.name = r.name;
         item.style.color = r.color;
+        item.style.setProperty("--tile-color", r.color);
         item.innerHTML = `
-          <span class="legend-swatch" style="background:${r.color}"></span>
-          <span class="legend-name">${r.display_name}</span>
-          <span class="legend-bar"><span class="legend-bar-fill" style="width:0%"></span></span>
+          <div class="cortex-tile-head">
+            <span class="cortex-tile-dot" style="background:${r.color}"></span>
+            <span class="cortex-tile-name">${r.display_name}</span>
+            <span class="cortex-tile-pct mono">0%</span>
+          </div>
+          <canvas class="cortex-tile-spark" width="220" height="28"></canvas>
+          <div class="cortex-tile-metric mono">—</div>
         `;
         item.addEventListener("click", () => this.select(r.name));
         legendEl.appendChild(item);
+        this._sparkBuffers.set(r.name, new Float32Array(SPARK_LEN));
       }
     }
+
     for (const r of regionStates) {
-      const item = legendEl.querySelector(`.legend-item[data-name="${r.name}"]`);
-      if (item) {
-        const fill = item.querySelector(".legend-bar-fill");
-        if (fill) fill.style.width = `${(r.activation * 100).toFixed(0)}%`;
-        item.classList.toggle("selected", r.name === this.selectedName);
+      const item = legendEl.querySelector(`.cortex-tile[data-name="${r.name}"]`);
+      if (!item) continue;
+      item.classList.toggle("selected", r.name === this.selectedName);
+
+      let buf = this._sparkBuffers.get(r.name);
+      if (!buf) {
+        buf = new Float32Array(SPARK_LEN);
+        this._sparkBuffers.set(r.name, buf);
       }
+      buf.copyWithin(0, 1);
+      buf[SPARK_LEN - 1] = r.activation;
+
+      const pctEl = item.querySelector(".cortex-tile-pct");
+      const metricEl = item.querySelector(".cortex-tile-metric");
+      const canvas = item.querySelector(".cortex-tile-spark");
+      if (pctEl) pctEl.textContent = `${(r.activation * 100).toFixed(0)}%`;
+
+      if (metricEl) {
+        const m = extraMetrics[r.name];
+        if (m && m.label) {
+          metricEl.textContent = `${m.label} ${m.value}`;
+          metricEl.style.opacity = "0.9";
+        } else {
+          metricEl.textContent = `${r.neurons_active}/${r.neurons_total} neurons`;
+          metricEl.style.opacity = "0.55";
+        }
+      }
+
+      const hot = r.activation > 0.55;
+      item.classList.toggle("cortex-tile-hot", hot);
+      const glow = Math.min(1, r.activation * 1.4);
+      item.style.setProperty("--tile-glow", glow.toFixed(3));
+
+      if (canvas) this._drawCortexSparkline(canvas, buf, r.color, r.activation);
     }
+  }
+
+  _drawCortexSparkline(canvas, buf, color, act) {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const cssW = canvas.clientWidth || canvas.width;
+    const cssH = canvas.clientHeight || canvas.height;
+    const targetW = Math.max(1, Math.round(cssW * dpr));
+    const targetH = Math.max(1, Math.round(cssH * dpr));
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+      canvas.width = targetW;
+      canvas.height = targetH;
+    }
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, h * 0.5);
+    ctx.lineTo(w, h * 0.5);
+    ctx.stroke();
+
+    const n = buf.length;
+    const step = w / (n - 1);
+    const yFor = (v) => h - 2 - Math.max(0, Math.min(1, v)) * (h - 4);
+
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    for (let i = 0; i < n; i++) ctx.lineTo(i * step, yFor(buf[i]));
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, this._hexToRgba(color, 0.55));
+    grad.addColorStop(1, this._hexToRgba(color, 0.02));
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const x = i * step;
+      const y = yFor(buf[i]);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.6 * dpr;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 6 * dpr * Math.min(1, 0.3 + act);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    const hx = w - 1.5 * dpr;
+    const hy = yFor(buf[n - 1]);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(hx, hy, 2.2 * dpr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  _hexToRgba(hex, a) {
+    if (!hex || hex[0] !== "#") return `rgba(200,200,255,${a})`;
+    const s = hex.length === 4
+      ? hex.slice(1).split("").map((c) => c + c).join("")
+      : hex.slice(1);
+    const r = parseInt(s.slice(0, 2), 16);
+    const g = parseInt(s.slice(2, 4), 16);
+    const b = parseInt(s.slice(4, 6), 16);
+    return `rgba(${r},${g},${b},${a})`;
   }
 
   _addInteraction() {
