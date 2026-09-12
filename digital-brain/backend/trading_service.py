@@ -223,6 +223,7 @@ class TradingService:
             self._tasks.append(asyncio.create_task(
                 self._hood_auto_sell_loop(), name="td-hood-autosell",
             ))
+        if self.live is not None:
             self._push_event(
                 "live_ready",
                 f"live executor armed · wallet {self.live.pubkey_str[:4]}…"
