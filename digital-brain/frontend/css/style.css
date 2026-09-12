@@ -1720,6 +1720,15 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   font-family: var(--font-mono);
 }
 .trading-block-title .count { font-weight: 400; }
+.trading-block-subtitle {
+  margin-top: 12px;
+  margin-bottom: 6px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
 .trading-block-title .trading-block-note {
   margin-left: auto;
   font-weight: 400;

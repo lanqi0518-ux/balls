@@ -478,6 +478,9 @@ def build_from_env() -> Optional[LiveExecutor]:
     if not key:
         LOG.info("BRAIN_SOL_PRIVKEY not set — live execution disabled")
         return None
+    if os.getenv("LIVE_SOL_ENABLED", "1").strip() in ("0", "false", "no", "off"):
+        LOG.info("LIVE_SOL_ENABLED=off — SOL live execution disabled")
+        return None
     try:
         return LiveExecutor(privkey_hex=key, limits=ExecutorLimits.from_env())
     except Exception as e:  # noqa: BLE001

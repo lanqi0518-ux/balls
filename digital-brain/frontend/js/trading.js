@@ -230,6 +230,39 @@ function updateHood(hood) {
   }).join("");
   const body = document.getElementById("hood-body");
   if (body) {
+    const pnl = hood.pnl || {};
+    const openRows = (pnl.open_positions || []).map((p) => {
+      const pnlCls = clsSign(p.pnl_eth);
+      const pctStr = p.pnl_pct == null ? "—" : (p.pnl_pct >= 0 ? "+" : "") + Number(p.pnl_pct).toFixed(1) + "%";
+      const cur = p.current_eth > 0 ? Number(p.current_eth).toFixed(6) : "quoting…";
+      return `<tr>
+        <td>${escapeHtml(p.symbol || "—")}</td>
+        <td class="mono num">${Number(p.eth_in || 0).toFixed(6)}</td>
+        <td class="mono num">${cur}</td>
+        <td class="mono num ${pnlCls}">${Number(p.pnl_eth || 0).toFixed(6)}</td>
+        <td class="mono ${pnlCls}">${pctStr}</td>
+        <td>${p.buy_hash ? `<a class="mono" target="_blank" rel="noopener" href="https://robinhoodchain.blockscout.com/tx/${p.buy_hash}">${short(p.buy_hash, 5)}</a>` : "—"}</td>
+      </tr>`;
+    }).join("");
+    const closedRows = (pnl.recent_closed || []).map((c) => {
+      const pnlCls = clsSign(c.pnl_eth);
+      const pctStr = (c.pnl_pct >= 0 ? "+" : "") + Number(c.pnl_pct || 0).toFixed(1) + "%";
+      return `<tr>
+        <td class="mono">${new Date(c.closed_at_s * 1000).toLocaleTimeString()}</td>
+        <td>${escapeHtml(c.symbol || "—")}</td>
+        <td class="mono num">${Number(c.eth_in || 0).toFixed(6)}</td>
+        <td class="mono num">${Number(c.eth_out || 0).toFixed(6)}</td>
+        <td class="mono num ${pnlCls}">${Number(c.pnl_eth || 0).toFixed(6)}</td>
+        <td class="mono ${pnlCls}">${pctStr}</td>
+        <td>${c.sell_hash ? `<a class="mono" target="_blank" rel="noopener" href="https://robinhoodchain.blockscout.com/tx/${c.sell_hash}">${short(c.sell_hash, 5)}</a>` : "—"}</td>
+      </tr>`;
+    }).join("");
+    const totalCls = clsSign(pnl.total_pnl_eth);
+    const realizedCls = clsSign(pnl.realized_pnl_eth);
+    const unrealCls = clsSign(pnl.unrealized_pnl_eth);
+    const winRate = pnl.n_closed > 0
+      ? ((pnl.closed_wins || 0) / pnl.n_closed * 100).toFixed(0) + "%"
+      : "—";
     body.innerHTML = `
       <div class="live-header">
         <div class="live-header-cell">
@@ -243,22 +276,46 @@ function updateHood(hood) {
           <div class="live-header-value mono">${(hood.eth_balance || 0).toFixed(6)}</div>
         </div>
         <div class="live-header-cell">
-          <div class="live-header-label">HOURLY / DAILY</div>
-          <div class="live-header-value mono">
-            ${(hood.spent_last_hour_eth || 0).toFixed(6)} /
-            ${(hood.spent_last_day_eth || 0).toFixed(6)} ETH
+          <div class="live-header-label">TOTAL P&amp;L</div>
+          <div class="live-header-value mono ${totalCls}">
+            ${(pnl.total_pnl_eth >= 0 ? "+" : "") + Number(pnl.total_pnl_eth || 0).toFixed(6)} ETH
           </div>
         </div>
         <div class="live-header-cell">
-          <div class="live-header-label">CAPS · trade / hr / day / positions</div>
+          <div class="live-header-label">REALIZED / UNREALIZED</div>
           <div class="live-header-value mono">
-            ${(L.max_trade_eth || 0).toFixed(6)} ·
-            ${(L.max_hourly_eth || 0).toFixed(6)} ·
-            ${(L.max_daily_eth || 0).toFixed(6)} ·
-            ${L.max_positions || 0}
+            <span class="${realizedCls}">${(pnl.realized_pnl_eth >= 0 ? "+" : "") + Number(pnl.realized_pnl_eth || 0).toFixed(6)}</span>
+            /
+            <span class="${unrealCls}">${(pnl.unrealized_pnl_eth >= 0 ? "+" : "") + Number(pnl.unrealized_pnl_eth || 0).toFixed(6)}</span>
+          </div>
+        </div>
+        <div class="live-header-cell">
+          <div class="live-header-label">TRADES · win rate</div>
+          <div class="live-header-value mono">
+            ${pnl.n_open || 0} open · ${pnl.n_closed || 0} closed · ${winRate}
           </div>
         </div>
       </div>
+
+      ${openRows ? `
+        <div class="trading-block-subtitle">OPEN POSITIONS · live-marked to Uniswap V3 quote</div>
+        <table class="trading-table live-tx-table">
+          <thead><tr>
+            <th>TOKEN</th><th>ETH IN</th><th>ETH NOW</th><th>P&amp;L (ETH)</th><th>P&amp;L %</th><th>BUY TX</th>
+          </tr></thead>
+          <tbody>${openRows}</tbody>
+        </table>
+      ` : ""}
+
+      ${closedRows ? `
+        <div class="trading-block-subtitle">RECENT CLOSES · realized</div>
+        <table class="trading-table live-tx-table">
+          <thead><tr>
+            <th>TIME</th><th>TOKEN</th><th>ETH IN</th><th>ETH OUT</th><th>P&amp;L</th><th>%</th><th>SELL TX</th>
+          </tr></thead>
+          <tbody>${closedRows}</tbody>
+        </table>
+      ` : ""}
       ${rowsHtml ? `
         <table class="trading-table live-tx-table">
           <thead><tr>

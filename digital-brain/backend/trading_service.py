@@ -454,7 +454,11 @@ class TradingService:
             except Exception as e:  # noqa: BLE001
                 LOG.debug("hood balance refresh failed: %s", e)
             try:
-                await asyncio.wait_for(self._stop.wait(), timeout=30.0)
+                await self.hood.refresh_open_position_values()
+            except Exception as e:  # noqa: BLE001
+                LOG.debug("hood position mark refresh failed: %s", e)
+            try:
+                await asyncio.wait_for(self._stop.wait(), timeout=20.0)
             except asyncio.TimeoutError:
                 pass
 
@@ -690,7 +694,17 @@ class TradingService:
         #     coin is interesting, we just won't buy it.
         #   * Established pairs need >= $20K liquidity AND at least a 1%
         #     move in the last hour, otherwise it's not worth compute.
+        # If Solana execution is disabled at the executor level, drop SOL
+        # tokens from the scan entirely so the brain isn't wasting cycles
+        # scoring things it can't buy.
+        skip_sol = self.live is None
+        skip_hood = self.hood is None
+
         def _is_candidate(p) -> bool:
+            if skip_sol and p.chain == "solana":
+                return False
+            if skip_hood and p.chain == "robinhood":
+                return False
             if self.tokens.is_fresh_launch(p.base_address):
                 return True
             return p.liquidity_usd >= 20_000 and abs(p.price_change_h1) >= 1.0

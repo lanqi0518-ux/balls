@@ -210,6 +210,14 @@ class HoodExecutor:
         self.eth_balance_at_s: float = 0.0
         # {token_addr: {symbol, amount_raw, opened_at_s, eth_spent}}
         self.open_positions: Dict[str, dict] = {}
+        # Realized-PnL journal: rolling list of closed trades so the UI
+        # can render a live P&L strip and running totals.
+        # Each entry: {symbol, addr, eth_in, eth_out, pnl_eth, opened_at_s,
+        #              closed_at_s, buy_hash, sell_hash}
+        self.closed_positions: List[dict] = []
+        self.realized_pnl_eth: float = 0.0
+        self.total_eth_spent: float = 0.0
+        self.total_eth_received: float = 0.0
         self._state_path = state_path or os.path.join(
             os.getenv("DATA_DIR", "./data"), "live_hood_positions.json"
         )
@@ -264,6 +272,11 @@ class HoodExecutor:
                 self.open_positions = data["open_positions"]
                 LOG.info("restored %d live HOOD position(s) from disk",
                          len(self.open_positions))
+            if isinstance(data, dict):
+                self.closed_positions = list(data.get("closed_positions", []))[-200:]
+                self.realized_pnl_eth = float(data.get("realized_pnl_eth", 0.0))
+                self.total_eth_spent = float(data.get("total_eth_spent", 0.0))
+                self.total_eth_received = float(data.get("total_eth_received", 0.0))
         except FileNotFoundError:
             pass
         except Exception as e:  # noqa: BLE001
@@ -275,7 +288,13 @@ class HoodExecutor:
             _os.makedirs(_os.path.dirname(self._state_path) or ".", exist_ok=True)
             tmp = self._state_path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump({"open_positions": self.open_positions}, f)
+                json.dump({
+                    "open_positions": self.open_positions,
+                    "closed_positions": self.closed_positions[-200:],
+                    "realized_pnl_eth": self.realized_pnl_eth,
+                    "total_eth_spent": self.total_eth_spent,
+                    "total_eth_received": self.total_eth_received,
+                }, f)
             _os.replace(tmp, self._state_path)
         except Exception as e:  # noqa: BLE001
             LOG.warning("failed to persist HOOD positions: %s", e)
@@ -564,8 +583,30 @@ class HoodExecutor:
                     "fee_tier": best_fee,
                     "buy_hash": tx_hash,
                 }
+                self.total_eth_spent += abs(eth_amount)
             else:
-                self.open_positions.pop(token_addr.lower(), None)
+                # Sell: proceeds `best_out` are in WETH wei (the min_out we
+                # would have accepted; actual received may be a bit higher).
+                pos = self.open_positions.pop(token_addr.lower(), None)
+                eth_out = best_out / WEI_PER_ETH
+                rec.eth_amount = float(eth_out)  # positive on sell
+                eth_in = float(pos.get("eth_spent") or 0.0) if pos else 0.0
+                pnl = eth_out - eth_in
+                self.realized_pnl_eth += pnl
+                self.total_eth_received += eth_out
+                self.closed_positions.append({
+                    "symbol": symbol,
+                    "addr": token_addr,
+                    "eth_in": eth_in,
+                    "eth_out": eth_out,
+                    "pnl_eth": pnl,
+                    "pnl_pct": (pnl / eth_in * 100.0) if eth_in > 0 else 0.0,
+                    "opened_at_s": int((pos or {}).get("opened_at_s") or rec.t),
+                    "closed_at_s": rec.t,
+                    "buy_hash": (pos or {}).get("buy_hash"),
+                    "sell_hash": tx_hash,
+                })
+                self.closed_positions = self.closed_positions[-200:]
             self._save_positions()
         except Exception as e:  # noqa: BLE001
             rec.status = "failed"
@@ -718,6 +759,62 @@ class HoodExecutor:
             self._nonce_cache = None
             raise
 
+    # --- live P&L quoting -----------------------------------------------
+
+    async def refresh_open_position_values(self) -> None:
+        """Quote each open position back to ETH via QuoterV2 and cache the
+        current mark on the position dict. Best-effort; failures are silent."""
+        for addr, pos in list(self.open_positions.items()):
+            try:
+                amt = int(pos.get("amount_out_raw") or 0)
+                fee = int(pos.get("fee_tier") or 3000)
+                if amt <= 0:
+                    continue
+                out = await self._quote_v3_single(
+                    _to_checksum(addr), WETH9, fee, amt,
+                )
+                if out and out > 0:
+                    pos["current_eth_value"] = out / WEI_PER_ETH
+                    pos["marked_at_s"] = int(time.time())
+            except Exception:
+                pass
+        self._save_positions()
+
+    def pnl_summary(self) -> dict:
+        """Compute a full P&L snapshot from the persisted books."""
+        unrealized = 0.0
+        marked_open = []
+        for addr, pos in self.open_positions.items():
+            eth_in = float(pos.get("eth_spent") or 0.0)
+            cur = float(pos.get("current_eth_value") or 0.0)
+            pnl = cur - eth_in if cur > 0 else 0.0
+            unrealized += pnl
+            marked_open.append({
+                "symbol": pos.get("symbol"),
+                "addr": addr,
+                "eth_in": eth_in,
+                "current_eth": cur,
+                "pnl_eth": pnl,
+                "pnl_pct": (pnl / eth_in * 100.0) if eth_in > 0 else None,
+                "opened_at_s": int(pos.get("opened_at_s") or 0),
+                "buy_hash": pos.get("buy_hash"),
+            })
+        marked_open.sort(key=lambda p: -(p.get("pnl_eth") or 0.0))
+        recent_closed = list(self.closed_positions[-10:])[::-1]
+        return {
+            "realized_pnl_eth": round(self.realized_pnl_eth, 8),
+            "unrealized_pnl_eth": round(unrealized, 8),
+            "total_pnl_eth": round(self.realized_pnl_eth + unrealized, 8),
+            "total_eth_spent": round(self.total_eth_spent, 8),
+            "total_eth_received": round(self.total_eth_received, 8),
+            "open_positions": marked_open,
+            "n_open": len(self.open_positions),
+            "n_closed": len(self.closed_positions),
+            "closed_wins": sum(1 for c in self.closed_positions if c.get("pnl_eth", 0) > 0),
+            "closed_losses": sum(1 for c in self.closed_positions if c.get("pnl_eth", 0) <= 0),
+            "recent_closed": recent_closed,
+        }
+
     # --- snapshot --------------------------------------------------------
 
     def snapshot(self) -> dict:
@@ -746,6 +843,7 @@ class HoodExecutor:
                 "min_confidence": L.min_confidence,
             },
             "recent_trades": [r.to_public() for r in list(self._ledger)[-15:]],
+            "pnl": self.pnl_summary(),
         }
 
 
