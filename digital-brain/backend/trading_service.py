@@ -756,59 +756,73 @@ class TradingService:
                         and candidate_intent["confidence"] > best_intent["confidence"])):
                 best_intent = candidate_intent
 
-            held = p.base_address in self.paper.positions
+            held_paper = p.base_address in self.paper.positions
+            held_live = (self.live is not None
+                         and p.base_address in self.live.open_positions)
+            held_hood = (self.hood is not None
+                         and p.base_address.lower() in self.hood.open_positions)
             # Confidence gate: don't act unless the cortex is clearly leaning
             # that way. Prevents random-scalping-into-the-ground while
             # untrained. Fresh pump.fun launches get a stricter gate — the
             # noise floor on brand-new tokens is much higher and rug risk
             # is real, so we demand more conviction before opening.
             buy_gate = 0.65 if is_fresh else 0.50
-            if action == BUY and not held and conf >= buy_gate:
-                pos = self.paper.try_buy(
-                    p.base_address, p.base_symbol, p.price_usd,
-                    features=feats.tolist(), hints=hints.tolist(),
-                )
-                if pos:
-                    self._push_event(
-                        "trade",
-                        f"BUY {p.base_symbol} @ ${p.price_usd:.6f} · "
-                        f"conf {conf:.2f}",
-                        f"买入 {p.base_symbol} @ ${p.price_usd:.6f} · "
-                        f"置信度 {conf:.2f}",
-                        extra={"symbol": p.base_symbol, "mint": p.base_address,
-                               "side": "buy", "price_usd": p.price_usd},
+            if action == BUY and conf >= buy_gate:
+                # Paper trader: decision journal. It has its own max_positions
+                # cap; when full it returns None. Live/HOOD executors have
+                # their OWN independent caps (default 2) and MUST NOT be
+                # gated by the paper trader — otherwise real trading stalls
+                # the moment the paper book is full.
+                if not held_paper:
+                    pos = self.paper.try_buy(
+                        p.base_address, p.base_symbol, p.price_usd,
+                        features=feats.tolist(), hints=hints.tolist(),
                     )
-                    # Mirror to real chain when the matching live executor
-                    # is present.  Each chain has its own executor with
-                    # its own hard confidence gate (`min_confidence`,
-                    # default 0.75) — stricter than the paper gate on
-                    # purpose.
-                    if p.chain == "solana" and self.live is not None:
-                        asyncio.create_task(self._live_buy(
-                            p.base_address, p.base_symbol,
-                            p.liquidity_usd or 0.0, conf,
-                        ))
-                    elif p.chain == "robinhood" and self.hood is not None:
-                        asyncio.create_task(self._hood_buy(
-                            p.base_address, p.base_symbol,
-                            p.liquidity_usd or 0.0, conf,
-                        ))
-            elif action == SELL and held and conf >= 0.50:
-                closed = self.paper.try_sell(p.base_address, p.price_usd, reason="policy_sell")
-                if closed:
-                    self._on_position_closed(closed)
-                    if (p.chain == "solana" and self.live is not None
-                            and p.base_address in self.live.open_positions):
-                        asyncio.create_task(self._live_sell(
-                            p.base_address, p.base_symbol,
-                            p.liquidity_usd or 0.0,
-                        ))
-                    elif (p.chain == "robinhood" and self.hood is not None
-                            and p.base_address.lower() in self.hood.open_positions):
-                        asyncio.create_task(self._hood_sell(
-                            p.base_address, p.base_symbol,
-                            p.liquidity_usd or 0.0,
-                        ))
+                    if pos:
+                        self._push_event(
+                            "trade",
+                            f"BUY {p.base_symbol} @ ${p.price_usd:.6f} · "
+                            f"conf {conf:.2f}",
+                            f"买入 {p.base_symbol} @ ${p.price_usd:.6f} · "
+                            f"置信度 {conf:.2f}",
+                            extra={"symbol": p.base_symbol,
+                                   "mint": p.base_address,
+                                   "side": "buy", "price_usd": p.price_usd},
+                        )
+                # Live routing runs INDEPENDENTLY of paper. Each chain's
+                # executor has its own hard confidence gate (default 0.75,
+                # stricter than paper) and its own per-hour / per-day / max
+                # position caps enforced inside its `_pre_trade_check`.
+                if (p.chain == "solana" and self.live is not None
+                        and not held_live):
+                    asyncio.create_task(self._live_buy(
+                        p.base_address, p.base_symbol,
+                        p.liquidity_usd or 0.0, conf,
+                    ))
+                elif (p.chain == "robinhood" and self.hood is not None
+                        and not held_hood):
+                    asyncio.create_task(self._hood_buy(
+                        p.base_address, p.base_symbol,
+                        p.liquidity_usd or 0.0, conf,
+                    ))
+            elif action == SELL and conf >= 0.50:
+                if held_paper:
+                    closed = self.paper.try_sell(p.base_address, p.price_usd,
+                                                  reason="policy_sell")
+                    if closed:
+                        self._on_position_closed(closed)
+                # Independently sell on the live executor if it holds a
+                # position — even when the paper book already closed it out.
+                if p.chain == "solana" and held_live:
+                    asyncio.create_task(self._live_sell(
+                        p.base_address, p.base_symbol,
+                        p.liquidity_usd or 0.0,
+                    ))
+                elif p.chain == "robinhood" and held_hood:
+                    asyncio.create_task(self._hood_sell(
+                        p.base_address, p.base_symbol,
+                        p.liquidity_usd or 0.0,
+                    ))
 
         if best_intent is not None:
             self._latest_intent = best_intent
