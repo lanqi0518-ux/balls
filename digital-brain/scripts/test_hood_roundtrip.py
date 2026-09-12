@@ -30,7 +30,7 @@ async def main():
 
     print(f"[init] wallet={execu.address}")
 
-    bal_before = await execu.fetch_eth_balance()
+    bal_before = await execu.refresh_eth_balance()
     print(f"[balance] {bal_before:.6f} ETH  (halted={execu.is_halted()} dry_run={execu.is_dry_run()})")
     if bal_before < BUY_ETH * 3:
         print(f"ERROR: balance too low; need ~{BUY_ETH * 3:.4f} ETH for buy + gas + sell gas")
