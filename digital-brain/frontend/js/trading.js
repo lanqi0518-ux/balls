@@ -51,7 +51,7 @@ export function initTrading(panelEl, opts = {}) {
 
     <div class="trading-block">
       <div class="trading-block-title">
-        <span>🎯 Candidate pool (fresh + small-cap, mega-caps filtered out)</span>
+        <span>Candidate pool · fresh + small-cap · mega-caps filtered</span>
         <span class="count" id="hot-count">0</span>
       </div>
       <div id="hot-body"></div>
@@ -59,14 +59,14 @@ export function initTrading(panelEl, opts = {}) {
 
     <div class="trading-block">
       <div class="trading-block-title">
-        <span>🧠 Smart-money leaderboard (rolling 24h realized PnL)</span>
+        <span>Smart-money leaderboard · rolling 24h realized PnL</span>
       </div>
       <div id="lb-body"></div>
     </div>
 
     <div class="trading-block">
       <div class="trading-block-title">
-        <span>👁 Tracked wallets</span>
+        <span>Tracked wallets</span>
         <span class="count" id="w-count">0</span>
         <span class="trading-block-note" id="w-auto-note">auto-discovering…</span>
       </div>

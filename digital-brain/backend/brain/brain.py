@@ -544,8 +544,8 @@ class Brain:
         is_learned = (getattr(concept, "category", "") or "").startswith("learned_")
         desc_en = "" if is_learned else (concept.desc_en or "")[:80]
         desc_zh = "" if is_learned else (concept.desc_zh or "")[:40]
-        text_en = f"💭 associates with {concept.en}" + (f" — {desc_en}" if desc_en else "")
-        text_zh = f"💭 联想到「{concept.zh}」" + (f"——{desc_zh}" if desc_zh else "")
+        text_en = f"associates with {concept.en}" + (f" — {desc_en}" if desc_en else "")
+        text_zh = f"联想到「{concept.zh}」" + (f"——{desc_zh}" if desc_zh else "")
         self._add_thought(
             "prefrontal_cortex",
             text_en, text_zh,

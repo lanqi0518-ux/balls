@@ -976,8 +976,8 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   border: 1px solid transparent;
 }
 .tag-agent { background: rgba(110, 231, 255, 0.12); border-color: rgba(110, 231, 255, 0.3); color: var(--accent); }
-.tag-food  { background: rgba(52, 211, 153, 0.12); border-color: rgba(52, 211, 153, 0.3); color: var(--good); }
-.tag-hazard { background: rgba(248, 113, 113, 0.12); border-color: rgba(248, 113, 113, 0.3); color: var(--bad); }
+.tag-food  { background: rgba(232, 217, 166, 0.10); border-color: rgba(232, 217, 166, 0.28); color: var(--gold-strong); }
+.tag-hazard { background: rgba(251, 113, 133, 0.10); border-color: rgba(251, 113, 133, 0.28); color: var(--danger); }
 
 /* ---------- Panel: region detail ------------------------------------------ */
 
@@ -2277,4 +2277,78 @@ body::after {
   .topbar { padding: 12px 16px; gap: 12px; }
   .brand-title { font-size: 15.5px; }
   .layout { padding: 10px; gap: 10px; }
+}
+
+/* --- Tab badges: money-gold for `paper`, cyan for `live` --- */
+#trading-badge.tab-badge {
+  background: rgba(232, 217, 166, 0.10);
+  border-color: rgba(232, 217, 166, 0.35);
+  color: var(--gold-strong);
+  text-shadow: 0 0 8px rgba(232, 217, 166, 0.35);
+}
+#web-badge.tab-badge {
+  background: rgba(110, 231, 255, 0.10);
+  border-color: rgba(110, 231, 255, 0.35);
+  color: var(--accent);
+  animation: liveBlink 2s ease-in-out infinite;
+}
+@keyframes liveBlink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
+}
+
+/* --- Env-panel canvas + surrounding shell: match the premium
+   framing used on other data surfaces. --- */
+.env-wrap {
+  padding: 6px;
+  border-radius: var(--r-md);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.015), rgba(0, 0, 0, 0.15));
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.035) inset,
+    0 12px 40px -24px rgba(0, 0, 0, 0.9);
+}
+#env-canvas {
+  border-radius: var(--r-sm);
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+}
+.env-stats {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+/* --- Footer speed slider polish --- */
+.footer input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--cognition));
+  border-radius: 3px;
+  margin: 0 8px;
+  vertical-align: middle;
+  width: 120px;
+}
+.footer input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  cursor: pointer;
+}
+.footer input[type="range"]::-moz-range-thumb {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  cursor: pointer;
 }
