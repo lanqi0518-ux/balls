@@ -338,6 +338,33 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   letter-spacing: 0.04em;
 }
 
+/* Taxonomic plate: scientific-classification chrome that appears
+   under the brand text. Reads like a museum specimen tag. */
+.brand-plate {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: rgba(232, 217, 166, 0.55);
+  margin-top: 4px;
+  padding: 2px 0;
+  text-transform: uppercase;
+}
+.brand-plate-hex {
+  color: rgba(232, 217, 166, 0.85);
+  text-shadow: 0 0 6px rgba(232, 217, 166, 0.4);
+  font-weight: 600;
+}
+.brand-plate-sep {
+  color: rgba(232, 217, 166, 0.35);
+}
+.brand-plate-class,
+.brand-plate-order {
+  color: rgba(200, 220, 255, 0.55);
+  font-style: italic;
+}
+
 .topbar-status {
   display: flex;
   gap: 10px;
@@ -777,6 +804,12 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
 .figcaption-text em {
   color: rgba(240, 171, 252, 0.9);
   font-style: normal;
+}
+.env-figcaption {
+  padding-top: 6px;
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 1.45;
 }
 
 .brain-tooltip {
