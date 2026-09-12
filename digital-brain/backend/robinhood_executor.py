@@ -54,8 +54,29 @@ V3_FACTORY    = "0x1f7d7550B1b028f7571E69A784071F0205FD2EfA"
 # router" so a follow-up unwrapWETH9 leg can sweep and unwrap the WETH.
 ADDRESS_THIS  = "0x0000000000000000000000000000000000000002"
 
+# Uniswap V4 on Robinhood Chain (chain id 4663).
+# Source: https://developers.uniswap.org/docs/protocols/v4/deployments
+V4_POOL_MANAGER   = "0x8366a39CC670B4001A1121B8F6A443A643e40951"
+V4_QUOTER         = "0x8DC178EFB8111bB0973Dd9d722ebEff267c98F94"
+V4_STATE_VIEW     = "0xF3334192D15450cDD385c8b70e03F9A6bd9E673B"
+UNIVERSAL_ROUTER  = "0x8876789976DEcBfCBbBE364623C63652DB8c0904"
+PERMIT2           = "0x000000000022D473030F116dDEE9F6B43aC78BA3"
+# In V4 native ETH is currency address(0). currency0 is always the
+# numerically-smaller address in a PoolKey, so ETH/token pools always
+# have currency0 = 0x0, currency1 = token.
+V4_NATIVE_CURRENCY = "0x0000000000000000000000000000000000000000"
+
 # Standard Uniswap V3 fee tiers we probe when routing (0.05%, 0.3%, 1%).
 V3_FEE_TIERS = (500, 3000, 10000)
+# V4 vanilla fee/tickSpacing pairs (hooks = 0x0). These cover the vast
+# majority of memecoin pools; hooked pools require per-token address
+# discovery which we skip.
+V4_FEE_TIERS = (
+    (100, 1),      # 0.01% · stable
+    (500, 10),     # 0.05%
+    (3000, 60),    # 0.3%
+    (10000, 200),  # 1%
+)
 
 WEI_PER_ETH = 10 ** 18
 
@@ -468,6 +489,103 @@ class HoodExecutor:
                 best_fee = fee
         return best_fee, best_out
 
+    # --- Uniswap V4 quoting ---------------------------------------------
+
+    async def _quote_v4_single_native(
+        self, token: str, fee: int, tick_spacing: int,
+        amount_in_wei: int, *, buy: bool,
+    ) -> Optional[int]:
+        """Quote a single-hop V4 swap between native ETH (currency0) and
+        `token` (currency1) at the vanilla (fee, tickSpacing) pool with
+        hooks == 0x0. ``buy=True`` swaps ETH → token (zeroForOne),
+        ``buy=False`` swaps token → ETH. Returns amountOut in raw units,
+        or None if the pool doesn't exist / has no liquidity."""
+        try:
+            from eth_abi import encode  # type: ignore
+        except Exception:  # noqa: BLE001
+            return None
+        # V4Quoter.quoteExactInputSingle((PoolKey,bool,uint128,bytes))
+        # PoolKey = (currency0, currency1, fee, tickSpacing, hooks)
+        sel = _selector(
+            "quoteExactInputSingle(((address,address,uint24,int24,address),"
+            "bool,uint128,bytes))"
+        )
+        pool_key = (
+            _to_checksum(V4_NATIVE_CURRENCY),
+            _to_checksum(token),
+            int(fee),
+            int(tick_spacing),
+            _to_checksum("0x0000000000000000000000000000000000000000"),
+        )
+        params = encode(
+            ["((address,address,uint24,int24,address),bool,uint128,bytes)"],
+            [(pool_key, bool(buy), int(amount_in_wei), b"")],
+        )
+        data = _hex(sel + params)
+        try:
+            js = await self._rpc("eth_call", [
+                {"to": _to_checksum(V4_QUOTER), "data": data}, "latest",
+            ])
+            ret = str(js.get("result") or "0x")
+            # V4Quoter returns (uint256 amountOut, uint256 gasEstimate).
+            # A "no route" pool reverts (eth_call returns 0x or an error).
+            if len(ret) < 66:
+                return None
+            return int(ret[2:66], 16)
+        except Exception as e:  # noqa: BLE001
+            LOG.debug("hood v4 quote %s@(%d,%d) buy=%s failed: %s",
+                      token[:6], fee, tick_spacing, buy, e)
+            return None
+
+    async def _best_v4_pool_native(
+        self, token: str, amount_in_wei: int, *, buy: bool,
+    ) -> Tuple[Optional[Tuple[int, int]], int]:
+        """Probe every vanilla V4 (fee, tickSpacing) pool between native
+        ETH and `token`. Returns ((fee, tickSpacing), best_out) or
+        (None, 0)."""
+        best_key: Optional[Tuple[int, int]] = None
+        best_out = 0
+        for fee, ts in V4_FEE_TIERS:
+            out = await self._quote_v4_single_native(
+                token, fee, ts, amount_in_wei, buy=buy,
+            )
+            if out and out > best_out:
+                best_out = out
+                best_key = (fee, ts)
+        return best_key, best_out
+
+    # --- reverse-quote sell-route guard ---------------------------------
+
+    async def has_sell_route(self, token: str,
+                              probe_amount_raw: int) -> bool:
+        """Return True if a hypothetical sell of ``probe_amount_raw``
+        units of ``token`` back to ETH would find any live pool on
+        either Uniswap V3 (via WETH9) or Uniswap V4 (via native ETH).
+
+        Used as a pre-buy safety check so the brain never opens a
+        position it cannot exit."""
+        if probe_amount_raw <= 0:
+            return False
+        # V3 → WETH
+        try:
+            fee, out = await self._best_fee_tier(
+                token, WETH9, probe_amount_raw,
+            )
+            if fee is not None and out > 0:
+                return True
+        except Exception:  # noqa: BLE001
+            pass
+        # V4 → native ETH
+        try:
+            key, out = await self._best_v4_pool_native(
+                token, probe_amount_raw, buy=False,
+            )
+            if key is not None and out > 0:
+                return True
+        except Exception:  # noqa: BLE001
+            pass
+        return False
+
     # --- swap ------------------------------------------------------------
 
     async def buy(self, output_token: str, symbol: str, eth_amount: float,
@@ -507,8 +625,15 @@ class HoodExecutor:
     async def _swap(self, *, side: str, token_addr: str, symbol: str,
                      input_addr: str, output_addr: str,
                      amount_in_wei: int, eth_amount: float) -> HoodTradeRecord:
-        """Execute a single-hop Uniswap V3 exact-input swap via
-        SwapRouter02.exactInputSingle."""
+        """Execute a single-hop exact-input swap.
+
+        Routing waterfall:
+            1. Uniswap V3 SwapRouter02.exactInputSingle (WETH path).
+            2. Uniswap V4 Universal Router V4_SWAP (native-ETH path,
+               vanilla pools with hooks=0x0).
+
+        On BUY we also probe a reverse-route quote before broadcasting so
+        the brain never opens a position it can't exit."""
         rec = HoodTradeRecord(
             t=int(time.time()), side=side,
             token_addr=token_addr, token_symbol=symbol,
@@ -516,61 +641,111 @@ class HoodExecutor:
             status="pending",
         )
         try:
-            # 1) Quote to check the pool exists and calculate min-out
+            # 1) Quote V3 first (mature, cheap gas, most liquidity today).
             best_fee, best_out = await self._best_fee_tier(
                 input_addr, output_addr, amount_in_wei
             )
+            v4_key: Optional[Tuple[int, int]] = None
+            v4_out = 0
             if best_fee is None or best_out <= 0:
-                rec.status = "failed"
-                rec.error = "no_route"
-                self._ledger.append(rec)
-                return rec
+                # 1b) Fall back to V4 (native-ETH, vanilla pools).
+                v4_key, v4_out = await self._best_v4_pool_native(
+                    token=(output_addr if side == "buy" else input_addr),
+                    amount_in_wei=amount_in_wei,
+                    buy=(side == "buy"),
+                )
+                if v4_key is None or v4_out <= 0:
+                    rec.status = "failed"
+                    rec.error = "no_route"
+                    self._ledger.append(rec)
+                    return rec
+                # Use V4 route
+                best_out = v4_out
+
+            # 2) BUY-side: reverse-quote guard. Probe whether we could
+            # sell the tokens we'd receive back to ETH via any pool. If
+            # not, refuse the trade — we'd be stranding the position.
+            if side == "buy":
+                probe_tokens = max(1, best_out // 100)  # 1% probe
+                has_exit = await self.has_sell_route(output_addr,
+                                                      probe_tokens)
+                if not has_exit:
+                    rec.status = "blocked"
+                    rec.error = "no_sell_route"
+                    self._ledger.append(rec)
+                    return rec
             # Apply slippage floor
             slip = self.limits.max_slippage_bps
             min_out = best_out * (10_000 - slip) // 10_000
-            # 2) Dry-run short-circuit
+            # 3) Dry-run short-circuit
             if self.is_dry_run():
                 rec.status = "dry_run"
                 self._ledger.append(rec)
                 return rec
-            # 3) Build exactInputSingle calldata
-            calldata = self._build_exact_input_single(
-                input_addr, output_addr, best_fee, amount_in_wei, min_out,
-            )
-            # 4) For a BUY we send ETH as value (router wraps to WETH via
-            #    the payable multicall entrypoint).  SwapRouter02's
-            #    exactInputSingle is NOT payable directly — the standard
-            #    idiom is to wrap: `multicall([exactInputSingle, unwrapWETH9])`.
-            #    But when input is WETH9 and value == 0, we'd need a prior
-            #    ERC-20 approval.  To keep the executor self-contained we
-            #    build a `multicall` wrapper for the BUY path and send the
-            #    ETH as value.
-            if side == "buy":
-                data, value_wei = self._wrap_buy_multicall(calldata), amount_in_wei
+            # 4) Route: V3 (SwapRouter02) if we got a V3 quote, else V4
+            # (Universal Router). ``v4_key`` is set only when V3 was empty.
+            using_v4 = v4_key is not None
+            if using_v4:
+                # For V4 sells we need the token approved to Permit2 and
+                # then Permit2 approved to the Universal Router.
+                if side == "sell":
+                    approve_rec = await self._ensure_approval(
+                        token_addr=input_addr, amount_wei=amount_in_wei,
+                        spender=PERMIT2,
+                    )
+                    if approve_rec is not None and approve_rec.status != "confirmed":
+                        rec.status = "failed"
+                        rec.error = f"approve_permit2:{approve_rec.error or approve_rec.status}"
+                        self._ledger.append(rec)
+                        return rec
+                    permit2_rec = await self._ensure_permit2_allowance(
+                        token=input_addr, spender=UNIVERSAL_ROUTER,
+                        amount=amount_in_wei,
+                    )
+                    if permit2_rec is not None and permit2_rec.status != "confirmed":
+                        rec.status = "failed"
+                        rec.error = f"permit2:{permit2_rec.error or permit2_rec.status}"
+                        self._ledger.append(rec)
+                        return rec
+                data = self._build_universal_router_v4_swap(
+                    token=(output_addr if side == "buy" else input_addr),
+                    fee=v4_key[0], tick_spacing=v4_key[1],
+                    amount_in=amount_in_wei, min_out=min_out,
+                    zero_for_one=(side == "buy"),
+                    recipient=self.address,
+                )
+                to_addr = UNIVERSAL_ROUTER
+                value_wei = amount_in_wei if side == "buy" else 0
             else:
-                # SELL: approve router, then swap into the router itself
-                # (recipient=ADDRESS_THIS=0x02), then unwrapWETH9 to send
-                # native ETH back to us. This keeps proceeds as native ETH
-                # instead of leaving them locked as WETH ERC-20.
-                approve_rec = await self._ensure_approval(
-                    token_addr=input_addr, amount_wei=amount_in_wei,
-                )
-                if approve_rec is not None and approve_rec.status != "confirmed":
-                    rec.status = "failed"
-                    rec.error = f"approve:{approve_rec.error or approve_rec.status}"
-                    self._ledger.append(rec)
-                    return rec
-                # Rebuild swap calldata with recipient = ADDRESS_THIS.
-                swap_leg = self._build_exact_input_single(
-                    input_addr, output_addr, best_fee, amount_in_wei, min_out,
-                    recipient=ADDRESS_THIS,
-                )
-                unwrap_leg = self._build_unwrap_weth9(min_out, self.address)
-                data = self._wrap_multicall([swap_leg, unwrap_leg])
-                value_wei = 0
+                # V3 route (existing behaviour).
+                if side == "buy":
+                    calldata = self._build_exact_input_single(
+                        input_addr, output_addr, best_fee,
+                        amount_in_wei, min_out,
+                    )
+                    data = self._wrap_buy_multicall(calldata)
+                    value_wei = amount_in_wei
+                else:
+                    approve_rec = await self._ensure_approval(
+                        token_addr=input_addr, amount_wei=amount_in_wei,
+                        spender=SWAP_ROUTER02,
+                    )
+                    if approve_rec is not None and approve_rec.status != "confirmed":
+                        rec.status = "failed"
+                        rec.error = f"approve:{approve_rec.error or approve_rec.status}"
+                        self._ledger.append(rec)
+                        return rec
+                    swap_leg = self._build_exact_input_single(
+                        input_addr, output_addr, best_fee,
+                        amount_in_wei, min_out, recipient=ADDRESS_THIS,
+                    )
+                    unwrap_leg = self._build_unwrap_weth9(min_out, self.address)
+                    data = self._wrap_multicall([swap_leg, unwrap_leg])
+                    value_wei = 0
+                to_addr = SWAP_ROUTER02
             # 5) Broadcast
             tx_hash = await self._send_tx(
-                to=SWAP_ROUTER02, data=data, value_wei=value_wei,
+                to=to_addr, data=data, value_wei=value_wei,
             )
             rec.tx_hash = tx_hash
             rec.status = "confirmed"  # best-effort; we don't wait for finality
@@ -580,7 +755,10 @@ class HoodExecutor:
                     "opened_at_s": rec.t,
                     "eth_spent": abs(eth_amount),
                     "amount_out_raw": best_out,
-                    "fee_tier": best_fee,
+                    "fee_tier": best_fee if not using_v4 else None,
+                    "v4_pool": ({"fee": v4_key[0], "tick_spacing": v4_key[1]}
+                                if using_v4 else None),
+                    "route": "v4" if using_v4 else "v3",
                     "buy_hash": tx_hash,
                 }
                 self.total_eth_spent += abs(eth_amount)
@@ -667,29 +845,134 @@ class HoodExecutor:
 
 
     async def _ensure_approval(self, token_addr: str,
-                                 amount_wei: int) -> Optional[HoodTradeRecord]:
-        """Ensure the router has enough allowance to move `amount_wei` of
-        `token_addr` from us.  Returns the approve trade record if a new
-        approval was broadcast, or None if the existing allowance is
-        already sufficient.  On dry-run this is a no-op."""
-        # Read current allowance
+                                 amount_wei: int,
+                                 spender: str = SWAP_ROUTER02
+                                 ) -> Optional[HoodTradeRecord]:
+        """Ensure ``spender`` has enough ERC-20 allowance to move
+        ``amount_wei`` of ``token_addr`` from us. Returns the approve
+        trade record if a new approval was broadcast, or None if the
+        existing allowance is already sufficient. Dry-run is a no-op."""
         allowance = await self._erc20_allowance(token_addr, self.address,
-                                                  SWAP_ROUTER02)
+                                                  spender)
         if allowance >= amount_wei:
             return None
         if self.is_dry_run():
             return None
-        # Approve max (2^256 - 1) so we don't need to re-approve every trade.
-        approve_data = self._build_approve(SWAP_ROUTER02, (1 << 256) - 1)
+        approve_data = self._build_approve(spender, (1 << 256) - 1)
         tx_hash = await self._send_tx(to=token_addr, data=approve_data,
                                         value_wei=0)
         rec = HoodTradeRecord(
             t=int(time.time()), side="approve",
-            token_addr=token_addr, token_symbol="APPROVE",
+            token_addr=token_addr, token_symbol=f"APPROVE→{spender[:6]}",
             eth_amount=0.0, tx_hash=tx_hash, status="confirmed",
         )
         self._ledger.append(rec)
         return rec
+
+    async def _ensure_permit2_allowance(self, token: str, spender: str,
+                                          amount: int
+                                          ) -> Optional[HoodTradeRecord]:
+        """Ensure Permit2 has granted ``spender`` (typically the Universal
+        Router) an allowance ≥ ``amount`` for ``token`` from us. Permit2
+        stores allowances internally keyed by (owner, token, spender);
+        we set them directly via Permit2.approve — no signature flow."""
+        try:
+            allowance, _exp, _nonce = await self._permit2_allowance(
+                self.address, token, spender,
+            )
+        except Exception:  # noqa: BLE001
+            allowance = 0
+        if allowance >= amount:
+            return None
+        if self.is_dry_run():
+            return None
+        from eth_abi import encode  # type: ignore
+        sel = _selector("approve(address,address,uint160,uint48)")
+        expiration = (1 << 48) - 1
+        amt = (1 << 160) - 1
+        params = encode(
+            ["address", "address", "uint160", "uint48"],
+            [_to_checksum(token), _to_checksum(spender), amt, expiration],
+        )
+        tx_hash = await self._send_tx(to=PERMIT2, data=sel + params,
+                                        value_wei=0)
+        rec = HoodTradeRecord(
+            t=int(time.time()), side="approve",
+            token_addr=token, token_symbol=f"PERMIT2→{spender[:6]}",
+            eth_amount=0.0, tx_hash=tx_hash, status="confirmed",
+        )
+        self._ledger.append(rec)
+        return rec
+
+    async def _permit2_allowance(self, owner: str, token: str,
+                                   spender: str) -> Tuple[int, int, int]:
+        from eth_abi import encode  # type: ignore
+        sel = _selector("allowance(address,address,address)")
+        params = encode(
+            ["address", "address", "address"],
+            [_to_checksum(owner), _to_checksum(token), _to_checksum(spender)],
+        )
+        data = _hex(sel + params)
+        try:
+            js = await self._rpc("eth_call", [
+                {"to": _to_checksum(PERMIT2), "data": data}, "latest",
+            ])
+            ret = str(js.get("result") or "0x")
+            if len(ret) < 194:
+                return 0, 0, 0
+            return (int(ret[2:66], 16), int(ret[66:130], 16),
+                    int(ret[130:194], 16))
+        except Exception:  # noqa: BLE001
+            return 0, 0, 0
+
+    def _build_universal_router_v4_swap(
+        self, *, token: str, fee: int, tick_spacing: int,
+        amount_in: int, min_out: int, zero_for_one: bool,
+        recipient: str,
+    ) -> bytes:
+        """Build calldata for a single V4_SWAP through the Universal Router
+        between native ETH (currency0=0x0) and ``token`` (currency1) on the
+        vanilla pool (fee, tickSpacing, hooks=0x0).
+
+        Commands byte 0x10 = V4_SWAP. Inside V4_SWAP the ``actions`` bytes are:
+          0x06 SWAP_EXACT_IN_SINGLE
+          0x0c SETTLE_ALL   (pay input we owe the PoolManager)
+          0x0f TAKE_ALL     (collect the output owed to us)"""
+        from eth_abi import encode  # type: ignore
+        pool_key = (
+            _to_checksum(V4_NATIVE_CURRENCY),
+            _to_checksum(token),
+            int(fee),
+            int(tick_spacing),
+            _to_checksum("0x0000000000000000000000000000000000000000"),
+        )
+        swap_params = encode(
+            ["((address,address,uint24,int24,address),bool,uint128,uint128,bytes)"],
+            [(pool_key, bool(zero_for_one), int(amount_in), int(min_out), b"")],
+        )
+        input_currency = V4_NATIVE_CURRENCY if zero_for_one else token
+        output_currency = token if zero_for_one else V4_NATIVE_CURRENCY
+        settle_params = encode(
+            ["address", "uint256"],
+            [_to_checksum(input_currency), int(amount_in)],
+        )
+        take_params = encode(
+            ["address", "uint256"],
+            [_to_checksum(output_currency), int(min_out)],
+        )
+        actions = bytes([0x06, 0x0c, 0x0f])
+        v4_swap_input = encode(
+            ["bytes", "bytes[]"],
+            [actions, [swap_params, settle_params, take_params]],
+        )
+        commands = bytes([0x10])
+        deadline = int(time.time()) + 900
+        sel = _selector("execute(bytes,bytes[],uint256)")
+        exec_params = encode(
+            ["bytes", "bytes[]", "uint256"],
+            [commands, [v4_swap_input], deadline],
+        )
+        return sel + exec_params
 
     async def _erc20_allowance(self, token: str, owner: str, spender: str) -> int:
         sel = _selector("allowance(address,address)")
@@ -762,17 +1045,32 @@ class HoodExecutor:
     # --- live P&L quoting -----------------------------------------------
 
     async def refresh_open_position_values(self) -> None:
-        """Quote each open position back to ETH via QuoterV2 and cache the
-        current mark on the position dict. Best-effort; failures are silent."""
+        """Quote each open position back to ETH and cache the current
+        mark. Tries V3 QuoterV2 first, then V4 Quoter. Best-effort."""
         for addr, pos in list(self.open_positions.items()):
             try:
                 amt = int(pos.get("amount_out_raw") or 0)
-                fee = int(pos.get("fee_tier") or 3000)
                 if amt <= 0:
                     continue
-                out = await self._quote_v3_single(
-                    _to_checksum(addr), WETH9, fee, amt,
-                )
+                out = None
+                # Prefer the exact pool this position was bought through.
+                if (pos.get("route") or "v3") == "v4" and pos.get("v4_pool"):
+                    vk = pos["v4_pool"]
+                    out = await self._quote_v4_single_native(
+                        _to_checksum(addr),
+                        int(vk.get("fee") or 3000),
+                        int(vk.get("tick_spacing") or 60),
+                        amt, buy=False,
+                    )
+                if not out:
+                    fee = int(pos.get("fee_tier") or 3000)
+                    out = await self._quote_v3_single(
+                        _to_checksum(addr), WETH9, fee, amt,
+                    )
+                if not out:
+                    _key, out = await self._best_v4_pool_native(
+                        _to_checksum(addr), amt, buy=False,
+                    )
                 if out and out > 0:
                     pos["current_eth_value"] = out / WEI_PER_ETH
                     pos["marked_at_s"] = int(time.time())

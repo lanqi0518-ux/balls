@@ -1,7 +1,7 @@
 /**
  * trading.js — the "Trading Desk" panel.
  *
- * Renders the paper trader's book, hot Solana tokens, tracked smart wallets,
+ * Renders the paper trader's book, hot Robinhood-chain tokens, tracked smart wallets,
  * our from-scratch PnL leaderboard, and a small equity-curve sparkline.
  * Also exposes an "add wallet" form so the user can plug in extra addresses
  * they think are alpha.
@@ -16,7 +16,7 @@ export function initTrading(panelEl, opts = {}) {
 
     <div class="trading-block trading-block-live" id="live-block" style="display:none">
       <div class="trading-block-title">
-        <span>Live on-chain wallet · Solana (disabled)</span>
+        <span>Live on-chain wallet · Solana</span>
         <span class="count" id="live-status">—</span>
       </div>
       <div id="live-body"></div>
@@ -462,7 +462,7 @@ function updateHot(hot) {
 }
 
 function chainBadge(chain) {
-  const c = (chain || "solana").toLowerCase();
+  const c = (chain || "robinhood").toLowerCase();
   const map = {
     solana:   { label: "SOL",   cls: "chain-sol" },
     robinhood:{ label: "HOOD",  cls: "chain-hood" },
@@ -476,7 +476,7 @@ function chainBadge(chain) {
 
 function chainExplorerUrl(mint, chain) {
   // Chain-aware explorer link.
-  const c = (chain || "solana").toLowerCase();
+  const c = (chain || "robinhood").toLowerCase();
   if (c === "robinhood") {
     // Robinhood-chain uses EVM addresses. DexScreener is the best
     // neutral explorer we can link to without picking a Robinhood-side
@@ -486,7 +486,8 @@ function chainExplorerUrl(mint, chain) {
   if (c === "ethereum")  return `https://etherscan.io/token/${encodeURIComponent(mint)}`;
   if (c === "base")      return `https://basescan.org/token/${encodeURIComponent(mint)}`;
   if (c === "bsc")       return `https://bscscan.com/token/${encodeURIComponent(mint)}`;
-  return `https://solscan.io/token/${encodeURIComponent(mint)}`;
+  if (c === "solana")    return `https://solscan.io/token/${encodeURIComponent(mint)}`;
+  return `https://dexscreener.com/robinhood/${encodeURIComponent(mint)}`;
 }
 
 function updateFresh(fresh) {
