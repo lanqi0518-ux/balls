@@ -976,8 +976,6 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   border: 1px solid transparent;
 }
 .tag-agent { background: rgba(110, 231, 255, 0.12); border-color: rgba(110, 231, 255, 0.3); color: var(--accent); }
-.tag-food  { background: rgba(232, 217, 166, 0.10); border-color: rgba(232, 217, 166, 0.28); color: var(--gold-strong); }
-.tag-hazard { background: rgba(251, 113, 133, 0.10); border-color: rgba(251, 113, 133, 0.28); color: var(--danger); }
 
 /* ---------- Panel: region detail ------------------------------------------ */
 
@@ -2329,9 +2327,19 @@ body::after {
 /* Trader-terminal tone on the sandbox stat grid: subtle mint for GAIN,
    subtle rose for LOSS, gold for EQUITY. All numerics only — labels stay
    uniform-muted so nothing shouts. */
-.env-stat-gain .env-stat-value    { color: var(--gain, #6EE7B7); }
-.env-stat-loss .env-stat-value    { color: var(--loss, #FCA5A5); }
-.env-stat-equity .env-stat-value  { color: var(--gold, #E8D9A6); }
+.env-stat-gain .env-stat-value {
+  color: #6EE7B7;
+  text-shadow: 0 0 12px rgba(110, 231, 183, 0.25);
+}
+.env-stat-loss .env-stat-value {
+  color: #FCA5A5;
+  text-shadow: 0 0 12px rgba(252, 165, 165, 0.25);
+}
+.env-stat-equity .env-stat-value {
+  color: var(--gold-strong);
+  text-shadow: 0 0 14px rgba(253, 230, 138, 0.3);
+  font-weight: 700;
+}
 
 /* --- Footer speed slider polish --- */
 .footer input[type="range"] {
