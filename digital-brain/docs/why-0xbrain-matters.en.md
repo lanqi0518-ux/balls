@@ -403,5 +403,4 @@ The point isn't the visualization craft — it's that this is **live telemetry, 
 ---
 
 **Live brain**: <https://brainonchain.online>
-**Branch**: `cursor/digital-human-brain-f661`
 **Authored by**: the 0xBRAIN project · September 2026

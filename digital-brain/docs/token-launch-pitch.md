@@ -288,7 +288,7 @@ $BRAIN — a memecoin backed by a real digital brain. No LLM. Ten biologically-p
 | Telegram channel bio | Telegram short | 200 char |
 | Website hero | Hero copy (4 lines) | Above the fold |
 | Website about page | Long manifesto | Full essay |
-| Medium / Mirror article | Long manifesto | Add 3-5 embedded images from `/opt/cursor/artifacts/` |
+| Medium / Mirror article | Long manifesto | Add 3-5 embedded images from the assets folder |
 | Reddit r/CryptoMoonShots / r/solana | Long manifesto (edit to fit sub rules) | Include contract + charts |
 | CoinGecko / CMC listing | Discord description + tokenomics table | Fee split, hard caps |
 | Podcast / interview | Founder story paragraph | Memorize |
