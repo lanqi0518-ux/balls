@@ -98,8 +98,13 @@ const escapeHtml = (s) => String(s == null ? "" : s)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const short = (s, n = 4) => (!s ? "—" : (s.length > n * 2 + 3 ? s.slice(0, n) + "…" + s.slice(-n) : s));
 
+let LAUNCHPAD_LABELS = {};
+let LAUNCHPAD_ONLY = false;
+
 export function updateTrading(trading) {
   if (!trading) return;
+  LAUNCHPAD_LABELS = trading.hood_launchpad_labels || {};
+  LAUNCHPAD_ONLY = !!trading.hood_launchpad_only;
   updateSummary(trading);
   updateLive(trading.live);
   updateHood(trading.hood);
@@ -108,6 +113,19 @@ export function updateTrading(trading) {
   updateLeaderboard(trading.leaderboard || []);
   updateWallets(trading.tracked_wallets || [], trading.discovery_status || {},
                 trading.tuning || {});
+}
+
+function launchpadTag(addr, chain) {
+  if ((chain || "").toLowerCase() !== "robinhood") return "";
+  const key = (addr || "").toLowerCase();
+  const pad = LAUNCHPAD_LABELS[key];
+  if (pad) {
+    return ` <span class="pad-tag pad-ok" title="Deployed by ${escapeHtml(pad)} — brain can BUY">${escapeHtml(pad)}</span>`;
+  }
+  if (LAUNCHPAD_ONLY) {
+    return ` <span class="pad-tag pad-skip" title="Not from a known launchpad — brain will NOT buy">no-pad</span>`;
+  }
+  return "";
 }
 
 function updateLive(live) {
@@ -448,6 +466,7 @@ function updateHot(hot) {
         <td class="sym">
           <a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.base_symbol || "?")}</a>
           ${p.is_fresh_launch ? `<span class="fresh-badge" title="fresh launch, ${p.fresh_age_minutes}m old">NEW</span>` : ""}
+          ${launchpadTag(p.base_address, p.chain)}
         </td>
         <td>${chainBadge(p.chain)}</td>
         <td>${fmtUsd(p.price_usd)}</td>
@@ -521,6 +540,7 @@ function updateFresh(fresh) {
       <tr>
         <td class="sym">
           <a href="${escapeHtml(mintUrl)}" target="_blank" rel="noopener">${escapeHtml(c.symbol || "?")}</a>
+          ${launchpadTag(c.mint, c.chain)}
         </td>
         <td>${chainBadge(c.chain)}</td>
         <td class="mono-sm" style="color:var(--text-muted)">${escapeHtml((c.name || "").slice(0, 22))}</td>

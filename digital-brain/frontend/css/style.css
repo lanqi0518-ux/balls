@@ -1786,6 +1786,29 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   border-color: rgba(250, 204, 21, 0.4);
   color: var(--warn);
 }
+.pad-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  text-transform: lowercase;
+  font-family: var(--font-mono);
+  vertical-align: middle;
+}
+.pad-tag.pad-ok {
+  background: rgba(110, 231, 183, 0.16);
+  border: 1px solid rgba(110, 231, 183, 0.45);
+  color: #6EE7B7;
+}
+.pad-tag.pad-skip {
+  background: rgba(148, 163, 184, 0.10);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #94A3B8;
+  text-transform: none;
+}
 .fresh-badge.grad {
   background: rgba(52, 211, 153, 0.16);
   border-color: rgba(52, 211, 153, 0.4);

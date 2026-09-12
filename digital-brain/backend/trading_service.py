@@ -45,6 +45,7 @@ from .paper_trader import PaperTrader
 from .persistence import Persistence
 from .solana_executor import build_from_env as build_live_executor
 from .robinhood_executor import build_from_env as build_hood_executor
+from .robinhood_launchpads import RobinhoodLaunchpadClassifier
 
 
 LOG = logging.getLogger("trading_service")
@@ -112,6 +113,18 @@ class TradingService:
         # executor), separate wallet, separate hard limits, separate
         # ledger.  Runs in parallel to `self.live` on HOOD-chain tokens.
         self.hood = build_hood_executor()
+        # Classifier: given a token address on Robinhood Chain, tells us
+        # whether it was deployed by a known launchpad (hood.fun,
+        # dyor.fun, robinlaunch, …). Buys are only allowed on tokens
+        # that clear this filter — arbitrary Uniswap-deployed contracts
+        # from unknown EOAs are treated as untrusted and skipped.
+        self.hood_launchpads = RobinhoodLaunchpadClassifier() if self.hood is not None else None
+        # Env override so operators can bypass the allow-list entirely
+        # (e.g. during initial testing on a chain where no launchpad is
+        # widely deployed yet). Default is ON.
+        self.hood_launchpad_only = os.getenv(
+            "HOOD_LAUNCHPAD_ONLY", "1",
+        ).strip() not in ("0", "false", "no", "off")
 
         self.decision_interval = decision_interval
         self.discovery_interval = discovery_interval
@@ -223,6 +236,10 @@ class TradingService:
             self._tasks.append(asyncio.create_task(
                 self._hood_auto_sell_loop(), name="td-hood-autosell",
             ))
+            self._tasks.append(asyncio.create_task(
+                self._hood_launchpad_warmup_loop(),
+                name="td-hood-launchpad-warmup",
+            ))
         if self.live is not None:
             self._push_event(
                 "live_ready",
@@ -256,6 +273,11 @@ class TradingService:
         if self.hood is not None:
             try:
                 await self.hood.close()
+            except Exception:  # noqa: BLE001
+                pass
+        if self.hood_launchpads is not None:
+            try:
+                await self.hood_launchpads.close()
             except Exception:  # noqa: BLE001
                 pass
         self._save_now()
@@ -364,6 +386,24 @@ class TradingService:
         gas so the wallet can always send its own unwrap/sell tx."""
         if self.hood is None:
             return
+        # Launchpad guard: only buy tokens the brain has confirmed were
+        # deployed by a known bonding-curve launchpad on Robinhood Chain.
+        # Everything else — random contracts an unknown EOA shoved into
+        # Uniswap — is treated as an untrusted scam pool.
+        if self.hood_launchpad_only and self.hood_launchpads is not None:
+            cls = await self.hood_launchpads.classify(token_addr)
+            if cls.launchpad is None:
+                reason = f"not_from_launchpad(creator={(cls.creator or '?')[:8]})"
+                self._push_event(
+                    "hood_launchpad_skip",
+                    f"[hood] skip BUY {symbol}: {reason}",
+                    f"[HOOD] 跳过买入 {symbol}：非发射台部署（creator={(cls.creator or '?')[:8]}）",
+                    extra={"symbol": symbol, "mint": token_addr,
+                            "chain": "robinhood", "side": "buy",
+                            "reason": reason, "creator": cls.creator,
+                            "classifier_error": cls.error},
+                )
+                return
         # Reserve enough native ETH for ~50 more txs at typical L2 gas
         # (each is <0.00003 ETH; 0.002 ETH covers ~65 txs).
         GAS_RESERVE = 0.002
@@ -525,6 +565,32 @@ class TradingService:
                 LOG.debug("hood auto-sell loop iteration failed: %s", e)
             try:
                 await asyncio.wait_for(self._stop.wait(), timeout=15.0)
+            except asyncio.TimeoutError:
+                pass
+
+    async def _hood_launchpad_warmup_loop(self) -> None:
+        """Every ~45s, walk the current Robinhood-chain trending set and
+        pre-classify each token so the buy path always hits a hot cache
+        and never blocks on Blockscout."""
+        if self.hood is None or self.hood_launchpads is None:
+            return
+        while not self._stop.is_set():
+            try:
+                seen = 0
+                for p in self.tokens.snapshot():
+                    if p.chain != "robinhood":
+                        continue
+                    seen += 1
+                    try:
+                        await self.hood_launchpads.classify(p.base_address)
+                    except Exception:  # noqa: BLE001
+                        pass
+                    if seen >= 20:
+                        break
+            except Exception as e:  # noqa: BLE001
+                LOG.debug("launchpad warmup iteration failed: %s", e)
+            try:
+                await asyncio.wait_for(self._stop.wait(), timeout=45.0)
             except asyncio.TimeoutError:
                 pass
 
@@ -1237,6 +1303,11 @@ class TradingService:
             "paper": self.paper.snapshot(prices),
             "live": self.live.snapshot() if self.live is not None else None,
             "hood": self.hood.snapshot() if self.hood is not None else None,
+            "hood_launchpads": (self.hood_launchpads.cached_snapshot()
+                                 if self.hood_launchpads is not None else None),
+            "hood_launchpad_labels": (self.hood_launchpads.token_labels()
+                                       if self.hood_launchpads is not None else {}),
+            "hood_launchpad_only": bool(self.hood_launchpad_only),
             "trader_cortex_stats": self.brain.trader_cortex.stats(),
             "latest_intent": self._latest_intent,
             "events": list(self._trader_events[-60:]),
