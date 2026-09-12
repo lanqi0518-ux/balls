@@ -34,9 +34,13 @@ import torch.nn.functional as F
 from .config import BrainConfig
 from .regions import (
     Amygdala,
+    BasalGanglia,
     CentralComplex,
+    Cerebellum,
     DefaultModeNetwork,
     Hippocampus,
+    InsularCortex,
+    LocusCoeruleus,
     MotorCortex,
     NucleusAccumbens,
     PrefrontalCortex,
@@ -155,6 +159,16 @@ class Brain:
         # rest of the brain can read as a 4-D feature vector.
         self.central_complex = CentralComplex()
 
+        # --- Newer regions (added to grow the digital brain past 10 modules) ---
+        # Cerebellum: forward-model / motor calibration (Wolpert-Miall-Kawato).
+        # Basal ganglia: Go/NoGo action gating (Frank 2005).
+        # Insular cortex: interoception, risk-as-feeling (Damasio, Craig).
+        # Locus coeruleus: noradrenergic gain under uncertainty (Aston-Jones).
+        self.cerebellum = Cerebellum()
+        self.basal_ganglia = BasalGanglia(num_actions=num_actions)
+        self.insular_cortex = InsularCortex()
+        self.locus_coeruleus = LocusCoeruleus()
+
         self.regions: List = [
             self.visual_cortex,
             self.thalamus,
@@ -166,6 +180,10 @@ class Brain:
             self.default_mode,
             self.trader_cortex,
             self.central_complex,
+            self.cerebellum,
+            self.basal_ganglia,
+            self.insular_cortex,
+            self.locus_coeruleus,
         ]
 
         # Running state used for online learning.
@@ -339,6 +357,21 @@ class Brain:
 
         # ---- 1. Reward / motivation update from LAST action ----
         pred_error = self.nucleus_accumbens.perceive(reward)
+
+        # Cerebellum: compare the critic's LAST value estimate against the
+        # reward that actually arrived. Rolling MSE → forward-model
+        # calibration scalar.
+        if self._last_value is not None:
+            try:
+                self.cerebellum.observe(float(self._last_value.item()), reward)
+            except Exception:  # noqa: BLE001
+                pass
+        # Basal ganglia: credit the action that just executed with the
+        # reward we just got, so the Go/NoGo baselines learn online.
+        if self._last_reported_action is not None:
+            self.basal_ganglia.credit(self._last_reported_action, reward)
+        # Locus coeruleus: track running |prediction error| → NA gain scalar.
+        lc_gain = self.locus_coeruleus.observe(pred_error)
         if reward > 0.5:
             self._add_thought("nucleus_accumbens",
                               f"Reward received ({reward:+.1f}). Prediction error {pred_error:+.2f}.",
@@ -370,6 +403,12 @@ class Brain:
 
         # ---- 4. Emotion: amygdala reads danger + learned associations ----
         fear = self.amygdala.perceive(gated_visual, danger, self.step_count)
+        # Insula reads a body-state proxy (recent reward as "PnL" and fear
+        # as "underwater fraction"). Returns a gut_feeling in [-1, +1] and
+        # exposes a small additive fear boost when the gut says caution.
+        gut = self.insular_cortex.observe(reward, fear)
+        if self.insular_cortex.fear_boost() > 0.05:
+            fear = float(min(1.0, fear + self.insular_cortex.fear_boost()))
         if fear > 0.7:
             self._add_thought("amygdala",
                               f"High fear ({fear:.2f}) — bias toward escape.",
@@ -408,6 +447,10 @@ class Brain:
         if fear > 0.6:
             logits = logits.clone()
             logits[4] -= 1.5  # discourage freezing when scared
+
+        # Basal-ganglia Go/NoGo gate: shift each action's logit by its
+        # rolling reward baseline before the motor cortex samples.
+        logits = self.basal_ganglia.gate(logits)
 
         # ---- 8. Motor: sample action ----
         action, log_prob, probs = self.motor_cortex.act(logits)
@@ -481,7 +524,9 @@ class Brain:
                                location=position, step=self.step_count)
 
         # ---- 10. DMN ticks (may replay a memory in the background) ----
-        self.engagement = min(1.0, abs(pred_error) * 1.5 + fear * 0.5 + 0.15)
+        # LC noradrenergic gain scales overall engagement — under
+        # uncertainty the brain runs "hot".
+        self.engagement = min(1.0, (abs(pred_error) * 1.5 + fear * 0.5 + 0.15) * lc_gain)
         replayed = self.default_mode.tick(self.engagement, self.hippocampus, self.step_count)
         if replayed is not None:
             self._add_thought("default_mode",
@@ -677,6 +722,10 @@ class Brain:
             "hippocampus": self.hippocampus.state_dict_serializable(),
             "amygdala": self.amygdala.state_dict_serializable(),
             "nucleus_accumbens": self.nucleus_accumbens.state_dict_serializable(),
+            "cerebellum": self.cerebellum.state_dict_serializable(),
+            "basal_ganglia": self.basal_ganglia.state_dict_serializable(),
+            "insular_cortex": self.insular_cortex.state_dict_serializable(),
+            "locus_coeruleus": self.locus_coeruleus.state_dict_serializable(),
             "learned_concepts": list(self.learned_concepts),
         }
 
@@ -698,6 +747,14 @@ class Brain:
                 self.amygdala.load_state_dict_safe(sd["amygdala"])
             if "nucleus_accumbens" in sd:
                 self.nucleus_accumbens.load_state_dict_safe(sd["nucleus_accumbens"])
+            if "cerebellum" in sd:
+                self.cerebellum.load_state_dict_safe(sd["cerebellum"])
+            if "basal_ganglia" in sd:
+                self.basal_ganglia.load_state_dict_safe(sd["basal_ganglia"])
+            if "insular_cortex" in sd:
+                self.insular_cortex.load_state_dict_safe(sd["insular_cortex"])
+            if "locus_coeruleus" in sd:
+                self.locus_coeruleus.load_state_dict_safe(sd["locus_coeruleus"])
             # Restore learned concepts (added at runtime, e.g. fresh tokens
             # the brain has seen). Each entry becomes a permanent knowledge
             # memory again so associations continue to work.

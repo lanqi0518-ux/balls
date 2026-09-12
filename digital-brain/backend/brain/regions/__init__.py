@@ -8,6 +8,10 @@ from .default_mode import DefaultModeNetwork
 from .thalamus import Thalamus
 from .trader_cortex import TraderCortex
 from .central_complex import CentralComplex
+from .cerebellum import Cerebellum
+from .basal_ganglia import BasalGanglia
+from .insular_cortex import InsularCortex
+from .locus_coeruleus import LocusCoeruleus
 
 __all__ = [
     "VisualCortex",
@@ -20,6 +24,10 @@ __all__ = [
     "Thalamus",
     "TraderCortex",
     "CentralComplex",
+    "Cerebellum",
+    "BasalGanglia",
+    "InsularCortex",
+    "LocusCoeruleus",
     "ACTION_NAMES",
     "ACTION_NAMES_ZH",
 ]
