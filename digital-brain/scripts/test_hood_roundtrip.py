@@ -74,7 +74,7 @@ async def main():
     print(f"[SELL] status={sell.status} tx={sell.tx_hash} error={sell.error}")
 
     await asyncio.sleep(10)
-    bal_after = await execu.fetch_eth_balance()
+    bal_after = await execu.refresh_eth_balance()
     print(f"\n[balance] before={bal_before:.6f} after={bal_after:.6f} delta={bal_after-bal_before:+.6f} ETH")
     print(f"\n[DONE] buy={buy.tx_hash} sell={sell.tx_hash}")
     return 0

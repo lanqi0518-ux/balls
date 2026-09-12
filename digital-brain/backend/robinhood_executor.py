@@ -50,6 +50,9 @@ SWAP_ROUTER02 = "0xCaf681a66D020601342297493863E78C959E5cb2"
 QUOTER_V2     = "0x33e885ED0Ec9bF04EcfB19341582aADCb4c8A9E7"
 WETH9         = "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73"
 V3_FACTORY    = "0x1f7d7550B1b028f7571E69A784071F0205FD2EfA"
+# Uniswap V3 peripheral convention: recipient=address(2) means "keep in
+# router" so a follow-up unwrapWETH9 leg can sweep and unwrap the WETH.
+ADDRESS_THIS  = "0x0000000000000000000000000000000000000002"
 
 # Standard Uniswap V3 fee tiers we probe when routing (0.05%, 0.3%, 1%).
 V3_FEE_TIERS = (500, 3000, 10000)
@@ -522,9 +525,10 @@ class HoodExecutor:
             if side == "buy":
                 data, value_wei = self._wrap_buy_multicall(calldata), amount_in_wei
             else:
-                # SELL: approve router for `amount_in_wei` of the ERC-20,
-                # then exactInputSingle.  The approve is a separate tx we
-                # send first; only after it lands do we broadcast the swap.
+                # SELL: approve router, then swap into the router itself
+                # (recipient=ADDRESS_THIS=0x02), then unwrapWETH9 to send
+                # native ETH back to us. This keeps proceeds as native ETH
+                # instead of leaving them locked as WETH ERC-20.
                 approve_rec = await self._ensure_approval(
                     token_addr=input_addr, amount_wei=amount_in_wei,
                 )
@@ -533,7 +537,14 @@ class HoodExecutor:
                     rec.error = f"approve:{approve_rec.error or approve_rec.status}"
                     self._ledger.append(rec)
                     return rec
-                data, value_wei = calldata, 0
+                # Rebuild swap calldata with recipient = ADDRESS_THIS.
+                swap_leg = self._build_exact_input_single(
+                    input_addr, output_addr, best_fee, amount_in_wei, min_out,
+                    recipient=ADDRESS_THIS,
+                )
+                unwrap_leg = self._build_unwrap_weth9(min_out, self.address)
+                data = self._wrap_multicall([swap_leg, unwrap_leg])
+                value_wei = 0
             # 5) Broadcast
             tx_hash = await self._send_tx(
                 to=SWAP_ROUTER02, data=data, value_wei=value_wei,
@@ -563,21 +574,26 @@ class HoodExecutor:
 
     def _build_exact_input_single(self, input_addr: str, output_addr: str,
                                           fee: int, amount_in: int,
-                                          min_out: int) -> bytes:
+                                          min_out: int,
+                                          recipient: Optional[str] = None) -> bytes:
         """SwapRouter02.exactInputSingle(ExactInputSingleParams) selector +
         ABI-encoded params.  ExactInputSingleParams:
             (tokenIn, tokenOut, fee, recipient, amountIn, amountOutMinimum,
              sqrtPriceLimitX96)
-        SwapRouter02 dropped the `deadline` field vs the older v1 router."""
+        SwapRouter02 dropped the `deadline` field vs the older v1 router.
+
+        `recipient` defaults to our address; pass ADDRESS_THIS when the
+        proceeds must stay in the router for a follow-up unwrapWETH9 leg."""
         sel = _selector(
             "exactInputSingle((address,address,uint24,address,uint256,"
             "uint256,uint160))"
         )
         from eth_abi import encode  # type: ignore
+        recip = _to_checksum(recipient) if recipient else _to_checksum(self.address)
         params = encode(
             ["(address,address,uint24,address,uint256,uint256,uint160)"],
             [(_to_checksum(input_addr), _to_checksum(output_addr), fee,
-              _to_checksum(self.address), amount_in, min_out, 0)],
+              recip, amount_in, min_out, 0)],
         )
         return sel + params
 
@@ -587,9 +603,21 @@ class HoodExecutor:
         exactInputSingle.  SwapRouter02.multicall is payable so the ETH
         travels with the tx; the router wraps it to WETH internally
         before invoking the pool."""
+        return self._wrap_multicall([exact_input_calldata])
+
+    def _wrap_multicall(self, legs) -> bytes:
         from eth_abi import encode  # type: ignore
         sel = _selector("multicall(bytes[])")
-        params = encode(["bytes[]"], [[exact_input_calldata]])
+        params = encode(["bytes[]"], [list(legs)])
+        return sel + params
+
+    def _build_unwrap_weth9(self, amount_min: int, recipient: str) -> bytes:
+        """SwapRouter02.unwrapWETH9(uint256 amountMinimum, address recipient)
+        — sweeps all WETH held by the router, unwraps it, and sends native
+        ETH to `recipient`."""
+        sel = _selector("unwrapWETH9(uint256,address)")
+        from eth_abi import encode  # type: ignore
+        params = encode(["uint256", "address"], [amount_min, _to_checksum(recipient)])
         return sel + params
 
 
