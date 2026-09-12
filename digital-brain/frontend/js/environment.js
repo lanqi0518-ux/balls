@@ -177,17 +177,17 @@ export function renderEnvStats(container, envState, brainState) {
       <div class="env-stat-label">CYCLE</div>
       <div class="env-stat-value">${envState.episode}</div>
     </div>
-    <div class="env-stat">
-      <div class="env-stat-label">+ SIGNAL</div>
+    <div class="env-stat env-stat-gain">
+      <div class="env-stat-label">GAIN</div>
       <div class="env-stat-value">${envState.food_eaten}</div>
     </div>
-    <div class="env-stat">
-      <div class="env-stat-label">− SIGNAL</div>
+    <div class="env-stat env-stat-loss">
+      <div class="env-stat-label">LOSS</div>
       <div class="env-stat-value">${envState.hazards_hit}</div>
     </div>
-    <div class="env-stat">
-      <div class="env-stat-label">Σ VALUE</div>
-      <div class="env-stat-value">${rw.toFixed(2)}</div>
+    <div class="env-stat env-stat-equity">
+      <div class="env-stat-label">EQUITY</div>
+      <div class="env-stat-value">${rw >= 0 ? "+" : ""}${rw.toFixed(2)}</div>
     </div>
   `;
 }

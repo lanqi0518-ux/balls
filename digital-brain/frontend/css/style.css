@@ -2326,6 +2326,13 @@ body::after {
   color: var(--text-muted);
 }
 
+/* Trader-terminal tone on the sandbox stat grid: subtle mint for GAIN,
+   subtle rose for LOSS, gold for EQUITY. All numerics only — labels stay
+   uniform-muted so nothing shouts. */
+.env-stat-gain .env-stat-value    { color: var(--gain, #6EE7B7); }
+.env-stat-loss .env-stat-value    { color: var(--loss, #FCA5A5); }
+.env-stat-equity .env-stat-value  { color: var(--gold, #E8D9A6); }
+
 /* --- Footer speed slider polish --- */
 .footer input[type="range"] {
   -webkit-appearance: none;
