@@ -138,6 +138,33 @@ loadKnowledge(knowledgePanel);
 initTrading(tradingPanel, { onCommand: (cmd, extra) => send(cmd, extra) });
 initWebView(webPanel);
 
+// Contract-address copy-to-clipboard on the brand plate.
+(function wireCaCopy() {
+  const btn = document.getElementById("brain-ca-copy");
+  if (!btn) return;
+  btn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    const addr = btn.dataset.ca || "";
+    if (!addr) return;
+    try {
+      await navigator.clipboard.writeText(addr);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = addr; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); } catch {}
+      document.body.removeChild(ta);
+    }
+    const orig = btn.textContent;
+    btn.textContent = "copied";
+    btn.classList.add("copied");
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.classList.remove("copied");
+    }, 1400);
+  });
+})();
+
 detailTabs.addEventListener("click", (e) => {
   const btn = e.target.closest(".tab[data-view]");
   if (!btn) return;

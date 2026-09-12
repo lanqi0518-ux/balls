@@ -356,6 +356,44 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   text-shadow: 0 0 6px rgba(232, 217, 166, 0.4);
   font-weight: 600;
 }
+.brand-plate-ca {
+  color: #6EE7FF;
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 2px 7px;
+  border: 1px solid rgba(110, 231, 255, 0.45);
+  border-radius: 4px;
+  background: rgba(110, 231, 255, 0.06);
+  text-shadow: 0 0 8px rgba(110, 231, 255, 0.35);
+  transition: background 0.15s, border-color 0.15s;
+}
+.brand-plate-ca:hover {
+  background: rgba(110, 231, 255, 0.14);
+  border-color: rgba(110, 231, 255, 0.85);
+}
+.brand-plate-copy {
+  font-family: inherit;
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(200, 220, 255, 0.65);
+  background: transparent;
+  border: 1px solid rgba(200, 220, 255, 0.25);
+  border-radius: 3px;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.brand-plate-copy:hover {
+  color: #6EE7FF;
+  border-color: rgba(110, 231, 255, 0.55);
+}
+.brand-plate-copy.copied {
+  color: #6EE7B7;
+  border-color: rgba(110, 231, 183, 0.7);
+  background: rgba(110, 231, 183, 0.10);
+}
 .brand-plate-sep {
   color: rgba(232, 217, 166, 0.35);
 }
