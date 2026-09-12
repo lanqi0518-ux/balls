@@ -79,24 +79,28 @@ def _env_int(name: str, default: int) -> int:
 class HoodLimits:
     """Hard risk limits on Robinhood-Chain live trades. Small on purpose."""
     # Maximum ETH notional on any single swap. 0.0005 ETH ~ $2 at $4000/ETH.
-    max_trade_eth: float = 0.0005
-    max_hourly_eth: float = 0.002
-    max_daily_eth: float = 0.006
-    max_positions: int = 2
-    min_liquidity_usd: float = 40_000.0
-    max_slippage_bps: int = 500
-    min_confidence: float = 0.75
+    # The user's stance: "the brain decides how to buy, whatever it wants".
+    # We keep only the bare minimums needed so the wallet doesn't brick
+    # itself (gas reserve) or get sandwiched to oblivion (slippage cap).
+    # Confidence, liquidity, per-hour and per-day caps are effectively off.
+    max_trade_eth: float = 0.05      # cap at half the current wallet as a sanity fuse
+    max_hourly_eth: float = 10.0     # effectively off
+    max_daily_eth: float = 100.0     # effectively off
+    max_positions: int = 20          # let the brain diversify freely
+    min_liquidity_usd: float = 1_000.0  # tiny floor to skip zero-liquidity honeypots
+    max_slippage_bps: int = 1500     # 15% — memes on low-liq pools need room
+    min_confidence: float = 0.55     # only skip when the brain itself is unsure
 
     @classmethod
     def from_env(cls) -> "HoodLimits":
         return cls(
-            max_trade_eth=_env_float("LIVE_HOOD_MAX_TRADE_ETH", 0.0005),
-        max_hourly_eth=_env_float("LIVE_HOOD_MAX_HOURLY_ETH", 0.002),
-            max_daily_eth=_env_float("LIVE_HOOD_MAX_DAILY_ETH", 0.006),
-            max_positions=_env_int("LIVE_HOOD_MAX_POSITIONS", 2),
-            min_liquidity_usd=_env_float("LIVE_HOOD_MIN_LIQ_USD", 40_000.0),
-            max_slippage_bps=_env_int("LIVE_HOOD_MAX_SLIPPAGE_BPS", 500),
-            min_confidence=_env_float("LIVE_HOOD_MIN_CONFIDENCE", 0.75),
+            max_trade_eth=_env_float("LIVE_HOOD_MAX_TRADE_ETH", 0.05),
+            max_hourly_eth=_env_float("LIVE_HOOD_MAX_HOURLY_ETH", 10.0),
+            max_daily_eth=_env_float("LIVE_HOOD_MAX_DAILY_ETH", 100.0),
+            max_positions=_env_int("LIVE_HOOD_MAX_POSITIONS", 20),
+            min_liquidity_usd=_env_float("LIVE_HOOD_MIN_LIQ_USD", 1_000.0),
+            max_slippage_bps=_env_int("LIVE_HOOD_MAX_SLIPPAGE_BPS", 1500),
+            min_confidence=_env_float("LIVE_HOOD_MIN_CONFIDENCE", 0.55),
         )
 
 

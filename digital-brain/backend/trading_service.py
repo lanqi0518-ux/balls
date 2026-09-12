@@ -355,11 +355,30 @@ class TradingService:
 
     async def _hood_buy(self, token_addr: str, symbol: str,
                           liquidity_usd: float, confidence: float) -> None:
+        """Let the brain decide the size.  Confidence scales bet size
+        against available balance; we only reserve a small ETH slice for
+        gas so the wallet can always send its own unwrap/sell tx."""
         if self.hood is None:
             return
+        # Reserve enough native ETH for ~50 more txs at typical L2 gas
+        # (each is <0.00003 ETH; 0.002 ETH covers ~65 txs).
+        GAS_RESERVE = 0.002
+        available = max(0.0, float(self.hood.eth_balance) - GAS_RESERVE)
+        # Confidence-scaled position size:
+        #   conf 0.55 → 5% of available
+        #   conf 0.75 → 25%
+        #   conf 0.90 → 60%
+        #   conf 1.00 → 100%
+        c = max(0.0, min(1.0, float(confidence)))
+        size_frac = (c - 0.5) ** 2 * 4.0 if c > 0.5 else 0.02
+        size_eth = min(available * size_frac, self.hood.limits.max_trade_eth)
+        # Floor at 0.0002 ETH so a positive-signal buy is never absurdly small.
+        if 0 < available < 0.0002:
+            return
+        size_eth = max(size_eth, min(0.0002, available))
         rec = await self.hood.buy(
             output_token=token_addr, symbol=symbol,
-            eth_amount=self.hood.limits.max_trade_eth,
+            eth_amount=size_eth,
             liquidity_usd=liquidity_usd, confidence=confidence,
         )
         self._push_hood_event(rec)
@@ -766,7 +785,7 @@ class TradingService:
             # untrained. Fresh pump.fun launches get a stricter gate — the
             # noise floor on brand-new tokens is much higher and rug risk
             # is real, so we demand more conviction before opening.
-            buy_gate = 0.65 if is_fresh else 0.50
+            buy_gate = 0.55 if is_fresh else 0.40
             if action == BUY and conf >= buy_gate:
                 # Paper trader: decision journal. It has its own max_positions
                 # cap; when full it returns None. Live/HOOD executors have
