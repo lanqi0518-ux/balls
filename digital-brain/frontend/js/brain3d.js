@@ -13,6 +13,10 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
 /**
  * Backend region positions are (x, y, z) in a millimetre-ish space where:
@@ -31,8 +35,12 @@ export class BrainScene {
 
     this._initScene();
     this._buildAnatomy();
+    this._buildVasculature();
+    this._buildDustMotes();
+    this._buildAuraShell();
     this._addLights();
     this._addStarfield();
+    this._initPostprocessing();
     this._addInteraction();
     this._resize();
     window.addEventListener("resize", () => this._resize());
@@ -67,16 +75,22 @@ export class BrainScene {
   }
 
   _addLights() {
-    this.scene.add(new THREE.AmbientLight(0x2a3550, 0.75));
-    const key = new THREE.DirectionalLight(0xc0ddff, 0.9);
+    this.scene.add(new THREE.AmbientLight(0x2b3555, 0.55));
+    const key = new THREE.DirectionalLight(0xc9ddff, 1.15);
     key.position.set(200, 320, 220);
     this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0xd8b4fe, 0.4);
+    const rim = new THREE.DirectionalLight(0xf0abfc, 0.65);
     rim.position.set(-220, -140, -110);
     this.scene.add(rim);
-    const bottom = new THREE.DirectionalLight(0x60a5fa, 0.28);
+    const bottom = new THREE.DirectionalLight(0x60a5fa, 0.32);
     bottom.position.set(0, -320, 0);
     this.scene.add(bottom);
+    // Warm point-source planted inside the brain — makes the transmission
+    // material actually glow from within instead of reading as gray glass.
+    const core = new THREE.PointLight(0xffb6e8, 1.3, 220, 1.4);
+    core.position.set(0, -6, 0);
+    this.scene.add(core);
+    this.coreLight = core;
   }
 
   // -----------------------------------------------------------------
@@ -179,15 +193,29 @@ export class BrainScene {
     }
     geo.computeVertexNormals();
 
-    const mat = new THREE.MeshPhongMaterial({
-      color: 0xb8a8c8,
-      emissive: 0x2b1f35,
-      specular: 0x6f5f80,
-      shininess: 28,
+    // Wet-glass cerebrum — physical material with high transmission so
+    // you can see the vessels + region cores glowing through the surface.
+    // Combined with the bloom pass this gives the whole brain a
+    // "holographic organ in a jar" feel.
+    const mat = new THREE.MeshPhysicalMaterial({
+      color: 0xcbb8de,
+      emissive: 0x1c1230,
+      emissiveIntensity: 0.42,
+      roughness: 0.28,
+      metalness: 0.05,
+      transmission: 0.55,      // lets background/vessels bleed through
+      thickness: 4.5,
+      ior: 1.35,
       transparent: true,
-      opacity: 0.30,
+      opacity: 0.55,
       side: THREE.DoubleSide,
-      flatShading: false,
+      clearcoat: 0.6,
+      clearcoatRoughness: 0.25,
+      sheen: 0.8,
+      sheenRoughness: 0.5,
+      sheenColor: new THREE.Color(0xffb1e6),
+      attenuationDistance: 40,
+      attenuationColor: new THREE.Color(0xff9fd6),
     });
     const cerebrum = new THREE.Mesh(geo, mat);
     this.scene.add(cerebrum);
@@ -196,13 +224,54 @@ export class BrainScene {
     // Fine wireframe overlay traces the folds — looks like MRI surface lines.
     const wireGeo = new THREE.EdgesGeometry(geo, 22);
     const wireMat = new THREE.LineBasicMaterial({
-      color: 0x7a6890,
+      color: 0xb98cc6,
       transparent: true,
-      opacity: 0.28,
+      opacity: 0.34,
     });
     const wire = new THREE.LineSegments(wireGeo, wireMat);
     this.scene.add(wire);
     this.cerebrumWireframe = wire;
+
+    // A back-side inner shell painted with a fresnel-emissive shader so
+    // the brain appears lit from inside — a cortical bioluminescence.
+    const innerGeo = geo.clone();
+    const innerMat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      uniforms: {
+        uTime: { value: 0 },
+        uWarm: { value: new THREE.Color(0xff9fd6) },
+        uCool: { value: new THREE.Color(0x6ee7ff) },
+      },
+      vertexShader: `
+        varying vec3 vN;
+        varying vec3 vPos;
+        void main() {
+          vN = normalize(normalMatrix * normal);
+          vPos = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vN;
+        varying vec3 vPos;
+        uniform float uTime;
+        uniform vec3 uWarm;
+        uniform vec3 uCool;
+        void main() {
+          float rim = pow(1.0 - abs(vN.z), 2.2);
+          float pulse = 0.72 + 0.28 * sin(uTime * 0.9 + vPos.y * 0.05);
+          vec3 col = mix(uCool, uWarm, 0.5 + 0.5 * sin(uTime * 0.4 + vPos.x * 0.04));
+          gl_FragColor = vec4(col, rim * pulse * 0.55);
+        }
+      `,
+    });
+    const inner = new THREE.Mesh(innerGeo, innerMat);
+    inner.scale.setScalar(0.985);
+    this.scene.add(inner);
+    this.cerebrumInner = inner;
   }
 
   /**
@@ -339,6 +408,285 @@ export class BrainScene {
   }
 
   // -----------------------------------------------------------------
+  //  Vasculature — Circle of Willis + major cerebral arteries +
+  //                superior sagittal sinus. Rendered as glowing tubes
+  //                with pulsating blood-cell dots traveling along them.
+  //                Anatomical accuracy is stylised — we're not passing
+  //                a neurosurgery board, we're going for MRA-render vibe.
+  // -----------------------------------------------------------------
+
+  _buildVasculature() {
+    this.vesselCurves = [];              // { curve, kind, radius, color }
+    this.vesselPulses = [];              // { curve, mesh, speed, phase, size }
+
+    const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+    // -- ARTERIES (bright rose-red, more prominent) --------------------
+    const arteries = [
+      // Basilar artery — vertical along brainstem, feeding upward.
+      {
+        color: 0xff5675, radius: 0.65, kind: "artery",
+        points: [
+          V( 0, -70, -34), V( 0, -60, -34), V( 0, -50, -34),
+          V( 0, -40, -32), V( 0, -30, -30),
+        ],
+      },
+      // Anterior Cerebral Artery, LEFT — up through the longitudinal fissure.
+      {
+        color: 0xff5675, radius: 0.55, kind: "artery",
+        points: [
+          V( 0, -30, -28), V(-1, -20, -14), V(-1.5, -5, 6),
+          V(-1.8, 12, 30), V(-2.0, 24, 46), V(-2.2, 28, 58),
+        ],
+      },
+      // Anterior Cerebral Artery, RIGHT — mirrored.
+      {
+        color: 0xff5675, radius: 0.55, kind: "artery",
+        points: [
+          V( 0, -30, -28), V( 1, -20, -14), V( 1.5, -5, 6),
+          V( 1.8, 12, 30), V( 2.0, 24, 46), V( 2.2, 28, 58),
+        ],
+      },
+      // Middle Cerebral Artery, LEFT — sweeping laterally over the temporal lobe.
+      {
+        color: 0xff4a72, radius: 0.6, kind: "artery",
+        points: [
+          V( 0, -30, -26), V(-8, -32, -18), V(-18, -30, -6),
+          V(-30, -22,  8), V(-42, -10, 18), V(-48,  4, 24),
+          V(-46, 18, 22),
+        ],
+      },
+      // Middle Cerebral Artery, RIGHT — mirrored.
+      {
+        color: 0xff4a72, radius: 0.6, kind: "artery",
+        points: [
+          V( 0, -30, -26), V( 8, -32, -18), V( 18, -30, -6),
+          V( 30, -22,  8), V( 42, -10, 18), V( 48,  4, 24),
+          V( 46, 18, 22),
+        ],
+      },
+      // Posterior Cerebral Artery, LEFT — wrapping around toward occipital.
+      {
+        color: 0xff5675, radius: 0.5, kind: "artery",
+        points: [
+          V( 0, -30, -30), V(-6, -28, -40), V(-14, -22, -52),
+          V(-22, -10, -60), V(-28,  4, -62), V(-30, 16, -60),
+        ],
+      },
+      // Posterior Cerebral Artery, RIGHT — mirrored.
+      {
+        color: 0xff5675, radius: 0.5, kind: "artery",
+        points: [
+          V( 0, -30, -30), V( 6, -28, -40), V( 14, -22, -52),
+          V( 22, -10, -60), V( 28,  4, -62), V( 30, 16, -60),
+        ],
+      },
+    ];
+
+    // -- VENOUS SINUSES (deeper violet-crimson, thicker) ---------------
+    const veins = [
+      // Superior sagittal sinus — runs along the top midline, front→back.
+      {
+        color: 0x9b3c7b, radius: 0.85, kind: "vein",
+        points: [
+          V( 0, 28, 58), V( 0, 34, 40), V( 0, 38, 20),
+          V( 0, 40, 0), V( 0, 40, -20), V( 0, 36, -40), V( 0, 30, -56),
+        ],
+      },
+      // Transverse sinus, LEFT — wrapping around back-of-head from midline.
+      {
+        color: 0x9b3c7b, radius: 0.75, kind: "vein",
+        points: [
+          V( 0, 30, -56), V(-10, 20, -60), V(-24, 8, -60),
+          V(-34, -6, -54), V(-38, -20, -44),
+        ],
+      },
+      // Transverse sinus, RIGHT — mirrored.
+      {
+        color: 0x9b3c7b, radius: 0.75, kind: "vein",
+        points: [
+          V( 0, 30, -56), V( 10, 20, -60), V( 24, 8, -60),
+          V( 34, -6, -54), V( 38, -20, -44),
+        ],
+      },
+    ];
+
+    const vesselGroup = new THREE.Group();
+    vesselGroup.userData.__vessels = true;
+    this.vesselGroup = vesselGroup;
+    this.scene.add(vesselGroup);
+
+    const addVessel = (v) => {
+      const curve = new THREE.CatmullRomCurve3(v.points, false, "catmullrom", 0.5);
+      const tubeGeo = new THREE.TubeGeometry(curve, 96, v.radius, 10, false);
+      const mat = new THREE.MeshBasicMaterial({
+        color: v.color,
+        transparent: true,
+        opacity: v.kind === "artery" ? 0.78 : 0.55,
+      });
+      const tube = new THREE.Mesh(tubeGeo, mat);
+      vesselGroup.add(tube);
+
+      // Emissive outer sleeve — additive-blended for a hot bloom halo.
+      const haloGeo = new THREE.TubeGeometry(curve, 96, v.radius * 2.6, 10, false);
+      const haloMat = new THREE.MeshBasicMaterial({
+        color: v.color,
+        transparent: true,
+        opacity: v.kind === "artery" ? 0.12 : 0.08,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const halo = new THREE.Mesh(haloGeo, haloMat);
+      vesselGroup.add(halo);
+
+      this.vesselCurves.push({ curve, kind: v.kind, radius: v.radius, color: v.color });
+
+      // Seed 2–4 pulses per vessel — small emissive spheres that will be
+      // ticked along the curve every frame.
+      const N = v.kind === "artery" ? 3 : 2;
+      for (let i = 0; i < N; i++) {
+        const pulseColor = v.kind === "artery" ? 0xffe1ea : 0xf5b6d6;
+        const size = v.radius * (v.kind === "artery" ? 1.7 : 1.4);
+        const geo = new THREE.SphereGeometry(size, 12, 10);
+        const mat = new THREE.MeshBasicMaterial({
+          color: pulseColor,
+          transparent: true,
+          opacity: 0.95,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        vesselGroup.add(mesh);
+        this.vesselPulses.push({
+          curve,
+          mesh,
+          speed: (v.kind === "artery" ? 0.14 : 0.09) + Math.random() * 0.05,
+          phase: i / N + Math.random() * 0.02,
+          size,
+        });
+      }
+    };
+
+    arteries.forEach(addVessel);
+    veins.forEach(addVessel);
+  }
+
+  // Tiny floating "dust motes" — mystical suspended particles that
+  // drift around the whole brain, catching bloom.
+  _buildDustMotes() {
+    const N = 480;
+    const geo = new THREE.BufferGeometry();
+    const positions = new Float32Array(N * 3);
+    const colors = new Float32Array(N * 3);
+    const sizes = new Float32Array(N);
+    const seed = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      // Distribute in a shell around the brain, biased toward the halo zone.
+      const r = 80 + Math.random() * 120;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      positions[i * 3    ] = r * Math.sin(phi) * Math.cos(theta);
+      positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.72;
+      positions[i * 3 + 2] = r * Math.cos(phi);
+      const roll = Math.random();
+      // A few color families so the field feels layered.
+      if (roll < 0.55) {
+        colors[i * 3] = 0.42; colors[i * 3 + 1] = 0.9; colors[i * 3 + 2] = 1.0;   // cyan
+      } else if (roll < 0.82) {
+        colors[i * 3] = 0.94; colors[i * 3 + 1] = 0.67; colors[i * 3 + 2] = 0.99; // magenta
+      } else {
+        colors[i * 3] = 1.0;  colors[i * 3 + 1] = 0.86; colors[i * 3 + 2] = 0.68; // gold
+      }
+      sizes[i] = 0.9 + Math.random() * 1.6;
+      seed[i] = Math.random() * Math.PI * 2;
+    }
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute("color",    new THREE.BufferAttribute(colors, 3));
+    geo.setAttribute("size",     new THREE.BufferAttribute(sizes, 1));
+    const mat = new THREE.PointsMaterial({
+      vertexColors: true,
+      size: 1.6,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.82,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const dust = new THREE.Points(geo, mat);
+    dust.userData.__seed = seed;
+    this.dustMotes = dust;
+    this.scene.add(dust);
+  }
+
+  // A big, faintly-glowing aura sphere behind the brain — becomes the
+  // "halo" that bloom lights up around the whole cortex.
+  _buildAuraShell() {
+    const geo = new THREE.SphereGeometry(120, 48, 32);
+    const mat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      uniforms: {
+        uTime: { value: 0 },
+        uColorA: { value: new THREE.Color(0x6ee7ff) },
+        uColorB: { value: new THREE.Color(0xf0abfc) },
+        uColorC: { value: new THREE.Color(0xffd28a) },
+      },
+      vertexShader: `
+        varying vec3 vNormal;
+        varying vec3 vPos;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          vPos = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vNormal;
+        varying vec3 vPos;
+        uniform float uTime;
+        uniform vec3 uColorA;
+        uniform vec3 uColorB;
+        uniform vec3 uColorC;
+        void main() {
+          float lat = normalize(vPos).y;
+          float lon = atan(vPos.z, vPos.x);
+          float band1 = sin(lat * 3.2 + uTime * 0.15) * 0.5 + 0.5;
+          float band2 = sin(lon * 2.0 + uTime * 0.10) * 0.5 + 0.5;
+          vec3 mixCol = mix(uColorA, uColorB, band1);
+          mixCol = mix(mixCol, uColorC, band2 * 0.35);
+          float rim = pow(1.0 - abs(vNormal.z), 1.4);
+          gl_FragColor = vec4(mixCol, rim * 0.28);
+        }
+      `,
+    });
+    const aura = new THREE.Mesh(geo, mat);
+    this.auraShell = aura;
+    this.scene.add(aura);
+  }
+
+  _initPostprocessing() {
+    // EffectComposer chain: render → strong bloom → output tone-mapping.
+    // This is what makes the vessels + region cores actually feel magical
+    // instead of just "colored spheres in the dark".
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+
+    const w = this.container.clientWidth || 800;
+    const h = this.container.clientHeight || 600;
+    this.bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(w, h),
+      /* strength */  0.95,
+      /* radius   */  0.85,
+      /* threshold*/  0.12,
+    );
+    this.composer.addPass(this.bloomPass);
+    this.composer.addPass(new OutputPass());
+  }
+
+  // -----------------------------------------------------------------
   //  Region markers (one glowing sphere per BrainRegion)
   // -----------------------------------------------------------------
 
@@ -370,22 +718,26 @@ export class BrainScene {
 
   _addRegion(meta) {
     const color = new THREE.Color(meta.color);
+    // Bloom-friendly amplified color for the emissive core — passing a
+    // >1.0 value to MeshBasicMaterial doesn't work, so we push the hue
+    // toward white/saturated to guarantee the threshold catches it.
+    const hot = color.clone().lerp(new THREE.Color(0xffffff), 0.25);
     const scenePos = this._backendToScene(meta.position);
 
     const baseSize = 10;
     const coreGeo = new THREE.SphereGeometry(baseSize, 24, 20);
     const coreMat = new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity: 0.9,
+      color: hot, transparent: true, opacity: 1.0,
     });
     const core = new THREE.Mesh(coreGeo, coreMat);
 
     const glowGeo = new THREE.SphereGeometry(baseSize, 24, 20);
     const glowMat = new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity: 0.2,
+      color, transparent: true, opacity: 0.35,
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
     const glow = new THREE.Mesh(glowGeo, glowMat);
-    glow.scale.setScalar(2.2);
+    glow.scale.setScalar(2.6);
 
     const group = new THREE.Group();
     group.add(glow);
@@ -550,18 +902,66 @@ export class BrainScene {
     this.renderer.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    if (this.composer) this.composer.setSize(w, h);
+    if (this.bloomPass) this.bloomPass.setSize(w, h);
   }
 
   _animate() {
     requestAnimationFrame(() => this._animate());
+    const t = performance.now() * 0.001;
+
     for (const entry of this.regions.values()) {
       entry.pulseCurrent += (entry.pulseTarget - entry.pulseCurrent) * 0.15;
-      const t = performance.now() * 0.001;
       const baseScale = entry.core.scale.x || 1;
       const wobble = 1 + entry.pulseCurrent * 0.08 * Math.sin(t * (2 + entry.pulseCurrent * 3));
       entry.glow.scale.setScalar((baseScale * 2.3) * wobble);
     }
+
+    // Blood-cell pulses stream along vessels. Speed constant per-pulse;
+    // phase wraps every ~7 s so pulses feel like a heart-driven pump.
+    if (this.vesselPulses) {
+      for (const p of this.vesselPulses) {
+        p.phase = (p.phase + p.speed * 0.006) % 1;
+        const pt = p.curve.getPoint(p.phase);
+        p.mesh.position.copy(pt);
+        const throb = 0.85 + 0.35 * Math.sin(t * 4 + p.phase * 6.28);
+        p.mesh.scale.setScalar(throb);
+        p.mesh.material.opacity = 0.75 + 0.2 * Math.sin(t * 3 + p.phase * 5.0);
+      }
+    }
+
+    // Aura shell drifts in color with time.
+    if (this.auraShell) {
+      this.auraShell.material.uniforms.uTime.value = t;
+      this.auraShell.rotation.y = t * 0.03;
+    }
+    if (this.cerebrumInner) {
+      this.cerebrumInner.material.uniforms.uTime.value = t;
+    }
+
+    // Dust motes gently orbit and pulse in brightness so the whole space
+    // feels alive — not just the brain surface.
+    if (this.dustMotes) {
+      this.dustMotes.rotation.y = t * 0.02;
+      this.dustMotes.rotation.x = Math.sin(t * 0.05) * 0.05;
+      this.dustMotes.material.opacity = 0.68 + 0.18 * Math.sin(t * 0.6);
+    }
+
+    // Cerebrum breathes ever so slightly with the collective activation.
+    if (this.cerebrum) {
+      let mean = 0.4;
+      let n = 0;
+      for (const e of this.regions.values()) { mean += e.pulseCurrent; n++; }
+      if (n) mean = mean / (n + 1);
+      const breathe = 1 + 0.008 * Math.sin(t * 1.2) + mean * 0.02;
+      this.cerebrum.scale.setScalar(breathe);
+    }
+
     this.controls.update();
-    this.renderer.render(this.scene, this.camera);
+    if (this.composer) {
+      this.composer.render();
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 }

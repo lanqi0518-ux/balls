@@ -579,14 +579,82 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   min-height: 0;
   border-radius: var(--r-md);
   background:
-    radial-gradient(ellipse at 50% 100%, rgba(110, 231, 255, 0.08), transparent 60%),
-    linear-gradient(180deg, rgba(5, 7, 18, 0.7) 0%, rgba(10, 15, 28, 0.7) 100%);
+    radial-gradient(circle at 30% 25%, rgba(240, 171, 252, 0.16), transparent 55%),
+    radial-gradient(circle at 72% 78%, rgba(110, 231, 255, 0.16), transparent 55%),
+    radial-gradient(ellipse at 50% 100%, rgba(255, 145, 197, 0.10), transparent 65%),
+    linear-gradient(180deg, rgba(4, 5, 12, 0.92) 0%, rgba(9, 6, 22, 0.9) 100%);
   position: relative;
   overflow: hidden;
   cursor: grab;
   border: 1px solid var(--border);
+  box-shadow:
+    inset 0 0 90px -20px rgba(200, 150, 240, 0.12),
+    inset 0 0 22px -6px rgba(110, 231, 255, 0.08);
 }
 #brain3d:active { cursor: grabbing; }
+
+/* Fomofly-style specimen header + figcaption around the brain viz.
+   Small caps, monospaced numerics, hairline dividers. Reads like a
+   scientific plate rather than a control panel. */
+.specimen-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 10px 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+}
+.specimen-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+.specimen-meta-label {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.specimen-meta-stat {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+}
+.specimen-meta-decision {
+  color: rgba(240, 171, 252, 0.85);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.brain-figcaption {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 10px;
+  padding: 9px 10px 4px;
+  margin-top: 6px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.figcaption-idx {
+  color: var(--gold-strong, #FDE68A);
+  letter-spacing: 0.14em;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 10px;
+  padding-top: 2px;
+}
+.figcaption-text {
+  font-family: "Inter", sans-serif;
+  color: rgba(200, 205, 220, 0.72);
+}
+.figcaption-text em {
+  color: rgba(240, 171, 252, 0.9);
+  font-style: normal;
+}
 
 .brain-tooltip {
   position: absolute;

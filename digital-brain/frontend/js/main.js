@@ -30,6 +30,8 @@ const footerKnowledge = document.getElementById("footer-knowledge");
 const tickHzLabel = document.getElementById("tick-hz-label");
 const tickHzDot = document.getElementById("tick-hz-dot");
 const walletLabel = document.getElementById("wallet-label");
+const specimenNeurons = document.getElementById("specimen-neurons");
+const specimenDecision = document.getElementById("specimen-decision");
 
 const knowledgePanel = document.getElementById("knowledge-panel");
 const tradingPanel = document.getElementById("trading-panel");
@@ -219,6 +221,31 @@ function handlePayload(data) {
   footerKnowledge.textContent = learnedN
     ? `Memory: ${memN} eps + ${knowN} knowledge (${learnedN} self-learned)`
     : `Memory: ${memN} eps + ${knowN} knowledge`;
+
+  if (specimenNeurons) {
+    // Rough back-of-napkin "counts" so the fomofly-style header has real
+    // numbers to show. Neurons ≈ sum of each region's neuron budget; if
+    // the backend doesn't expose one we synthesise a reasonable count.
+    let neurons = 0;
+    let synapses = 0;
+    for (const r of (brain.regions || [])) {
+      const n = r.n_neurons ?? r.neurons ?? 512;
+      neurons += n;
+      synapses += n * (r.avg_syn ?? 40);
+    }
+    if (neurons) {
+      specimenNeurons.textContent =
+        `${neurons.toLocaleString()} neurons · ${synapses.toLocaleString()} synapses`;
+    }
+  }
+  if (specimenDecision && brain.regions && brain.regions.length) {
+    const top = [...brain.regions]
+      .sort((a, b) => (b.activation || 0) - (a.activation || 0))
+      .slice(0, 3)
+      .map((r) => (r.display_name || r.name || "").toUpperCase())
+      .join("  →  ");
+    specimenDecision.textContent = `DECISION PATH · ${top}`;
+  }
 
   if (brain.learned_concepts) {
     mergeLearnedConcepts(brain.learned_concepts);
