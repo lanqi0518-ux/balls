@@ -1,0 +1,18 @@
+# Everything except .next/{standalone,static} + public + package files.
+# We ship pre-built standalone output (see Dockerfile.prebuilt) because
+# Fly's Depot builder currently compiles our marketing root route to a
+# near-empty client bundle. Local build → COPY → run stays reliable.
+node_modules
+npm-debug.log
+.env
+.env.local
+.env*.local
+.git
+.gitignore
+README.md
+Dockerfile
+.dockerignore
+.vscode
+.idea
+coverage
+*.log

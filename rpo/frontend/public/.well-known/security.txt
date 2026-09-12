@@ -1,0 +1,4 @@
+Contact: https://github.com/lanqi0518-ux/balls/security/advisories/new
+Preferred-Languages: en
+Policy: https://github.com/lanqi0518-ux/balls/blob/main/SECURITY.md
+Expires: 2027-01-01T00:00:00.000Z

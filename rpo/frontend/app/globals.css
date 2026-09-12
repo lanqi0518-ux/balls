@@ -1,0 +1,254 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --paper: #ffffff;
+  --paper-100: #faf9f5;
+  --paper-200: #f5f3ec;
+  --ink: #0a0a0a;
+  --line: rgba(10, 10, 10, 0.08);
+}
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: #0a0a0a;
+  color: #ffffff;
+}
+
+/* Continuous animations — hint the browser to promote them to their own
+   compositor layer so the CPU/GPU doesn't re-rasterize every frame. */
+.animate-float,
+.animate-float-slow,
+.animate-marquee,
+.animate-spin-slow {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Reduced-motion: honor user preference AND kill continuous CSS animations */
+/*  on any device where the user hasn't opted in. Keeps decorative motion    */
+/*  when explicitly enabled, but never burns compositor cycles by default    */
+/*  on visitors who don't need it.                                           */
+/* -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  .container-tight {
+    @apply mx-auto max-w-6xl px-5 lg:px-8;
+  }
+  .container-wide {
+    @apply mx-auto max-w-7xl px-5 lg:px-8;
+  }
+  .container-copy {
+    @apply mx-auto max-w-3xl px-5 lg:px-8;
+  }
+
+  .section {
+    @apply py-24 lg:py-36;
+    /* Skip paint/layout when the section is far off-screen.
+       Massive win for long marketing pages — the browser doesn't
+       render sections it can't see. */
+    content-visibility: auto;
+    contain-intrinsic-size: 800px;
+  }
+  .section-tight {
+    @apply py-16 lg:py-24;
+    content-visibility: auto;
+    contain-intrinsic-size: 500px;
+  }
+
+  /* Cards on white — subtle inset border + soft outer shadow */
+  .card {
+    @apply relative bg-white rounded-3xl border border-line;
+  }
+  .card-soft {
+    @apply relative bg-white rounded-3xl shadow-soft border border-line;
+  }
+  .card-hover {
+    @apply relative bg-white rounded-3xl border border-line transition-all duration-300 hover:shadow-card hover:-translate-y-0.5;
+  }
+  .card-floating {
+    @apply relative bg-white rounded-3xl border border-line shadow-floating;
+  }
+  .card-ivory {
+    @apply relative bg-paper-100 rounded-3xl border border-line;
+  }
+  .card-dark {
+    @apply relative bg-ink-900 rounded-3xl text-white border border-black/60;
+  }
+
+  /* Buttons — dark ink primary on white */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed select-none;
+  }
+  .btn-primary {
+    @apply btn bg-ink-900 hover:bg-ink-800 text-white rounded-full px-5 py-2.5 shadow-soft hover:shadow-card;
+  }
+  .btn-forest {
+    @apply btn bg-forest-500 hover:bg-forest-600 text-white rounded-full px-5 py-2.5 shadow-soft hover:shadow-card;
+  }
+  .btn-secondary {
+    @apply btn bg-paper-100 hover:bg-paper-200 text-ink-900 border border-line rounded-full px-5 py-2.5;
+  }
+  .btn-outline {
+    @apply btn border border-line-strong hover:border-ink-900 text-ink-900 rounded-full px-5 py-2.5 bg-transparent hover:bg-paper-100;
+  }
+  .btn-ghost {
+    @apply btn text-ink-500 hover:text-ink-900 rounded-full px-4 py-2;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs text-ink-500 bg-white;
+  }
+  .badge-forest {
+    @apply badge bg-forest-50 border-forest-200 text-forest-500;
+  }
+  .badge-peach {
+    @apply badge bg-peach-50 border-peach-200 text-peach-600;
+  }
+  .badge-dark {
+    @apply badge bg-ink-900 border-ink-900 text-white;
+  }
+
+  .link {
+    @apply text-ink-500 hover:text-ink-900 transition-colors;
+  }
+
+  .kbd {
+    @apply inline-flex items-center rounded border border-line-strong bg-white px-1.5 py-0.5 text-[10px] font-mono text-ink-500;
+  }
+
+  .divider {
+    @apply h-px w-full bg-line;
+  }
+
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-ink-500 font-medium;
+  }
+
+  .eyebrow-dark {
+    @apply inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-white/70 font-medium;
+  }
+
+  .prose-editorial {
+    @apply text-ink-600 leading-relaxed [&>p]:mb-4 [&>h2]:font-display [&>h2]:text-3xl [&>h2]:text-ink-900 [&>h2]:mt-14 [&>h2]:mb-4 [&>h3]:text-xl [&>h3]:text-ink-900 [&>h3]:mt-8 [&>h3]:mb-3 [&>ul]:list-disc [&>ul]:pl-6 [&>ul]:mb-4 [&>li]:mb-1 [&_a]:text-forest-500 [&_a:hover]:underline [&_code]:font-mono [&_code]:text-forest-500 [&_code]:bg-paper-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-[0.9em];
+  }
+}
+
+/* 3D perspective helper */
+.perspective-1200 {
+  perspective: 1200px;
+}
+.perspective-2000 {
+  perspective: 2000px;
+}
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+/* Soft paper grain */
+.paper-grain {
+  background-image: var(--paper-grain, url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.035 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"));
+}
+
+/* Subtle grid backdrop for hero */
+.grid-bg {
+  background-image: linear-gradient(
+      to right,
+      rgba(10, 10, 10, 0.04) 1px,
+      transparent 1px
+    ),
+    linear-gradient(to bottom, rgba(10, 10, 10, 0.04) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(
+    ellipse 60% 45% at 50% 40%,
+    black 40%,
+    transparent 100%
+  );
+}
+
+/* Dot pattern for section dividers */
+.dot-bg {
+  background-image: radial-gradient(rgba(10, 10, 10, 0.10) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Marquee track (used by <Marquee>) */
+.marquee-track {
+  animation: marquee 40s linear infinite;
+}
+
+/* Scrollbar — thin, matches paper */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #ffffff;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(10, 10, 10, 0.14);
+  border-radius: 8px;
+  border: 2px solid #ffffff;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(10, 10, 10, 0.24);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* CodeBlock syntax highlighting.
+   Tokens produced by /components/ui/CodeBlock.tsx. Rendered on the
+   dark #0A0A0A backdrop; colors chosen to match the RPO palette. */
+.hl-kw   { color: #FF8A5C; }             /* peach-400 · keywords */
+.hl-type { color: #7EC59A; }             /* forest-300 · types  */
+.hl-id   { color: #E5E5EA; }             /* base identifiers    */
+.hl-str  { color: #FFC6A9; }             /* peach-200 · strings */
+.hl-num  { color: #FFA37A; }             /* peach-300 · numbers */
+.hl-com  { color: #6D7078; font-style: italic; } /* dimmed comment */
+.hl-op   { color: #B0B4BB; }
+.hl-var  { color: #7EC59A; }
+.hl-val  { color: #FFC6A9; }
+.not-prose pre code { background: transparent !important; padding: 0 !important; border: 0 !important; color: inherit !important; }
