@@ -418,6 +418,14 @@ export class BrainScene {
   _buildVasculature() {
     this.vesselCurves = [];              // { curve, kind, radius, color }
     this.vesselPulses = [];              // { curve, mesh, speed, phase, size }
+    /**
+     * Per-vessel handles so we can animate each tube's brightness with
+     * its own systolic wave.  Every vessel gets a random phase offset so
+     * the whole tree pulses organically rather than in lock-step.
+     *   { core, halo1, halo2, baseCoreOp, baseHalo1Op, baseHalo2Op,
+     *     phase, kind, color, wavePos, waveActive, curve }
+     */
+    this.vesselShells = [];
 
     const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -543,36 +551,36 @@ export class BrainScene {
       const curve = new THREE.CatmullRomCurve3(v.points, false, "catmullrom", 0.5);
       // Effective radius: arteries thicker + more visible than veins.
       const R = v.radius * (v.kind === "artery" ? 1.8 : 1.7);
-      // Inner opaque core — the actual vessel body.
+      const baseCoreOp  = v.kind === "artery" ? 0.92 : 0.72;
+      const baseHalo1Op = v.kind === "artery" ? 0.28 : 0.18;
+      const baseHalo2Op = v.kind === "artery" ? 0.08 : 0.05;
+
       const tubeGeo = new THREE.TubeGeometry(curve, 128, R, 12, false);
       const mat = new THREE.MeshBasicMaterial({
         color: v.color,
         transparent: true,
-        opacity: v.kind === "artery" ? 0.92 : 0.72,
+        opacity: baseCoreOp,
       });
       const tube = new THREE.Mesh(tubeGeo, mat);
       tube.renderOrder = 2;
       vesselGroup.add(tube);
 
-      // Emissive middle sleeve — additive-blended for a warm halo (this
-      // is what bloom will pick up and turn into a soft red glow).
       const halo1 = new THREE.Mesh(
         new THREE.TubeGeometry(curve, 128, R * 2.2, 12, false),
         new THREE.MeshBasicMaterial({
           color: v.color, transparent: true,
-          opacity: v.kind === "artery" ? 0.28 : 0.18,
+          opacity: baseHalo1Op,
           blending: THREE.AdditiveBlending, depthWrite: false,
         }),
       );
       halo1.renderOrder = 1;
       vesselGroup.add(halo1);
 
-      // Outer soft glow — very wide, low opacity for atmospheric bleed.
       const halo2 = new THREE.Mesh(
         new THREE.TubeGeometry(curve, 96, R * 4.5, 8, false),
         new THREE.MeshBasicMaterial({
           color: v.color, transparent: true,
-          opacity: v.kind === "artery" ? 0.08 : 0.05,
+          opacity: baseHalo2Op,
           blending: THREE.AdditiveBlending, depthWrite: false,
         }),
       );
@@ -580,11 +588,20 @@ export class BrainScene {
       vesselGroup.add(halo2);
 
       this.vesselCurves.push({ curve, kind: v.kind, radius: R, color: v.color });
+      this.vesselShells.push({
+        core: tube, halo1, halo2,
+        baseCoreOp, baseHalo1Op, baseHalo2Op,
+        phase: Math.random() * Math.PI * 2,
+        kind: v.kind,
+        color: v.color,
+        curve,
+        // Per-vessel randomized systolic bias so no two beats overlap perfectly.
+        heartOffset: Math.random() * 0.4,
+      });
 
-      // Seed 3–5 pulses per vessel — hot bright emissive spheres that
-      // travel along the curve. These are what the eye reads as "living
-      // blood cells being pumped through arteries."
-      const N = v.kind === "artery" ? 4 : 2;
+      // Seed pulses per vessel — hot bright emissive spheres that
+      // travel along the curve. These are the visible blood cells.
+      const N = v.kind === "artery" ? 5 : 3;
       for (let i = 0; i < N; i++) {
         const pulseColor = v.kind === "artery" ? 0xfff0f5 : 0xffcce6;
         const size = R * (v.kind === "artery" ? 1.9 : 1.5);
@@ -602,9 +619,40 @@ export class BrainScene {
         this.vesselPulses.push({
           curve,
           mesh,
-          speed: (v.kind === "artery" ? 0.16 : 0.10) + Math.random() * 0.05,
+          baseSpeed: (v.kind === "artery" ? 0.16 : 0.10) + Math.random() * 0.05,
           phase: i / N + Math.random() * 0.02,
           size,
+          kind: v.kind,
+        });
+      }
+
+      // Systolic waves — larger, brighter blooms that fire from the
+      // start of each vessel at heartbeat intervals and race down its
+      // length.  These carry the felt "beat" of thinking.  Each vessel
+      // gets a small pool; only one is visible at a time (opacity=0 else).
+      const WAVE_POOL = v.kind === "artery" ? 2 : 1;
+      for (let i = 0; i < WAVE_POOL; i++) {
+        const waveSize = R * (v.kind === "artery" ? 3.2 : 2.4);
+        const geo = new THREE.SphereGeometry(waveSize, 18, 14);
+        const mat = new THREE.MeshBasicMaterial({
+          color: v.kind === "artery" ? 0xffffff : 0xffdae8,
+          transparent: true,
+          opacity: 0,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.renderOrder = 4;
+        vesselGroup.add(mesh);
+        this.vesselWaves = this.vesselWaves || [];
+        this.vesselWaves.push({
+          curve,
+          mesh,
+          waveSize,
+          kind: v.kind,
+          progress: 1,     // start "done" so it doesn't fire immediately
+          nextFireAt: 0.4 + Math.random() * 1.8,
+          duration: v.kind === "artery" ? 0.9 : 1.3,
         });
       }
     };
@@ -747,6 +795,8 @@ export class BrainScene {
   }
 
   updateRegions(regionStates) {
+    let sumAct = 0;
+    let nAct = 0;
     for (const r of regionStates) {
       if (!this.regions.has(r.name)) {
         this._addRegion(r);
@@ -762,8 +812,26 @@ export class BrainScene {
       entry.glow.material.opacity = 0.20 + r.activation * 0.35;
       entry.glow.scale.setScalar((size * 2.2) / entry.baseSize);
       entry.pulseTarget = r.activation;
+      sumAct += r.activation;
+      nAct++;
     }
     this._updateLegend(regionStates);
+
+    // Fallback engagement drive when the backend hasn't published a
+    // `engagement` scalar of its own — use mean cortical activation.
+    if (this.engagement == null && nAct > 0) {
+      this._engagementFromRegions = sumAct / nAct;
+    }
+  }
+
+  /** Drive the vessel heartbeat externally.  `x` is a 0..1 "thinking
+   *  intensity" scalar (typically brain.engagement from the backend). */
+  setEngagement(x) {
+    if (!Number.isFinite(x)) return;
+    x = Math.max(0, Math.min(1, x));
+    // Smooth EMA so the pulse doesn't twitch on every tick.
+    if (this.engagement == null) this.engagement = x;
+    this.engagement += (x - this.engagement) * 0.12;
   }
 
   _addRegion(meta) {
@@ -968,16 +1036,77 @@ export class BrainScene {
       entry.glow.scale.setScalar((baseScale * 2.3) * wobble);
     }
 
-    // Blood-cell pulses stream along vessels. Speed constant per-pulse;
-    // phase wraps every ~7 s so pulses feel like a heart-driven pump.
+    // ---- Vasculature is ALIVE.  Every vessel visibly pulsates. ----
+    // Brain engagement (0..1, set from outside via setEngagement) drives
+    // the heart rate: idle brain -> ~55 bpm feel, thinking hard -> ~110.
+    const eng = this.engagement != null
+        ? this.engagement
+        : (this._engagementFromRegions ?? 0.5);
+    const heartHz = 0.9 + eng * 1.4;          // ~0.9-2.3 Hz systole
+    const dt = (this._lastFrameT != null) ? Math.min(0.1, t - this._lastFrameT) : 0.016;
+    this._lastFrameT = t;
+
+    // Per-vessel systolic modulation of core + halos.  Every vessel
+    // breathes at heartHz + its own phase offset so the whole tree
+    // reads as an organic vascular tree, not a synchronised light show.
+    if (this.vesselShells) {
+      const twoPi = Math.PI * 2;
+      for (const s of this.vesselShells) {
+        // sinusoidal pulse rectified into [0..1]
+        const raw = Math.sin(t * heartHz * twoPi + s.phase);
+        const pulse = Math.max(0, raw);
+        // Extra emphasis on the SYSTOLIC half — pulse^2 sharpens the beat.
+        const beat = pulse * pulse;
+        const swing = 0.55 + 0.9 * eng;       // how loud the beat is
+        s.core.material.opacity  = Math.min(1, s.baseCoreOp  * (1 + beat * 0.35 * swing));
+        s.halo1.material.opacity = Math.min(1, s.baseHalo1Op * (1 + beat * 1.9  * swing));
+        s.halo2.material.opacity = Math.min(1, s.baseHalo2Op * (1 + beat * 2.5  * swing));
+        // Subtle thickness bloom so the halo LOOKS to expand with each beat.
+        const grow = 1 + beat * 0.18 * swing;
+        s.halo1.scale.setScalar(grow);
+        s.halo2.scale.setScalar(1 + beat * 0.28 * swing);
+      }
+    }
+
+    // Traveling blood cells: speed is a base + heart-rate boost.
     if (this.vesselPulses) {
       for (const p of this.vesselPulses) {
-        p.phase = (p.phase + p.speed * 0.006) % 1;
+        const spd = p.baseSpeed * (0.7 + eng * 1.2);
+        p.phase = (p.phase + spd * 0.006) % 1;
         const pt = p.curve.getPoint(p.phase);
         p.mesh.position.copy(pt);
-        const throb = 0.85 + 0.35 * Math.sin(t * 4 + p.phase * 6.28);
+        const throb = 0.85 + 0.35 * Math.sin(t * (4 + eng * 3) + p.phase * 6.28);
         p.mesh.scale.setScalar(throb);
         p.mesh.material.opacity = 0.75 + 0.2 * Math.sin(t * 3 + p.phase * 5.0);
+      }
+    }
+
+    // Systolic waves: bright blobs that fire at the start of each vessel
+    // in rhythm with the heart, then race along the curve.  This is what
+    // sells the "血管在思考时候的律动" — every vessel visibly beats.
+    if (this.vesselWaves) {
+      // Approx how long between beats.  eng=0 -> 1.1s, eng=1 -> ~0.45s.
+      const beatInterval = 0.6 + (1 - eng) * 0.9;
+      for (const w of this.vesselWaves) {
+        if (w.progress >= 1) {
+          w.nextFireAt -= dt;
+          if (w.nextFireAt <= 0) {
+            w.progress = 0;
+            w.nextFireAt = beatInterval * (0.85 + Math.random() * 0.4);
+          }
+          w.mesh.material.opacity = 0;
+        } else {
+          const durScaled = w.duration * (0.6 + (1 - eng) * 0.8);
+          w.progress = Math.min(1, w.progress + dt / durScaled);
+          const pt = w.curve.getPoint(w.progress);
+          w.mesh.position.copy(pt);
+          // Envelope: fast rise, gentle tail — mimics blood-pressure wave
+          const env = w.progress < 0.15
+              ? w.progress / 0.15
+              : Math.pow(1 - (w.progress - 0.15) / 0.85, 1.5);
+          w.mesh.material.opacity = env * (w.kind === "artery" ? 0.95 : 0.55);
+          w.mesh.scale.setScalar(0.7 + env * 1.6);
+        }
       }
     }
 

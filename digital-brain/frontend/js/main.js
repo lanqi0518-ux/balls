@@ -298,6 +298,17 @@ function handlePayload(data) {
   }
 
   brainScene.updateRegions(brain.regions);
+  // Drive the vessel heartbeat from the brain's live engagement signal.
+  // Falls back to tick_hz-derived proxy when engagement isn't published.
+  let engagementForVessels = null;
+  if (typeof brain.engagement === "number") {
+    engagementForVessels = brain.engagement;
+  } else if (typeof data.tick_hz === "number") {
+    engagementForVessels = Math.max(0, Math.min(1, (data.tick_hz - 2.5) / 8.5));
+  }
+  if (engagementForVessels != null) {
+    brainScene.setEngagement(engagementForVessels);
+  }
   envView.update(env);
   renderEnvStats(envStatsEl, env, brain);
   thoughtStream.addFromSnapshot(brain.thoughts);
