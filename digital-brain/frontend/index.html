@@ -219,21 +219,17 @@
       <div id="thought-stream" class="thought-stream"></div>
     </section>
 
-    <!-- LEFT-BOTTOM: ENVIRONMENT (small) -->
+    <!-- LEFT-BOTTOM: EMBODIMENT (sensorimotor sandbox) -->
     <section class="panel panel-env">
       <div class="panel-title">
-        <h2><span class="panel-title-idx">02</span>Body · gridworld</h2>
-        <div class="hint">
-          <span class="tag tag-food">food +1</span>
-          <span class="tag tag-hazard">hazard −1</span>
-        </div>
+        <h2><span class="panel-title-idx">02</span>Sensorimotor sandbox</h2>
+        <span class="hint mono">
+          <svg class="hint-icon"><use href="#icon-pulse"/></svg>
+          live embodiment
+        </span>
       </div>
       <div class="env-wrap">
         <canvas id="env-canvas" width="360" height="360"></canvas>
-      </div>
-      <div class="env-actions">
-        <button class="btn btn-mini" id="btn-poke-food">+ food</button>
-        <button class="btn btn-mini" id="btn-poke-hazard">+ hazard</button>
       </div>
       <div class="env-stats" id="env-stats"></div>
     </section>

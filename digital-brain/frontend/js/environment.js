@@ -172,23 +172,22 @@ export class EnvironmentView {
 export function renderEnvStats(container, envState, brainState) {
   if (!envState) return;
   const rw = brainState?.reward_stats?.cumulative_reward ?? 0;
-  const rwCls = rw > 0 ? "good" : (rw < 0 ? "bad" : "");
   container.innerHTML = `
     <div class="env-stat">
-      <div class="env-stat-label">EPISODE</div>
+      <div class="env-stat-label">CYCLE</div>
       <div class="env-stat-value">${envState.episode}</div>
     </div>
     <div class="env-stat">
-      <div class="env-stat-label">FOOD ATE</div>
-      <div class="env-stat-value good">${envState.food_eaten}</div>
+      <div class="env-stat-label">+ SIGNAL</div>
+      <div class="env-stat-value">${envState.food_eaten}</div>
     </div>
     <div class="env-stat">
-      <div class="env-stat-label">HAZARDS HIT</div>
-      <div class="env-stat-value bad">${envState.hazards_hit}</div>
+      <div class="env-stat-label">− SIGNAL</div>
+      <div class="env-stat-value">${envState.hazards_hit}</div>
     </div>
     <div class="env-stat">
-      <div class="env-stat-label">Σ REWARD</div>
-      <div class="env-stat-value ${rwCls}">${rw.toFixed(2)}</div>
+      <div class="env-stat-label">Σ VALUE</div>
+      <div class="env-stat-value">${rw.toFixed(2)}</div>
     </div>
   `;
 }

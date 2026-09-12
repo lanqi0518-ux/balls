@@ -27,8 +27,6 @@ const rewardLabel = document.getElementById("reward-label");
 const modeBadge = document.getElementById("mode-badge");
 const modeLabel = document.getElementById("mode-label");
 const footerKnowledge = document.getElementById("footer-knowledge");
-const btnPokeFood = document.getElementById("btn-poke-food");
-const btnPokeHazard = document.getElementById("btn-poke-hazard");
 const tickHzInput = document.getElementById("tick-hz");
 const tickHzLabel = document.getElementById("tick-hz-label");
 
@@ -701,10 +699,7 @@ function escapeHtml(s) {
 // ---------- Controls ----------
 // No pause / reset-brain buttons on purpose: the brain runs forever and
 // keeps every neuron weight, every memory, every learned trade. The only
-// user-facing knobs are: poke food/hazards, and tick speed.
-// Learning is uninterrupted.
-btnPokeFood.addEventListener("click", () => send("poke_food"));
-btnPokeHazard.addEventListener("click", () => send("poke_hazard"));
+// user-facing knob is the tick speed. Learning is uninterrupted.
 tickHzInput.addEventListener("input", (e) => {
   const hz = parseInt(e.target.value, 10);
   tickHzLabel.textContent = `${hz} Hz`;
