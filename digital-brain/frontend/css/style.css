@@ -2310,11 +2310,11 @@ body::after {
 #env-canvas {
   border-radius: var(--r-sm);
   display: block;
-  width: 100%;
-  height: auto;
   aspect-ratio: 1 / 1;
-  max-height: 360px;
-  max-width: 360px;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
   margin: 0 auto;
 }
 .env-stats {
