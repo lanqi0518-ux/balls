@@ -56,6 +56,8 @@ ADDRESS_THIS  = "0x0000000000000000000000000000000000000002"
 
 # Uniswap V4 on Robinhood Chain (chain id 4663).
 # Source: https://developers.uniswap.org/docs/protocols/v4/deployments
+V2_FACTORY        = "0x8bcEaA40B9AcdfAedF85AdF4FF01F5Ad6517937f"
+V2_ROUTER02       = "0x89e5DB8B5aA49aA85AC63f691524311AEB649eba"
 V4_POOL_MANAGER   = "0x8366a39CC670B4001A1121B8F6A443A643e40951"
 V4_QUOTER         = "0x8DC178EFB8111bB0973Dd9d722ebEff267c98F94"
 V4_STATE_VIEW     = "0xF3334192D15450cDD385c8b70e03F9A6bd9E673B"
@@ -554,19 +556,56 @@ class HoodExecutor:
                 best_key = (fee, ts)
         return best_key, best_out
 
+    # --- Uniswap V2 quoting ---------------------------------------------
+
+    async def _quote_v2(self, input_addr: str, output_addr: str,
+                          amount_in_wei: int) -> Optional[int]:
+        """V2Router.getAmountsOut(amount, [input, output]) — returns the
+        output amount, or None if the pair does not exist / has no
+        liquidity. All V2 swaps here route through WETH so both sides
+        must be WETH↔token."""
+        try:
+            from eth_abi import encode  # type: ignore
+        except Exception:  # noqa: BLE001
+            return None
+        sel = _selector("getAmountsOut(uint256,address[])")
+        path = [_to_checksum(input_addr), _to_checksum(output_addr)]
+        params = encode(["uint256", "address[]"], [int(amount_in_wei), path])
+        data = _hex(sel + params)
+        try:
+            js = await self._rpc("eth_call", [
+                {"to": _to_checksum(V2_ROUTER02), "data": data}, "latest",
+            ])
+            ret = str(js.get("result") or "0x")
+            # Returns uint256[]: offset (32) | len (32) | items…
+            if len(ret) < 2 + 32 * 3 * 2:
+                return None
+            length = int(ret[66:130], 16)
+            if length < 2:
+                return None
+            # amountOut is the last element (index length-1)
+            start = 130 + (length - 1) * 64
+            end = start + 64
+            if len(ret) < end:
+                return None
+            return int(ret[start:end], 16)
+        except Exception as e:  # noqa: BLE001
+            LOG.debug("hood v2 quote %s→%s failed: %s",
+                      input_addr[:6], output_addr[:6], e)
+            return None
+
     # --- reverse-quote sell-route guard ---------------------------------
 
     async def has_sell_route(self, token: str,
                               probe_amount_raw: int) -> bool:
         """Return True if a hypothetical sell of ``probe_amount_raw``
         units of ``token`` back to ETH would find any live pool on
-        either Uniswap V3 (via WETH9) or Uniswap V4 (via native ETH).
+        Uniswap V2 (via WETH9), V3 (via WETH9), or V4 (via native ETH).
 
         Used as a pre-buy safety check so the brain never opens a
         position it cannot exit."""
         if probe_amount_raw <= 0:
             return False
-        # V3 → WETH
         try:
             fee, out = await self._best_fee_tier(
                 token, WETH9, probe_amount_raw,
@@ -575,12 +614,17 @@ class HoodExecutor:
                 return True
         except Exception:  # noqa: BLE001
             pass
-        # V4 → native ETH
         try:
             key, out = await self._best_v4_pool_native(
                 token, probe_amount_raw, buy=False,
             )
             if key is not None and out > 0:
+                return True
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            out = await self._quote_v2(token, WETH9, probe_amount_raw)
+            if out and out > 0:
                 return True
         except Exception:  # noqa: BLE001
             pass
@@ -646,21 +690,30 @@ class HoodExecutor:
                 input_addr, output_addr, amount_in_wei
             )
             v4_key: Optional[Tuple[int, int]] = None
+            v2_out = 0
             v4_out = 0
             if best_fee is None or best_out <= 0:
                 # 1b) Fall back to V4 (native-ETH, vanilla pools).
+                token_for_v4 = (output_addr if side == "buy" else input_addr)
                 v4_key, v4_out = await self._best_v4_pool_native(
-                    token=(output_addr if side == "buy" else input_addr),
+                    token=token_for_v4,
                     amount_in_wei=amount_in_wei,
                     buy=(side == "buy"),
                 )
-                if v4_key is None or v4_out <= 0:
-                    rec.status = "failed"
-                    rec.error = "no_route"
-                    self._ledger.append(rec)
-                    return rec
-                # Use V4 route
-                best_out = v4_out
+                if v4_key is not None and v4_out > 0:
+                    best_out = v4_out
+                else:
+                    # 1c) Fall back to V2 (WETH9 path). Most Robinhood
+                    # Chain memecoins actually live here today.
+                    v2_out = await self._quote_v2(
+                        input_addr, output_addr, amount_in_wei,
+                    ) or 0
+                    if v2_out <= 0:
+                        rec.status = "failed"
+                        rec.error = "no_route"
+                        self._ledger.append(rec)
+                        return rec
+                    best_out = v2_out
 
             # 2) BUY-side: reverse-quote guard. Probe whether we could
             # sell the tokens we'd receive back to ETH via any pool. If
@@ -683,9 +736,32 @@ class HoodExecutor:
                 self._ledger.append(rec)
                 return rec
             # 4) Route: V3 (SwapRouter02) if we got a V3 quote, else V4
-            # (Universal Router). ``v4_key`` is set only when V3 was empty.
+            # (Universal Router), else V2 (V2 Router02).
             using_v4 = v4_key is not None
-            if using_v4:
+            using_v2 = (best_fee is None) and (not using_v4) and v2_out > 0
+            if using_v2:
+                deadline = int(time.time()) + 900
+                if side == "buy":
+                    data = self._build_v2_buy(
+                        output_addr, amount_in_wei, min_out, deadline,
+                    )
+                    value_wei = amount_in_wei
+                else:
+                    approve_rec = await self._ensure_approval(
+                        token_addr=input_addr, amount_wei=amount_in_wei,
+                        spender=V2_ROUTER02,
+                    )
+                    if approve_rec is not None and approve_rec.status != "confirmed":
+                        rec.status = "failed"
+                        rec.error = f"approve_v2:{approve_rec.error or approve_rec.status}"
+                        self._ledger.append(rec)
+                        return rec
+                    data = self._build_v2_sell(
+                        input_addr, amount_in_wei, min_out, deadline,
+                    )
+                    value_wei = 0
+                to_addr = V2_ROUTER02
+            elif using_v4:
                 # For V4 sells we need the token approved to Permit2 and
                 # then Permit2 approved to the Universal Router.
                 if side == "sell":
@@ -758,7 +834,8 @@ class HoodExecutor:
                     "fee_tier": best_fee if not using_v4 else None,
                     "v4_pool": ({"fee": v4_key[0], "tick_spacing": v4_key[1]}
                                 if using_v4 else None),
-                    "route": "v4" if using_v4 else "v3",
+                    "route": ("v2" if using_v2
+                              else ("v4" if using_v4 else "v3")),
                     "buy_hash": tx_hash,
                 }
                 self.total_eth_spent += abs(eth_amount)
@@ -925,6 +1002,44 @@ class HoodExecutor:
         except Exception:  # noqa: BLE001
             return 0, 0, 0
 
+    # --- Uniswap V2 swap calldata ---------------------------------------
+
+    def _build_v2_buy(self, token: str, amount_in_wei: int,
+                        min_out: int, deadline: int) -> bytes:
+        """V2Router02.swapExactETHForTokensSupportingFeeOnTransferTokens(
+             uint256 amountOutMin, address[] path, address to, uint256 deadline
+           ) — payable. Robust to fee-on-transfer memecoins."""
+        from eth_abi import encode  # type: ignore
+        sel = _selector(
+            "swapExactETHForTokensSupportingFeeOnTransferTokens(uint256,"
+            "address[],address,uint256)"
+        )
+        path = [_to_checksum(WETH9), _to_checksum(token)]
+        params = encode(
+            ["uint256", "address[]", "address", "uint256"],
+            [int(min_out), path, _to_checksum(self.address), int(deadline)],
+        )
+        return sel + params
+
+    def _build_v2_sell(self, token: str, amount_in_wei: int,
+                         min_out: int, deadline: int) -> bytes:
+        """V2Router02.swapExactTokensForETHSupportingFeeOnTransferTokens(
+             uint256 amountIn, uint256 amountOutMin, address[] path,
+             address to, uint256 deadline
+           ) — non-payable. Sends native ETH back to us."""
+        from eth_abi import encode  # type: ignore
+        sel = _selector(
+            "swapExactTokensForETHSupportingFeeOnTransferTokens(uint256,"
+            "uint256,address[],address,uint256)"
+        )
+        path = [_to_checksum(token), _to_checksum(WETH9)]
+        params = encode(
+            ["uint256", "uint256", "address[]", "address", "uint256"],
+            [int(amount_in_wei), int(min_out), path,
+             _to_checksum(self.address), int(deadline)],
+        )
+        return sel + params
+
     def _build_universal_router_v4_swap(
         self, *, token: str, fee: int, tick_spacing: int,
         amount_in: int, min_out: int, zero_for_one: bool,
@@ -1070,6 +1185,10 @@ class HoodExecutor:
                 if not out:
                     _key, out = await self._best_v4_pool_native(
                         _to_checksum(addr), amt, buy=False,
+                    )
+                if not out:
+                    out = await self._quote_v2(
+                        _to_checksum(addr), WETH9, amt,
                     )
                 if out and out > 0:
                     pos["current_eth_value"] = out / WEI_PER_ETH
