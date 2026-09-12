@@ -2369,3 +2369,50 @@ body::after {
 
 /* (Speed slider removed — tick rate is now driven by the brain's own
    engagement signal and rendered as a live tempo readout above.) */
+
+/* --- Live on-chain wallet block ---------------------------------------- */
+.trading-block-live {
+  border: 1px solid rgba(232, 217, 166, 0.22);
+  background:
+    linear-gradient(180deg, rgba(232, 217, 166, 0.03), rgba(0, 0, 0, 0.15));
+}
+.trading-block-live .trading-block-title { color: var(--gold-strong); }
+.trading-block-live .count.pos { color: #6EE7B7; }
+.trading-block-live .count.neg { color: #FCA5A5; }
+.trading-block-live .count.warn { color: var(--gold-strong); }
+.live-header {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px 22px;
+  padding: 10px 4px 14px;
+}
+.live-header-cell { display: flex; flex-direction: column; gap: 4px; }
+.live-header-label {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.live-header-value {
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.live-header-value a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(110, 231, 255, 0.4);
+}
+.live-header-value a:hover { color: var(--accent-strong, #A5F3FC); }
+.live-tx-table { width: 100%; }
+.live-tx-table td, .live-tx-table th { padding: 5px 8px; font-size: 11px; }
+.live-tx-table .pos { color: #6EE7B7; }
+.live-tx-table .neg { color: #FCA5A5; }
+.live-tx-table a { color: var(--accent); }
+.trading-block-live .empty {
+  padding: 12px 4px 6px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  line-height: 1.55;
+}

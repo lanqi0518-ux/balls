@@ -14,6 +14,14 @@ export function initTrading(panelEl, opts = {}) {
   panelEl.innerHTML = `
     <div class="trading-summary" id="trading-summary"></div>
 
+    <div class="trading-block trading-block-live" id="live-block" style="display:none">
+      <div class="trading-block-title">
+        <span>Live on-chain wallet</span>
+        <span class="count" id="live-status">—</span>
+      </div>
+      <div id="live-body"></div>
+    </div>
+
     <div class="trading-block">
       <div class="trading-block-title">
         <span>Equity curve</span>
@@ -106,6 +114,7 @@ const short = (s, n = 4) => (!s ? "—" : (s.length > n * 2 + 3 ? s.slice(0, n) 
 export function updateTrading(trading) {
   if (!trading) return;
   updateSummary(trading);
+  updateLive(trading.live);
   updateEquityCurve(trading.paper.equity_curve || [], trading.paper.start_usd);
   updatePositions(trading.paper.positions || []);
   updateFresh(trading.fresh_launches || []);
@@ -114,6 +123,83 @@ export function updateTrading(trading) {
   updateWallets(trading.tracked_wallets || [], trading.discovery_status || {},
                 trading.tuning || {});
   updateClosed(trading.paper.closed_recent || []);
+}
+
+function updateLive(live) {
+  const block = document.getElementById("live-block");
+  if (!block) return;
+  if (!live) {
+    block.style.display = "none";
+    return;
+  }
+  block.style.display = "";
+  const st = document.getElementById("live-status");
+  if (st) {
+    st.textContent = live.halted
+      ? "HALTED"
+      : (live.dry_run ? "DRY-RUN" : "ARMED");
+    st.className = "count " + (live.halted ? "neg" : (live.dry_run ? "warn" : "pos"));
+  }
+  const solscanUrl = `https://solscan.io/account/${live.wallet}`;
+  const L = live.limits || {};
+  const rowsHtml = (live.recent_trades || []).slice().reverse().map((r) => {
+    const cls = r.status === "confirmed" ? "pos"
+              : r.status === "blocked"   ? "neg"
+              : r.status === "failed"    ? "neg"
+              : "";
+    const sigCell = r.tx_sig
+      ? `<a class="mono" href="https://solscan.io/tx/${r.tx_sig}" target="_blank" rel="noopener">${short(r.tx_sig, 6)}</a>`
+      : "—";
+    return `<tr>
+      <td class="mono">${new Date(r.t * 1000).toLocaleTimeString()}</td>
+      <td class="${r.side === 'buy' ? 'pos' : 'neg'}">${r.side.toUpperCase()}</td>
+      <td>${escapeHtml(r.token_symbol || "—")}</td>
+      <td class="mono num">${Math.abs(r.sol_amount).toFixed(4)}</td>
+      <td class="mono ${cls}">${r.status.toUpperCase()}</td>
+      <td>${sigCell}</td>
+    </tr>`;
+  }).join("");
+  const body = document.getElementById("live-body");
+  if (body) {
+    body.innerHTML = `
+      <div class="live-header">
+        <div class="live-header-cell">
+          <div class="live-header-label">WALLET</div>
+          <div class="live-header-value mono">
+            <a href="${solscanUrl}" target="_blank" rel="noopener">${short(live.wallet, 6)}</a>
+          </div>
+        </div>
+        <div class="live-header-cell">
+          <div class="live-header-label">SOL BALANCE</div>
+          <div class="live-header-value mono">${(live.sol_balance || 0).toFixed(4)}</div>
+        </div>
+        <div class="live-header-cell">
+          <div class="live-header-label">HOURLY / DAILY</div>
+          <div class="live-header-value mono">
+            ${(live.spent_last_hour_sol || 0).toFixed(4)} /
+            ${(live.spent_last_day_sol || 0).toFixed(4)} SOL
+          </div>
+        </div>
+        <div class="live-header-cell">
+          <div class="live-header-label">CAPS · trade / hr / day / positions</div>
+          <div class="live-header-value mono">
+            ${(L.max_trade_sol || 0).toFixed(4)} ·
+            ${(L.max_hourly_sol || 0).toFixed(4)} ·
+            ${(L.max_daily_sol || 0).toFixed(4)} ·
+            ${L.max_positions || 0}
+          </div>
+        </div>
+      </div>
+      ${rowsHtml ? `
+        <table class="trading-table live-tx-table">
+          <thead><tr>
+            <th>TIME</th><th>SIDE</th><th>TOKEN</th><th>SOL</th><th>STATUS</th><th>TX</th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      ` : `<div class="empty">No on-chain trades yet. The brain will fire real swaps once it clears the ${((L.min_confidence || 0) * 100).toFixed(0)}% confidence gate on a candidate with ≥ $${(L.min_liquidity_usd || 0).toLocaleString()} liquidity.</div>`}
+    `;
+  }
 }
 
 function updateSummary(t) {

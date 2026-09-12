@@ -300,10 +300,21 @@ function handlePayload(data) {
 
 function updateTradingStrip(trading) {
   const p = trading.paper || {};
-  const eq = p.equity_usd || 0;
+  const live = trading.live;
+  // Prefer the LIVE wallet balance when the live executor is armed.
+  // We show SOL for on-chain equity (that's what the wallet actually holds);
+  // paper equity is the fallback so the strip is never blank at boot.
+  let displayText;
+  if (live && Number.isFinite(live.sol_balance)) {
+    const sol = live.sol_balance;
+    displayText = sol.toFixed(sol < 0.1 ? 4 : 3) + " SOL";
+  } else {
+    const eq = p.equity_usd || 0;
+    displayText = "$" + eq.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  }
+  paperEquityEl.textContent = displayText;
   const pnl = p.total_pnl_usd || 0;
   const pnlPct = p.total_pnl_pct || 0;
-  paperEquityEl.textContent = "$" + eq.toLocaleString(undefined, { maximumFractionDigits: 0 });
   const cls = pnl > 0 ? "up" : (pnl < 0 ? "down" : "");
   paperPnlEl.className = "mono " + cls;
   const sign = pnl >= 0 ? "+" : "";

@@ -43,6 +43,7 @@ from .market import (
 )
 from .paper_trader import PaperTrader
 from .persistence import Persistence
+from .solana_executor import build_from_env as build_live_executor
 
 
 LOG = logging.getLogger("trading_service")
@@ -101,6 +102,10 @@ class TradingService:
         self.target_tracked_wallets = target_tracked_wallets
         self.paper = PaperTrader(start_usd=start_usd)
         self.persistence = Persistence(persistence_dir or os.getenv("DATA_DIR", "./data"))
+        # Live executor is built once at startup from BRAIN_SOL_PRIVKEY.
+        # If the key is missing or malformed, `live` stays None and the
+        # rest of the service happily runs in paper-only mode.
+        self.live = build_live_executor()
 
         self.decision_interval = decision_interval
         self.discovery_interval = discovery_interval
@@ -201,6 +206,21 @@ class TradingService:
             asyncio.create_task(self._sol_price_loop(), name="td-solprice"),
             asyncio.create_task(self._discovery_loop(), name="td-discovery"),
         ]
+        if self.live is not None:
+            self._tasks.append(asyncio.create_task(
+                self._live_balance_loop(), name="td-live-balance",
+            ))
+            self._push_event(
+                "live_ready",
+                f"live executor armed · wallet {self.live.pubkey_str[:4]}…"
+                f"{self.live.pubkey_str[-4:]} · caps "
+                f"{self.live.limits.max_trade_sol:.4f}/trade "
+                f"{self.live.limits.max_daily_sol:.4f}/day",
+                f"链上执行已上线 · 钱包 {self.live.pubkey_str[:4]}…"
+                f"{self.live.pubkey_str[-4:]} · 单笔上限 "
+                f"{self.live.limits.max_trade_sol:.4f} SOL / 每日 "
+                f"{self.live.limits.max_daily_sol:.4f} SOL",
+            )
 
     async def stop(self) -> None:
         self._stop.set()
@@ -214,7 +234,105 @@ class TradingService:
             except (asyncio.CancelledError, Exception):
                 pass
         self._tasks = []
+        if self.live is not None:
+            try:
+                await self.live.close()
+            except Exception:  # noqa: BLE001
+                pass
         self._save_now()
+
+    async def _live_buy(self, mint: str, symbol: str,
+                         liquidity_usd: float, confidence: float) -> None:
+        """Fire a real on-chain buy alongside the paper leg. All safety
+        gates live inside the executor; we just log the outcome so the
+        thought stream reflects what actually happened."""
+        if self.live is None:
+            return
+        rec = await self.live.buy(
+            output_mint=mint, symbol=symbol,
+            sol_amount=self.live.limits.max_trade_sol,
+            liquidity_usd=liquidity_usd, confidence=confidence,
+        )
+        self._push_live_event(rec)
+
+    async def _live_sell(self, mint: str, symbol: str, liquidity_usd: float) -> None:
+        if self.live is None:
+            return
+        pos = self.live.open_positions.get(mint)
+        if not pos:
+            return
+        # We saved the exact raw token amount Jupiter told us the buy would
+        # yield. Feed that back in as the sell input. If the on-chain
+        # balance is slightly less (due to rent/fees rounding), the sell
+        # will still route — Jupiter picks the best partial fill within
+        # our slippage cap.
+        raw = int(pos.get("out_amount_raw") or 0)
+        if raw <= 0:
+            # Nothing we can safely close from bookkeeping alone.
+            self._push_event(
+                "live_skip_sell",
+                f"[live] skipped SELL {symbol}: no out_amount recorded",
+                f"[链上] 跳过卖出 {symbol}：未记录持仓数量",
+            )
+            self.live.open_positions.pop(mint, None)
+            return
+        rec = await self.live.sell(
+            input_mint=mint, symbol=symbol,
+            token_amount_raw=raw,
+            liquidity_usd=liquidity_usd,
+        )
+        self._push_live_event(rec)
+
+    def _push_live_event(self, rec) -> None:
+        sig_short = (rec.tx_sig[:6] + "…" + rec.tx_sig[-4:]) if rec.tx_sig else "—"
+        if rec.status == "confirmed":
+            self._push_event(
+                "live_trade",
+                f"[live] {rec.side.upper()} {rec.token_symbol} · sig {sig_short}",
+                f"[链上] {'买入' if rec.side == 'buy' else '卖出'} {rec.token_symbol} · 签名 {sig_short}",
+                extra={"symbol": rec.token_symbol, "mint": rec.token_mint,
+                       "side": rec.side, "tx_sig": rec.tx_sig,
+                       "sol_amount": rec.sol_amount},
+            )
+        elif rec.status == "blocked":
+            self._push_event(
+                "live_blocked",
+                f"[live] blocked {rec.side.upper()} {rec.token_symbol} · {rec.error}",
+                f"[链上] 拦截 {'买入' if rec.side == 'buy' else '卖出'} {rec.token_symbol} · {rec.error}",
+                extra={"symbol": rec.token_symbol, "mint": rec.token_mint,
+                       "side": rec.side, "reason": rec.error},
+            )
+        elif rec.status == "dry_run":
+            self._push_event(
+                "live_dry_run",
+                f"[live·dry] would {rec.side.upper()} {rec.token_symbol}",
+                f"[链上·演练] 计划{'买入' if rec.side == 'buy' else '卖出'} {rec.token_symbol}",
+                extra={"symbol": rec.token_symbol, "mint": rec.token_mint,
+                       "side": rec.side},
+            )
+        elif rec.status == "failed":
+            self._push_event(
+                "live_failed",
+                f"[live] failed {rec.side.upper()} {rec.token_symbol}: {rec.error}",
+                f"[链上] 失败 {'买入' if rec.side == 'buy' else '卖出'} {rec.token_symbol}：{rec.error}",
+                extra={"symbol": rec.token_symbol, "mint": rec.token_mint,
+                       "side": rec.side, "error": rec.error},
+            )
+
+    async def _live_balance_loop(self) -> None:
+        """Poll the on-chain wallet's SOL balance so the UI has a fresh
+        number to render. Cheap RPC call; runs every ~30 s."""
+        if self.live is None:
+            return
+        while not self._stop.is_set():
+            try:
+                await self.live.refresh_sol_balance()
+            except Exception as e:  # noqa: BLE001
+                LOG.debug("live balance refresh failed: %s", e)
+            try:
+                await asyncio.wait_for(self._stop.wait(), timeout=30.0)
+            except asyncio.TimeoutError:
+                pass
 
     # ------------------------------------------------------------------
 
@@ -548,17 +666,31 @@ class TradingService:
                 if pos:
                     self._push_event(
                         "trade",
-                        f"[paper] BUY {p.base_symbol} @ ${p.price_usd:.6f} · "
+                        f"BUY {p.base_symbol} @ ${p.price_usd:.6f} · "
                         f"conf {conf:.2f}",
-                        f"[paper] 买入 {p.base_symbol} @ ${p.price_usd:.6f} · "
+                        f"买入 {p.base_symbol} @ ${p.price_usd:.6f} · "
                         f"置信度 {conf:.2f}",
                         extra={"symbol": p.base_symbol, "mint": p.base_address,
                                "side": "buy", "price_usd": p.price_usd},
                     )
+                    # Mirror to real chain when live executor is present.
+                    # The executor enforces its own hard confidence gate
+                    # (`min_confidence`, default 0.75) — this is stricter
+                    # than the paper gate on purpose.
+                    if self.live is not None:
+                        asyncio.create_task(self._live_buy(
+                            p.base_address, p.base_symbol,
+                            p.liquidity_usd or 0.0, conf,
+                        ))
             elif action == SELL and held and conf >= 0.50:
                 closed = self.paper.try_sell(p.base_address, p.price_usd, reason="policy_sell")
                 if closed:
                     self._on_position_closed(closed)
+                    if self.live is not None and p.base_address in self.live.open_positions:
+                        asyncio.create_task(self._live_sell(
+                            p.base_address, p.base_symbol,
+                            p.liquidity_usd or 0.0,
+                        ))
 
         if best_intent is not None:
             self._latest_intent = best_intent
@@ -837,7 +969,7 @@ class TradingService:
         for mint, pos in self.paper.positions.items():
             prices.setdefault(mint, pos.entry_price_usd)
         return {
-            "mode": "paper",
+            "mode": "live" if self.live is not None else "paper",
             "tokens_status": self.tokens.status(),
             "wallets_status": self.wallets.status(),
             "discovery_status": self.discovery.status(),
@@ -847,6 +979,7 @@ class TradingService:
             "recent_wallet_trades": self.wallets.recent_trades_public(limit=30),
             "leaderboard": self.leaderboard.top_public(15),
             "paper": self.paper.snapshot(prices),
+            "live": self.live.snapshot() if self.live is not None else None,
             "trader_cortex_stats": self.brain.trader_cortex.stats(),
             "latest_intent": self._latest_intent,
             "events": list(self._trader_events[-60:]),
