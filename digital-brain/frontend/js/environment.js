@@ -11,7 +11,40 @@ export class EnvironmentView {
     this.ctx = canvas.getContext("2d");
     this.state = null;
     this._pulse = 0;
+    this._fitCanvas();
+    if (typeof ResizeObserver !== "undefined") {
+      const wrap = canvas.parentElement;
+      if (wrap) {
+        this._ro = new ResizeObserver(() => this._fitCanvas());
+        this._ro.observe(wrap);
+      }
+    }
+    window.addEventListener("resize", () => this._fitCanvas());
     this._loop();
+  }
+
+  // Physically size the square canvas to whatever the parent .env-wrap gives
+  // us — CSS max-height:100% on a canvas inside a flex-item parent doesn't
+  // reliably constrain us in Chrome, so we do it in JS to guarantee we never
+  // overflow into the stats grid below.
+  _fitCanvas() {
+    const wrap = this.canvas.parentElement;
+    if (!wrap) return;
+    const cs = getComputedStyle(wrap);
+    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const availW = wrap.clientWidth - padX;
+    const availH = wrap.clientHeight - padY;
+    const size = Math.max(80, Math.floor(Math.min(availW, availH)));
+    this.canvas.style.width = size + "px";
+    this.canvas.style.height = size + "px";
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (this.canvas.width !== size * dpr || this.canvas.height !== size * dpr) {
+      this.canvas.width = size * dpr;
+      this.canvas.height = size * dpr;
+      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    this._cssSize = size;
   }
 
   update(state) {
@@ -27,8 +60,10 @@ export class EnvironmentView {
   _draw() {
     const ctx = this.ctx;
     const s = this.state;
-    const W = this.canvas.width;
-    const H = this.canvas.height;
+    // With DPR-scaled canvas, drawing uses CSS pixels (setTransform above
+    // maps them into device pixels). Use the CSS-pixel size we cached.
+    const W = this._cssSize || (this.canvas.width / (window.devicePixelRatio || 1));
+    const H = W;
     ctx.clearRect(0, 0, W, H);
 
     // OLED background with a barely-there radial to give the surface
