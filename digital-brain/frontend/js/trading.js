@@ -12,23 +12,11 @@ let onCommand = () => {};
 export function initTrading(panelEl, opts = {}) {
   onCommand = opts.onCommand || (() => {});
   panelEl.innerHTML = `
-    <div class="trading-intro">
-      <strong>Paper trading only — no real money.</strong>
-      The brain hunts <strong>fresh Solana launches</strong> across every
-      launchpad it can reach, while filtering out established mega-caps so
-      its attention stays on new opportunities. It forms its own opinion on
-      every candidate and only borrows from smart-money wallets when it is
-      genuinely uncertain. Closed-trade PnL is back-propagated, wallet-copied
-      trades are annealed toward zero, and independent convictions are respected.
-      <span class="warn">Real on-chain execution is <strong>disabled</strong>
-      — enabling it requires a Solana private key and hard limits.</span>
-    </div>
-
     <div class="trading-summary" id="trading-summary"></div>
 
     <div class="trading-block">
       <div class="trading-block-title">
-        <span>Paper equity curve</span>
+        <span>Equity curve</span>
         <span class="count" id="eqcurve-hint">—</span>
       </div>
       <div class="equity-curve-wrap"><svg id="eq-curve" preserveAspectRatio="none"></svg></div>

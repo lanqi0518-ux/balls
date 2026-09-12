@@ -27,8 +27,9 @@ const rewardLabel = document.getElementById("reward-label");
 const modeBadge = document.getElementById("mode-badge");
 const modeLabel = document.getElementById("mode-label");
 const footerKnowledge = document.getElementById("footer-knowledge");
-const tickHzInput = document.getElementById("tick-hz");
 const tickHzLabel = document.getElementById("tick-hz-label");
+const tickHzDot = document.getElementById("tick-hz-dot");
+const walletLabel = document.getElementById("wallet-label");
 
 const knowledgePanel = document.getElementById("knowledge-panel");
 const tradingPanel = document.getElementById("trading-panel");
@@ -245,6 +246,23 @@ function handlePayload(data) {
     const auton = (st.autonomy_pct ?? 0).toFixed(0);
     footerTrader.textContent =
       `Trader: ${st.bc_updates || 0} BC / ${st.rl_updates || 0} RL · autonomy ${auton}%`;
+    if (walletLabel) {
+      const mode = String(data.trading.mode || "paper").toLowerCase();
+      walletLabel.textContent = mode === "live" ? "LIVE" : "WALLET";
+    }
+  }
+
+  // Auto-updating tick-rate readout in the footer. The backend drives this
+  // from the brain's engagement signal; we just display it and give the
+  // dot a matching color intensity.
+  if (typeof data.tick_hz === "number" && tickHzLabel) {
+    const hz = Math.max(0.1, data.tick_hz);
+    tickHzLabel.textContent = hz.toFixed(1) + " Hz";
+    if (tickHzDot) {
+      const t = Math.max(0, Math.min(1, (hz - 2) / 10));
+      tickHzDot.style.background = `hsl(${190 - t * 50}, ${60 + t * 30}%, ${45 + t * 25}%)`;
+      tickHzDot.style.boxShadow = `0 0 ${4 + t * 10}px hsla(${190 - t * 50}, 80%, 60%, ${0.4 + t * 0.5})`;
+    }
   }
 
   if (data.web !== undefined) {
@@ -697,14 +715,9 @@ function escapeHtml(s) {
 }
 
 // ---------- Controls ----------
-// No pause / reset-brain buttons on purpose: the brain runs forever and
-// keeps every neuron weight, every memory, every learned trade. The only
-// user-facing knob is the tick speed. Learning is uninterrupted.
-tickHzInput.addEventListener("input", (e) => {
-  const hz = parseInt(e.target.value, 10);
-  tickHzLabel.textContent = `${hz} Hz`;
-  send("speed", { hz });
-});
+// No pause, no reset, no speed slider. The brain runs continuously and
+// its tick rate rises and falls with its own engagement — that number
+// is streamed down each frame and rendered in the footer.
 
 // ---------- Go ----------
 connect();

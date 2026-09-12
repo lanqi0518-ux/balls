@@ -12,7 +12,7 @@
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Digital Human Brain" />
   <meta property="og:title" content="Digital Human Brain · Live Cortex Console" />
-  <meta property="og:description" content="9 deep-learning cortices + 1 LIF spiking ring-attractor, always on, hunting fresh launches on Solana + Robinhood Chain. No LLM. Paper only." />
+  <meta property="og:description" content="9 deep-learning cortices + 1 LIF spiking ring-attractor, always on, hunting fresh launches on Solana + Robinhood Chain." />
   <meta property="og:url" content="https://balls-lanqi.fly.dev/" />
   <meta property="og:image" content="https://balls-lanqi.fly.dev/icon-512.png" />
   <meta property="og:image:width" content="512" />
@@ -21,7 +21,7 @@
   <!-- Twitter card -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Digital Human Brain · Live Cortex Console" />
-  <meta name="twitter:description" content="9 deep-learning cortices + 1 LIF spiking ring-attractor, always on. No LLM. Paper only." />
+  <meta name="twitter:description" content="9 deep-learning cortices + 1 LIF spiking ring-attractor, always on." />
   <meta name="twitter:image" content="https://balls-lanqi.fly.dev/icon-512.png" />
 
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
@@ -129,9 +129,9 @@
       <div class="status-item">
         <span class="mono num" id="reward-label">Σreward 0.00</span>
       </div>
-      <div class="status-item badge badge-paper" id="paper-strip" title="Paper trading equity">
-        <svg class="badge-icon"><use href="#icon-paper"/></svg>
-        <span class="badge-label">PAPER</span>
+      <div class="status-item badge badge-wallet" id="wallet-strip" title="Live on-chain wallet · equity + session PnL">
+        <svg class="badge-icon"><use href="#icon-bolt"/></svg>
+        <span class="badge-label" id="wallet-label">WALLET</span>
         <span class="mono num" id="paper-equity">—</span>
         <span class="mono num" id="paper-pnl">—</span>
       </div>
@@ -241,7 +241,7 @@
           <button class="tab active" data-view="region">Region</button>
           <button class="tab" data-view="knowledge">Knowledge</button>
           <button class="tab" data-view="trading">
-            Trading desk <span class="tab-badge" id="trading-badge">paper</span>
+            Trading desk <span class="tab-badge" id="trading-badge">live</span>
           </button>
           <button class="tab" data-view="web">
             Web view <span class="tab-badge" id="web-badge">live</span>
@@ -273,15 +273,14 @@
       <span class="mono" id="footer-lifetime" title="Cumulative learning across every VM restart">
         Lifetime: — ticks · boot #—
       </span>
-      <span class="mono sep">·</span>
-      <span class="mono footer-guard">No LLM · Paper only</span>
     </div>
     <div class="footer-r">
-      <label class="mono">
-        Speed
-        <input type="range" id="tick-hz" min="1" max="20" step="1" value="6"/>
-        <span id="tick-hz-label">6 Hz</span>
-      </label>
+      <span class="mono footer-tick"
+            title="Tick rate the brain runs at right now — rises with engagement, falls when idle.">
+        <span class="footer-tick-dot" id="tick-hz-dot"></span>
+        <span class="footer-tick-label">tempo</span>
+        <span class="footer-tick-value" id="tick-hz-label">— Hz</span>
+      </span>
     </div>
   </footer>
 

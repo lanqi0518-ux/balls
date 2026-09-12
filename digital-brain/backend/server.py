@@ -116,11 +116,10 @@ class Simulation:
             self.trading.remove_wallet(addr)
         elif cmd == "trading_save":
             self.trading._save_now()
-        elif cmd == "speed":
-            hz = float(msg.get("hz", 6.0))
-            # Floor of 0.5 Hz is deliberate: the brain must always be
-            # ticking, even if the operator wants it slow.
-            self.tick_hz = max(0.5, min(30.0, hz))
+        # NOTE: `speed` is intentionally NOT handled. Tick rate is a
+        # function of the brain's own engagement (see _inner_loop). We
+        # keep the elif structure below so old client messages become
+        # no-ops instead of errors.
         elif cmd == "poke_food":
             from random import randrange
             free = {tuple(self.env.agent_pos)} | set(self.env.food) | set(self.env.hazards)
@@ -170,8 +169,25 @@ class Simulation:
         self._last_tick_at_s = time.time()
         await self._broadcast(self._payload(action_info=info))
 
+    # --- Auto tick rate ------------------------------------------------
+    # The brain's `engagement` scalar (0 = idle, 1 = strongly aroused)
+    # drives the tick rate. We map it into a comfortable [2.5 Hz, 11 Hz]
+    # window and EMA-smooth it so the number the UI shows doesn't
+    # visibly jitter every frame.
+    _TICK_HZ_MIN: float = 2.5
+    _TICK_HZ_MAX: float = 11.0
+    _TICK_HZ_EMA_ALPHA: float = 0.15  # slow smoother
+
+    def _target_tick_hz(self) -> float:
+        eng = float(getattr(self.brain, "engagement", 0.5) or 0.5)
+        eng = max(0.0, min(1.0, eng))
+        return self._TICK_HZ_MIN + (self._TICK_HZ_MAX - self._TICK_HZ_MIN) * eng
+
     async def _inner_loop(self) -> None:
         while True:
+            target = self._target_tick_hz()
+            self.tick_hz = (1 - self._TICK_HZ_EMA_ALPHA) * self.tick_hz + \
+                           self._TICK_HZ_EMA_ALPHA * target
             interval = 1.0 / max(0.5, self.tick_hz)
             await self._tick_once()
             await asyncio.sleep(interval)
