@@ -4,7 +4,7 @@
  * Speaks WebSocket to the backend at /ws. Reconnects on drop.
  */
 
-import { BrainScene } from "/static/js/brain3d.js";
+import { BrainScene } from "/static/js/brain3d.js?v=20260913g";
 import { EnvironmentView, renderEnvStats } from "/static/js/environment.js";
 import { ThoughtStream } from "/static/js/thoughtstream.js";
 import { loadKnowledge, setActiveConcept, categoryColor, mergeLearnedConcepts } from "/static/js/knowledge.js";
