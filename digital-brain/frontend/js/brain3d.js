@@ -38,6 +38,7 @@ export class BrainScene {
     this._buildVasculature();
     this._buildDustMotes();
     this._buildAuraShell();
+    this._buildVoidFace();
     this._addLights();
     this._addStarfield();
     this._initPostprocessing();
@@ -801,6 +802,228 @@ export class BrainScene {
     this.scene.add(aura);
   }
 
+  // -----------------------------------------------------------------
+  //  Void face — an ethereal, hollow face of glowing particles that
+  //  floats beside the brain and emotes in real time from the backend's
+  //  emotion summary (fear / valence / arousal / mood). It billboards
+  //  toward the camera and stays pinned to one side of the view, so it
+  //  reads like a face gazing out of the void next to the cortex.
+  // -----------------------------------------------------------------
+  _buildVoidFace() {
+    this._faceEmotion = { valence: 0, arousal: 0.2, fear: 0, gut: 0 };
+    this._faceEmotionTarget = { valence: 0, arousal: 0.2, fear: 0, gut: 0 };
+    this._faceMood = "CALM";
+    this._faceBlinkAt = 2 + Math.random() * 3;
+    this._faceBlink = 0; // 0 = open, 1 = shut
+
+    const group = new THREE.Group();
+    this.face = group;
+    this._faceMats = [];
+
+    const mkPointsMat = (opacity, size) => {
+      const m = new THREE.PointsMaterial({
+        color: 0x6ee7ff,
+        size,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      this._faceMats.push(m);
+      return m;
+    };
+
+    // 1) Face boundary — a faint hollow ellipse of points.
+    const HALO_N = 72;
+    const rx = 30, ry = 40;
+    const haloPos = new Float32Array(HALO_N * 3);
+    for (let i = 0; i < HALO_N; i++) {
+      const a = (i / HALO_N) * Math.PI * 2;
+      haloPos[i * 3] = Math.cos(a) * rx;
+      haloPos[i * 3 + 1] = Math.sin(a) * ry;
+      haloPos[i * 3 + 2] = 0;
+    }
+    const haloGeo = new THREE.BufferGeometry();
+    haloGeo.setAttribute("position", new THREE.BufferAttribute(haloPos, 3));
+    this.faceHalo = new THREE.Points(haloGeo, mkPointsMat(0.5, 1.5));
+    group.add(this.faceHalo);
+
+    // 2) Inner void dust filling the face — shimmering, low opacity.
+    const DUST_N = 150;
+    const dustPos = new Float32Array(DUST_N * 3);
+    for (let i = 0; i < DUST_N; i++) {
+      // Rejection-sample inside the ellipse.
+      let x, y;
+      do { x = (Math.random() * 2 - 1) * rx; y = (Math.random() * 2 - 1) * ry; }
+      while ((x * x) / (rx * rx) + (y * y) / (ry * ry) > 1);
+      dustPos[i * 3] = x;
+      dustPos[i * 3 + 1] = y;
+      dustPos[i * 3 + 2] = (Math.random() * 2 - 1) * 3;
+    }
+    const dustGeo = new THREE.BufferGeometry();
+    dustGeo.setAttribute("position", new THREE.BufferAttribute(dustPos, 3));
+    this.faceDust = new THREE.Points(dustGeo, mkPointsMat(0.28, 1.1));
+    group.add(this.faceDust);
+
+    // 3) Eyes — each a ring of points plus a bright pupil. Openness is the
+    //    group's y-scale (blink + fear widening).
+    const makeEye = (cx) => {
+      const eye = new THREE.Group();
+      const N = 28, r = 6.5;
+      const pos = new Float32Array(N * 3);
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * Math.PI * 2;
+        pos[i * 3] = Math.cos(a) * r;
+        pos[i * 3 + 1] = Math.sin(a) * r;
+        pos[i * 3 + 2] = 0;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      const ring = new THREE.Points(geo, mkPointsMat(0.85, 1.7));
+      eye.add(ring);
+      const pupilMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff, transparent: true, opacity: 0.95,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      this._facePupilMats = this._facePupilMats || [];
+      this._facePupilMats.push(pupilMat);
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(2.6, 12, 10), pupilMat);
+      pupil.position.z = 1.5;
+      eye.add(pupil);
+      eye.position.set(cx, 9, 2);
+      group.add(eye);
+      return eye;
+    };
+    this.eyeL = makeEye(-13);
+    this.eyeR = makeEye(13);
+
+    // 4) Brows — thin glowing bars; rotate + rise for worry/anger.
+    const browMat = new THREE.MeshBasicMaterial({
+      color: 0x6ee7ff, transparent: true, opacity: 0.8,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    this._faceBarMats = [browMat];
+    const browGeo = new THREE.BoxGeometry(15, 1.8, 1.2);
+    this.browL = new THREE.Mesh(browGeo, browMat);
+    this.browR = new THREE.Mesh(browGeo, browMat);
+    this.browL.position.set(-13, 20, 2);
+    this.browR.position.set(13, 20, 2);
+    group.add(this.browL);
+    group.add(this.browR);
+
+    // 5) Mouth — a closed loop of points (upper + lower lip) rebuilt each
+    //    frame from curvature (smile/frown) and openness.
+    this._mouthM = 16;
+    this._mouthHalf = 14;
+    this._mouthBaseY = -16;
+    const mouthPos = new Float32Array(this._mouthM * 2 * 3);
+    const mouthGeo = new THREE.BufferGeometry();
+    mouthGeo.setAttribute("position", new THREE.BufferAttribute(mouthPos, 3));
+    this.mouth = new THREE.Points(mouthGeo, mkPointsMat(0.9, 1.9));
+    this._mouthGeo = mouthGeo;
+    group.add(this.mouth);
+
+    group.visible = true;
+    this.scene.add(group);
+  }
+
+  _updateVoidFace(t, dt) {
+    if (!this.face) return;
+    const cur = this._faceEmotion;
+    const tgt = this._faceEmotionTarget;
+    // Ease toward the target feeling.
+    const k = 1 - Math.pow(0.001, dt); // ~time-constant smoothing
+    cur.valence += (tgt.valence - cur.valence) * k;
+    cur.arousal += (tgt.arousal - cur.arousal) * k;
+    cur.fear += (tgt.fear - cur.fear) * k;
+    cur.gut += (tgt.gut - cur.gut) * k;
+    const v = cur.valence, a = cur.arousal, f = cur.fear;
+
+    // Keep the face pinned to the right of the view and gazing at us.
+    const camDir = this.camera.position.clone().normalize();
+    const right = new THREE.Vector3(0, 1, 0).cross(camDir).normalize();
+    const up = camDir.clone().cross(right).normalize();
+    const offset = this._isMobile ? 96 : 120;
+    this.face.position.copy(right.multiplyScalar(offset)).addScaledVector(up, 6);
+    // Gentle float.
+    this.face.position.addScaledVector(up, Math.sin(t * 0.8) * 2.5);
+    this.face.lookAt(this.camera.position);
+
+    // ---- Colour from feeling: cyan calm → red fear, green joy, violet gloom.
+    const col = new THREE.Color(0x6ee7ff);
+    if (v > 0) col.lerp(new THREE.Color(0x5ef0a0), Math.min(1, v));
+    else col.lerp(new THREE.Color(0xa78bfa), Math.min(1, -v) * 0.85);
+    col.lerp(new THREE.Color(0xff4a5e), Math.min(1, f));
+    for (const m of this._faceMats) m.color.copy(col);
+    for (const m of this._faceBarMats) m.color.copy(col);
+
+    // ---- Shimmer scales with arousal.
+    const shimmer = 0.5 + 0.5 * Math.sin(t * (1.4 + a * 4));
+    if (this.faceHalo) this.faceHalo.material.opacity = 0.35 + 0.25 * shimmer + a * 0.15;
+    if (this.faceDust) {
+      this.faceDust.material.opacity = 0.18 + 0.18 * shimmer;
+      this.faceDust.rotation.z = Math.sin(t * 0.3) * 0.05;
+    }
+
+    // ---- Blink timing.
+    this._faceBlinkAt -= dt;
+    if (this._faceBlinkAt <= 0) {
+      this._faceBlink = 1;
+      this._faceBlinkAt = 2.5 + Math.random() * 4;
+    }
+    this._faceBlink = Math.max(0, this._faceBlink - dt * 8); // quick reopen
+
+    // ---- Eyes: openness widens with fear + arousal, droops when gloomy.
+    let open = 0.5 + a * 0.45 + f * 0.4 - Math.max(0, -v) * 0.2;
+    open = Math.max(0.12, Math.min(1.5, open)) * (1 - this._faceBlink);
+    open = Math.max(0.05, open);
+    if (this.eyeL) this.eyeL.scale.y = open;
+    if (this.eyeR) this.eyeR.scale.y = open;
+    // Pupils brighten with arousal.
+    if (this._facePupilMats) {
+      for (const m of this._facePupilMats) m.opacity = 0.6 + a * 0.4;
+    }
+
+    // ---- Brows: worry (fear) lifts inner ends; anger lowers them.
+    const anger = Math.max(0, Math.min(1, Math.max(0, -v) * a - f));
+    const inner = f * 0.5 - anger * 0.5;         // >0 worried, <0 angry
+    const rise = f * 5 - Math.max(0, -v) * 2.5;  // fear raises brows
+    if (this.browL && this.browR) {
+      this.browL.position.y = 20 + rise;
+      this.browR.position.y = 20 + rise;
+      this.browL.rotation.z = -inner * 0.6;      // left inner end (+x) up
+      this.browR.rotation.z = inner * 0.6;       // right inner end (−x) up
+    }
+
+    // ---- Mouth: curvature = valence (smile/frown), openness from arousal+fear.
+    const M = this._mouthM, half = this._mouthHalf, baseY = this._mouthBaseY;
+    const curvature = v;                          // + smile, − frown
+    const openAmt = Math.max(0, Math.min(1, a * 0.35 + f * 0.4 + Math.max(0, -v) * 0.1));
+    const openHalf = openAmt * 5.5;
+    const pos = this._mouthGeo.attributes.position.array;
+    for (let i = 0; i < M; i++) {
+      const nx = (M === 1) ? 0 : (i / (M - 1)) * 2 - 1; // -1..1
+      const x = nx * half;
+      const shape = nx * nx - 0.4;                 // corners high, center low
+      const cy = baseY + curvature * 6 * shape;
+      // upper lip
+      pos[i * 3] = x;
+      pos[i * 3 + 1] = cy + openHalf;
+      pos[i * 3 + 2] = 0;
+      // lower lip (reversed index so it forms a loop)
+      const j = M + (M - 1 - i);
+      pos[j * 3] = x;
+      pos[j * 3 + 1] = cy - openHalf;
+      pos[j * 3 + 2] = 0;
+    }
+    this._mouthGeo.attributes.position.needsUpdate = true;
+
+    // Whole-face breathing.
+    const breathe = 1 + 0.02 * Math.sin(t * 1.1) + a * 0.03;
+    this.face.scale.setScalar(breathe);
+  }
+
   _initPostprocessing() {
     // EffectComposer chain: render → strong bloom → output tone-mapping.
     // This is what makes the vessels + region cores actually feel magical
@@ -869,6 +1092,22 @@ export class BrainScene {
     if (this.engagement == null && nAct > 0) {
       this._engagementFromRegions = sumAct / nAct;
     }
+  }
+
+  /**
+   * Drive the void face's expression from the backend emotion summary
+   * (brain.snapshot().emotion). Everything is smoothed in the animation
+   * loop so the face eases between feelings instead of snapping.
+   */
+  setEmotion(e) {
+    if (!e || !this._faceEmotionTarget) return;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const t = this._faceEmotionTarget;
+    if (Number.isFinite(e.valence)) t.valence = clamp(e.valence, -1, 1);
+    if (Number.isFinite(e.arousal)) t.arousal = clamp(e.arousal, 0, 1);
+    if (Number.isFinite(e.fear)) t.fear = clamp(e.fear, 0, 1);
+    if (Number.isFinite(e.gut_feeling)) t.gut = clamp(e.gut_feeling, -1, 1);
+    if (e.mood) this._faceMood = e.mood;
   }
 
   /** Drive the vessel heartbeat externally.  `x` is a 0..1 "thinking
@@ -1277,6 +1516,9 @@ export class BrainScene {
       this.auraShell.material.uniforms.uTime.value = t;
       this.auraShell.rotation.y = t * 0.03;
     }
+
+    // The void face beside the brain — emotes in real time.
+    this._updateVoidFace(t, dt);
     if (this.cerebrumInner) {
       this.cerebrumInner.material.uniforms.uTime.value = t;
     }
