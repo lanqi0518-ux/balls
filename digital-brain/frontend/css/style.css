@@ -3219,7 +3219,7 @@ a.learn-hero-title:hover { color: #BAE6FD; text-decoration: underline; }
      learning panel lead. Reorder so region/learning sits right under the
      brain and hero. */
   .layout {
-    grid-template-rows: minmax(420px, 58vh) auto auto auto auto;
+    grid-template-rows: auto auto auto auto auto;
     grid-template-areas:
       "brain"
       "hero"
@@ -3227,7 +3227,31 @@ a.learn-hero-title:hover { color: #BAE6FD; text-decoration: underline; }
       "env"
       "thoughts";
   }
-  #brain3d { min-height: 360px; }
+
+  /* CRITICAL mobile fix: OrbitControls sets `touch-action: none` on the
+     canvas, which hijacks one-finger scroll — so you could never scroll
+     PAST the 3D brain to reach the region panel below it, and the panel
+     "didn't show". Allow vertical page scrolling over the canvas (drag
+     still rotates horizontally). !important beats the inline style
+     OrbitControls writes. */
+  #brain3d canvas { touch-action: pan-y !important; }
+
+  /* Let the brain panel be a normal, finite block so its region legend
+     flows below the canvas and the whole thing scrolls naturally. */
+  .panel-brain { overflow: visible; min-height: auto; }
+  #brain3d { flex: 0 0 auto; height: 44vh; min-height: 300px; }
+  .brain-legend { display: grid !important; }
+
+  /* The tabbed detail panel (Region / Learning / …) sits at natural
+     height and scrolls with the page rather than trapping content in a
+     zero-height inner scroller. */
+  .panel-region { min-height: auto; overflow: visible; }
+  .panel-region #region-detail,
+  .panel-region .learning-panel,
+  .panel-region .knowledge-panel,
+  .panel-region .trading-panel,
+  .panel-region .web-panel,
+  .panel-region .voice-panel { overflow: visible; max-height: none; }
 }
 
 @media (max-width: 460px) {
