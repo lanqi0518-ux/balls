@@ -2,7 +2,7 @@
 
 **A live, always-learning digital cortex running on a public blockchain.**
 Zero LLM. Zero pretrained weights. Zero external inference API.
-14 hand-written PyTorch modules learning online from a REINFORCE gradient.
+**20 hand-written brain regions** (19 PyTorch modules + 1 real LIF spiking central complex) learning online from a REINFORCE gradient.
 
 **Live**: <https://balls-lanqi.fly.dev>
 
@@ -22,11 +22,11 @@ grep -riE "openai|anthropic|claude|gpt|llama|mistral|cohere|huggingface|transfor
 
 ---
 
-## The 14 brain regions
+## The 20 brain regions
 
 Every region is a small PyTorch module (or a hand-written spiking net), grounded in real neuroscience, learning online. Click through and read the code — most files are under 100 lines.
 
-📁 [**All 14 regions in one folder**](https://github.com/lanqi0518-ux/brain/tree/main/digital-brain/backend/brain/regions)
+📁 [**All 20 regions in one folder**](https://github.com/lanqi0518-ux/brain/tree/main/digital-brain/backend/brain/regions)
 
 | # | Region | What it does |
 |---|---|---|
@@ -43,7 +43,13 @@ Every region is a small PyTorch module (or a hand-written spiking net), grounded
 | 11 🆕 | [Cerebellum](https://github.com/lanqi0518-ux/brain/blob/main/digital-brain/backend/brain/regions/cerebellum.py) | Forward-model calibration (Wolpert-Miall-Kawato 1998) |
 | 12 🆕 | [Basal ganglia](https://github.com/lanqi0518-ux/brain/blob/main/digital-brain/backend/brain/regions/basal_ganglia.py) | Go/NoGo action gating (Frank 2005) |
 | 13 🆕 | [Insular cortex](https://github.com/lanqi0518-ux/brain/blob/main/digital-brain/backend/brain/regions/insular_cortex.py) | Interoception, risk-as-feeling (Craig 2009; Damasio) |
-| 14 🆕 | [Locus coeruleus](https://github.com/lanqi0518-ux/brain/blob/main/digital-brain/backend/brain/regions/locus_coeruleus.py) | Noradrenergic gain (Aston-Jones & Cohen 2005) |
+| 14 | [Locus coeruleus](https://github.com/lanqi0518-ux/brain/blob/main/digital-brain/backend/brain/regions/locus_coeruleus.py) | Noradrenergic gain (Aston-Jones & Cohen 2005) |
+| 15 🆕 | [Anterior cingulate](https://github.com/lanqi0518-ux/brain/blob/main/digital-brain/backend/brain/regions/anterior_cingulate.py) | Conflict monitoring · entropy × RPE (Botvinick 2001; Carter 1998) |
+| 16 🆕 | [Ventral tegmental area](https://github.com/lanqi0518-ux/brain/blob/main/digital-brain/backend/brain/regions/ventral_tegmental.py) | Dopamine burst source, plasticity gain (Schultz 1997) |
+| 17 🆕 | [Hypothalamus](https://github.com/lanqi0518-ux/brain/blob/main/digital-brain/backend/brain/regions/hypothalamus.py) | Homeostatic drives · energy · arousal (Sternson 2013) |
+| 18 🆕 | [Entorhinal cortex](https://github.com/lanqi0518-ux/brain/blob/main/digital-brain/backend/brain/regions/entorhinal_cortex.py) | 6-module hexagonal grid-cell code (Moser 2008, Nobel 2014) |
+| 19 🆕 | [Posterior parietal](https://github.com/lanqi0518-ux/brain/blob/main/digital-brain/backend/brain/regions/posterior_parietal.py) | Evidence accumulator · drift-diffusion (Shadlen 2001) |
+| 20 🆕 | [Raphe nuclei](https://github.com/lanqi0518-ux/brain/blob/main/digital-brain/backend/brain/regions/raphe_nuclei.py) | Serotonin · patience · delay discounting (Doya 2002) |
 
 ---
 
