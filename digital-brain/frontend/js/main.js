@@ -6,7 +6,7 @@
 
 import { BrainScene } from "/static/js/brain3d.js?v=20260913g";
 import { EnvironmentView, renderEnvStats } from "/static/js/environment.js";
-import { ThoughtStream } from "/static/js/thoughtstream.js?v=20260913learn2";
+import { ThoughtStream } from "/static/js/thoughtstream.js?v=20260913learn3";
 import { loadKnowledge, setActiveConcept, categoryColor, mergeLearnedConcepts } from "/static/js/knowledge.js";
 import { initTrading, updateTrading } from "/static/js/trading.js";
 import { initWebView, updateWebView, updateWebTopbarStrip } from "/static/js/web_view.js";

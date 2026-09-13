@@ -116,6 +116,12 @@ class TwitterVoice:
         self.spontaneous_enabled = _truthy(os.getenv("TWITTER_SPONTANEOUS", "1"))
         self.spontaneous_gap_s = float(
             os.getenv("TWITTER_SPONTANEOUS_MIN_MINUTES", "5")) * 60.0
+        # Inner monologue: a short first-person line pushed into the live
+        # thought stream every few seconds so the stream reads as the brain's
+        # own words (never posted to X — this is thinking, not tweeting).
+        self.inner_voice_enabled = _truthy(os.getenv("INNER_VOICE", "1"))
+        self.inner_voice_gap_s = float(os.getenv("INNER_VOICE_SECONDS", "12"))
+        self._last_inner_voice_at = 0.0
         # A gentler, separate cool-down for "I just read something" reactions
         # so the news chatter doesn't dominate the timeline.
         self.news_react_gap_s = float(
@@ -216,8 +222,13 @@ class TwitterVoice:
             await asyncio.wait_for(self._stop.wait(), timeout=20.0)
         except asyncio.TimeoutError:
             pass
+        # Tick fast enough to service the inner-voice cadence; all the
+        # posting schedulers below are independently time-gated, so calling
+        # them every few seconds is cheap and never over-fires.
+        tick_s = max(2.0, min(6.0, self.inner_voice_gap_s))
         while not self._stop.is_set():
             try:
+                self._maybe_inner_voice()
                 self._maybe_post_weekly()
                 self._maybe_post_daily()
                 self._maybe_post_spontaneous()
@@ -226,7 +237,7 @@ class TwitterVoice:
             except Exception as e:  # noqa: BLE001
                 LOG.warning("twitter voice tick failed: %s", e)
             try:
-                await asyncio.wait_for(self._stop.wait(), timeout=30.0)
+                await asyncio.wait_for(self._stop.wait(), timeout=tick_s)
             except asyncio.TimeoutError:
                 pass
 
@@ -346,6 +357,29 @@ class TwitterVoice:
         self._emit("spontaneous", text, trigger=trigger)
         self._marks["last_spontaneous_at"] = now
         self._save_marks()
+
+    def _maybe_inner_voice(self) -> None:
+        """Push a short first-person 'thinking out loud' line into the brain's
+        live thought stream. Never posted to X — this is the brain's inner
+        monologue, so the Thought stream reads as its own words."""
+        if not self.inner_voice_enabled:
+            return
+        now = time.time()
+        if now - self._last_inner_voice_at < self.inner_voice_gap_s:
+            return
+        self._last_inner_voice_at = now
+        try:
+            state = self._gather_state()
+            text = self.brain.broca.compose_inner_voice(state)
+            if not text:
+                return
+            self.brain._add_thought(
+                "broca", text, text,
+                kind="voice",
+                extra={"channel": "inner"},
+            )
+        except Exception as e:  # noqa: BLE001
+            LOG.debug("inner voice failed: %s", e)
 
     def _maybe_post_learning_reaction(self) -> None:
         """The brain reacts, in near real-time, to a fresh thing it just read

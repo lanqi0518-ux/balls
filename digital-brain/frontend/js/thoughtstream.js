@@ -104,6 +104,17 @@ export class ThoughtStream {
 
   _render(t) {
     if (t._voice) return this._renderVoice(t);
+    // Inner monologue + spoken lines render as speech, not telemetry.
+    if (t.kind === "voice" || t.kind === "speak") {
+      const text = t.text || t.text_zh || "";
+      return `<div class="thought thought-voice voice-kind-inner">
+        <div class="thought-meta">
+          <span class="step">t=${t.step}</span>
+          <span class="region voice-speaker">Broca · thinking out loud</span>
+        </div>
+        <div class="thought-voice-text">${escapeHtml(text)}</div>
+      </div>`;
+    }
     const label = REGION_LABELS[t.region] || t.region;
     const text = t.text || t.text_zh || "";
     return `<div class="thought thought-kind-${t.kind}">

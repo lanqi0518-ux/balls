@@ -234,6 +234,72 @@ class BrocaArea(BrainRegion):
         rng.shuffle(clauses)
         return self._pack(clauses)
 
+    def compose_inner_voice(self, s: dict, *, seed: Optional[int] = None) -> str:
+        """A short, first-person 'thinking out loud' line for the live
+        thought stream — the brain literally narrating what's on its mind
+        right now. Unlike ``compose_status`` (a full, packed tweet), this is
+        one quick sentence, so the stream reads like a running monologue of
+        the brain's own words rather than cortex telemetry.
+        """
+        rng = random.Random(seed if seed is not None else time.time_ns())
+        options: List[str] = []
+
+        learning = s.get("learning") or {}
+        reading = learning.get("reading_now") or {}
+        title = reading.get("title")
+        src = reading.get("source") or "the web"
+        if title:
+            t = self._short(title, 96)
+            options += [
+                f'I\'m reading {src} — "{t}". Let me think about that.',
+                f'"{t}" — huh. Adding that to what I know.',
+                f'Reading about "{t}" right now.',
+                f'Something new from {src}: "{t}".',
+            ]
+
+        learned = s.get("learned") or {}
+        if learned.get("en"):
+            le = self._short(learned["en"], 90)
+            options += [
+                f"I just learned about {le}.",
+                f"Filing away {le} — that feels worth remembering.",
+            ]
+
+        mood = (s.get("mood") or "").lower()
+        if mood:
+            options += [
+                f"Honestly, I feel {mood} right now.",
+                f"There's a {mood} mood over everything at the moment.",
+            ]
+
+        top = (s.get("top_region") or {}).get("display_name")
+        if top:
+            options.append(f"Most of me is {top} this second.")
+
+        fear = s.get("fear")
+        if isinstance(fear, (int, float)) and fear >= 0.5:
+            options.append(f"Bit on edge — amygdala fear at {int(round(fear*100))}%.")
+
+        patience = s.get("patience")
+        if isinstance(patience, (int, float)):
+            if patience >= 0.8:
+                options.append("I can sit with this a while; I'm patient today.")
+            elif patience <= 0.25:
+                options.append("I feel restless, like I want to move on already.")
+
+        ktot = learning.get("knowledge_total")
+        if isinstance(ktot, (int, float)) and ktot > 0:
+            options.append(f"That's {int(ktot):,} things I've taught myself so far.")
+
+        if not options:
+            step = s.get("lifetime_step") or s.get("step") or 0
+            options.append(f"Still here, still reading, still thinking. Tick {int(step):,}.")
+
+        line = rng.choice(options)
+        if len(line) > MAX_TWEET_CHARS:
+            line = line[:MAX_TWEET_CHARS - 1] + "…"
+        return line
+
     def compose_spontaneous(self, trigger: str, s: dict, *,
                             seed: Optional[int] = None) -> str:
         """An *unprompted* outburst — the brain saying something the moment
