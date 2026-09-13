@@ -12,6 +12,7 @@ const KIND_LABEL = {
   status: "status",
   daily: "daily digest",
   weekly: "weekly milestone",
+  spontaneous: "spontaneous",
 };
 
 export function initVoice(panelEl) {
@@ -68,7 +69,8 @@ export function updateVoice(twitter) {
 }
 
 function renderUtterance(u) {
-  const kind = KIND_LABEL[u.kind] || u.kind || "status";
+  let kind = KIND_LABEL[u.kind] || u.kind || "status";
+  if (u.kind === "spontaneous" && u.trigger) kind = `spontaneous · ${u.trigger}`;
   const when = u.at_s ? fmtAgo(Date.now() / 1000 - u.at_s) : "";
   const posted = u.posted;
   const isDraft = !posted;

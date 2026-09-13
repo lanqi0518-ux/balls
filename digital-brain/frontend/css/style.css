@@ -833,6 +833,17 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   text-overflow: ellipsis;
   max-width: 100%;
 }
+.specimen-meta-emotion {
+  color: var(--accent);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  transition: color 0.6s ease;
+}
 .brain-figcaption {
   display: grid;
   grid-template-columns: max-content 1fr;
@@ -2984,6 +2995,11 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
   background: rgba(167, 139, 250, 0.14);
   border-color: rgba(167, 139, 250, 0.4);
   color: #C4B5FD;
+}
+.voice-kind-spontaneous {
+  background: rgba(255, 74, 94, 0.14);
+  border-color: rgba(255, 74, 94, 0.4);
+  color: #FF8DA0;
 }
 .voice-when { color: var(--text-muted); font-size: 10px; }
 .voice-chars { color: var(--text-muted); font-size: 10px; margin-left: auto; }

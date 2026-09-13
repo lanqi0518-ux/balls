@@ -33,6 +33,7 @@ const tickHzDot = document.getElementById("tick-hz-dot");
 const walletLabel = document.getElementById("wallet-label");
 const specimenNeurons = document.getElementById("specimen-neurons");
 const specimenDecision = document.getElementById("specimen-decision");
+const specimenEmotion = document.getElementById("specimen-emotion");
 
 const knowledgePanel = document.getElementById("knowledge-panel");
 const tradingPanel = document.getElementById("trading-panel");
@@ -346,6 +347,13 @@ function handlePayload(data) {
   if (engagementForVessels != null) {
     brainScene.setEngagement(engagementForVessels);
   }
+
+  // Drive the void face beside the brain + the on-screen expression caption
+  // from the backend's emotion summary (single source of truth).
+  if (brain.emotion) {
+    brainScene.setEmotion(brain.emotion);
+    updateEmotionCaption(brain.emotion);
+  }
   envView.update(env);
   renderEnvStats(envStatsEl, env, brain);
   thoughtStream.addFromSnapshot(brain.thoughts);
@@ -393,6 +401,27 @@ function updateTradingStrip(trading) {
   paperPnlEl.className = "mono " + (pnl > 0 ? "up" : pnl < 0 ? "down" : (armed ? "up" : ""));
   const pnlStr = pnl !== 0 ? `${pnl >= 0 ? "+" : ""}${pnl.toFixed(4)} ETH` : `${confirmed} tx · ${open} open`;
   paperPnlEl.textContent = pnlStr;
+}
+
+// ---------- Expression caption (mirrors the void face) -----------------
+const MOOD_COLOR = {
+  FEARFUL: "#ff4a5e",
+  ANXIOUS: "#fb923c",
+  GLOOMY: "#a78bfa",
+  ALERT: "#fbbf24",
+  CALM: "#6ee7ff",
+  CONTENT: "#5ef0a0",
+  EUPHORIC: "#34d399",
+};
+function updateEmotionCaption(emo) {
+  if (!specimenEmotion || !emo) return;
+  const mood = emo.mood || "—";
+  const fear = Math.round((emo.fear || 0) * 100);
+  const gut = (emo.gut_feeling >= 0 ? "+" : "") + (emo.gut_feeling ?? 0).toFixed(2);
+  const aro = Math.round((emo.arousal || 0) * 100);
+  specimenEmotion.textContent =
+    `EXPRESSION · ${mood} (fear ${fear}% · gut ${gut} · arousal ${aro}%)`;
+  specimenEmotion.style.color = MOOD_COLOR[mood] || "var(--text-secondary)";
 }
 
 // ---------- Hero: NOW THINKING -----------------------------------------
