@@ -68,7 +68,9 @@ export class BrainScene {
     // Mobile is much happier at 1x DPR — retina phones otherwise render
     // at ~9x pixel budget which pins the GPU and stalls scrolling.
     this._isMobile = window.matchMedia("(max-width: 800px)").matches;
-    const maxDpr = this._isMobile ? 1 : 2;
+    // 1.5x DPR on mobile keeps anatomy crisp on retina phones without
+    // pinning the GPU (2x would 4x the pixel budget).
+    const maxDpr = this._isMobile ? 1.5 : 2;
     this.renderer = new THREE.WebGLRenderer({ antialias: !this._isMobile, alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxDpr));
     this.renderer.setClearColor(0x000000, 0);
@@ -98,20 +100,18 @@ export class BrainScene {
     if (!this._isMobile) return;
     try {
       if (this.cerebrum && this.cerebrum.material) {
-        this.cerebrum.material.opacity = 0.22;
-        this.cerebrum.material.transmission = 0.35;
-        this.cerebrum.material.emissiveIntensity = 0.28;
+        this.cerebrum.material.opacity = 0.28;
+        this.cerebrum.material.transmission = 0.30;
+        this.cerebrum.material.emissiveIntensity = 0.32;
         this.cerebrum.material.needsUpdate = true;
       }
       if (this.cerebrumWireframe && this.cerebrumWireframe.material) {
-        this.cerebrumWireframe.material.opacity = 0.18;
+        this.cerebrumWireframe.material.opacity = 0.24;
       }
-      this._regionBaseSize = 6;
-      this._regionSizeGain = 4.5;
-      this.camera.position.set(150, 70, 180);
+      this.camera.position.set(155, 75, 185);
       this.camera.lookAt(0, 0, 0);
       if (this.controls) {
-        this.controls.minDistance = 90;
+        this.controls.minDistance = 95;
         this.controls.autoRotateSpeed = 0.5;
       }
     } catch {}
@@ -848,15 +848,16 @@ export class BrainScene {
       entry.data = r;
       // Region cores sit INSIDE the cerebrum as small luminous cortex
       // markers, not as giant spheres that eclipse the anatomy. Scale
-      // range is now roughly 3-6 units against a ~100-unit brain
-      // (bigger on mobile so 14 dots are all readable at 360px).
-      const baseUnits = this._isMobile ? 4.5 : 3.0;
-      const gainUnits = this._isMobile ? 4.0 : 3.0;
+      // range: 3-6 units on desktop, 3.5-6.5 units on mobile (against a
+      // ~100-unit brain). Slightly bigger on mobile so 14 dots are all
+      // still readable at 360px without eclipsing the anatomy.
+      const baseUnits = this._isMobile ? 3.5 : 3.0;
+      const gainUnits = this._isMobile ? 3.0 : 3.0;
       const size = baseUnits + Math.pow(r.activation, 0.7) * gainUnits;
       entry.core.scale.setScalar(size / entry.baseSize);
       entry.core.material.opacity = 0.9 + r.activation * 0.1;
-      entry.glow.material.opacity = (this._isMobile ? 0.30 : 0.20) + r.activation * 0.35;
-      entry.glow.scale.setScalar((size * (this._isMobile ? 2.6 : 2.2)) / entry.baseSize);
+      entry.glow.material.opacity = (this._isMobile ? 0.24 : 0.20) + r.activation * 0.32;
+      entry.glow.scale.setScalar((size * (this._isMobile ? 2.3 : 2.2)) / entry.baseSize);
       entry.pulseTarget = r.activation;
       sumAct += r.activation;
       nAct++;
