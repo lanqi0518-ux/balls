@@ -60,12 +60,13 @@ swap_size_mb = 512
   policy = "always"
 
 [[vm]]
-  # Bumped to 2GB and 2 CPUs so the headless Chromium web-embodiment
-  # subsystem has memory headroom alongside PyTorch + the spiking
-  # central complex.
-  size = "performance-2x"
-  memory = "4gb"
-  cpus = 2
+  # 4 dedicated cores + 8 GB — headless Chromium spawns 8-10 processes,
+  # PyTorch runs the 14-region cortex, plus the spiking central-complex
+  # LIF loop. With 14 regions live and rendering, 2 cores were saturating
+  # under WebSocket load; 4 cores keep TTFB under 200 ms even under fan-out.
+  size = "performance-4x"
+  memory = "8gb"
+  cpus = 4
 
 # One volume per machine; created via `flyctl volumes create data -r sjc -s 1`.
 # The brain's cortex weights, hippocampus, and paper-book all live here so
