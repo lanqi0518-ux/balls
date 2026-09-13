@@ -2044,7 +2044,9 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   body { min-height: 100vh; }
   .layout {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(520px, 62vh) auto auto auto auto;
+    /* Give the brain panel a big chunk of the screen so all 14 region
+       cores are actually visible above the fold on a phone. */
+    grid-template-rows: minmax(560px, 78vh) auto auto auto auto;
     grid-template-areas:
       "brain"
       "hero"
@@ -2052,17 +2054,29 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
       "region"
       "thoughts";
   }
-  .topbar { flex-wrap: wrap; padding: 12px 16px; }
-  .topbar-status { order: 3; width: 100%; }
+  .topbar { flex-wrap: wrap; padding: 8px 12px; gap: 6px; }
+  .topbar-status { order: 3; width: 100%; gap: 6px; }
   .topbar-actions { padding-left: 0; border-left: none; }
+  /* Compress topbar chips so they don't push the brain below the fold. */
+  .topbar .status-item { padding: 3px 8px; font-size: 10px; }
+  .topbar .badge { padding: 3px 8px; font-size: 10px; }
+  /* On tight phones, hide secondary status chips; the essentials
+     (connected · tick · reward · wallet · mode) still show. */
+  .topbar .badge-learning,
+  .topbar .badge-uptime,
+  .topbar .badge-browser { display: none; }
   .hero-thinking .hero-headline { font-size: clamp(24px, 6vw, 34px); }
   /* Reclaim room inside the brain panel for the 3D canvas — the
-     figcaption + specimen meta together eat half the panel on phones. */
+     figcaption + specimen meta together eat half the panel on phones.
+     On phones the anatomy is the message; hide all decorative text. */
   .panel-brain .brain-figcaption { display: none; }
-  .panel-brain .specimen-meta { padding: 4px 2px; gap: 2px; }
-  .panel-brain .specimen-meta-row { font-size: 9px; }
-  #brain3d { min-height: 300px; }
+  .panel-brain .specimen-meta { display: none; }
+  .panel-brain .brain-panel-head { padding-bottom: 4px; }
+  #brain3d { min-height: 460px; flex: 1 1 auto; }
   .brand-plate { flex-wrap: wrap; row-gap: 4px; }
+  /* Show fewer of the "always learning / uptime / live" chips at once
+     on tight phones so the brand plate stays a single visual unit. */
+  .brand-sub { font-size: 11px; line-height: 1.35; }
 }
 
 /* ---------- Web view: the brain's second body ---------------------------- */
