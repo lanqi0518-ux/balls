@@ -818,7 +818,7 @@ export class BrainScene {
 
     const group = new THREE.Group();
     this.face = group;
-    this._faceMats = [];
+    this._faceMats = [];   // glowing point/line feature materials (tinted)
 
     const mkPointsMat = (opacity, size) => {
       const m = new THREE.PointsMaterial({
@@ -834,43 +834,108 @@ export class BrainScene {
       return m;
     };
 
-    // 1) Face boundary — a faint hollow ellipse of points.
-    const HALO_N = 72;
-    const rx = 30, ry = 40;
-    const haloPos = new Float32Array(HALO_N * 3);
-    for (let i = 0; i < HALO_N; i++) {
-      const a = (i / HALO_N) * Math.PI * 2;
-      haloPos[i * 3] = Math.cos(a) * rx;
-      haloPos[i * 3 + 1] = Math.sin(a) * ry;
-      haloPos[i * 3 + 2] = 0;
-    }
-    const haloGeo = new THREE.BufferGeometry();
-    haloGeo.setAttribute("position", new THREE.BufferAttribute(haloPos, 3));
-    this.faceHalo = new THREE.Points(haloGeo, mkPointsMat(0.5, 1.5));
-    group.add(this.faceHalo);
+    // ================================================================
+    //  A translucent 3-D wireframe HEAD (like a scanned model): a UV
+    //  grid sphere sculpted into a human head — brow ridge, nose,
+    //  lips, eye sockets, cheeks, a tapering jaw — rendered as a
+    //  see-through blue skin with a clean quad wireframe over it.
+    // ================================================================
+    const US = 40, VS = 36;              // grid stacks × slices (fine quads)
+    const HW = 24, HH = 42, HD = 28;     // half width / height / depth
+    const rows = US + 1, cols = VS;
 
-    // 2) Inner void dust filling the face — shimmering, low opacity.
-    const DUST_N = 150;
-    const dustPos = new Float32Array(DUST_N * 3);
-    for (let i = 0; i < DUST_N; i++) {
-      // Rejection-sample inside the ellipse.
-      let x, y;
-      do { x = (Math.random() * 2 - 1) * rx; y = (Math.random() * 2 - 1) * ry; }
-      while ((x * x) / (rx * rx) + (y * y) / (ry * ry) > 1);
-      dustPos[i * 3] = x;
-      dustPos[i * 3 + 1] = y;
-      dustPos[i * 3 + 2] = (Math.random() * 2 - 1) * 3;
-    }
-    const dustGeo = new THREE.BufferGeometry();
-    dustGeo.setAttribute("position", new THREE.BufferAttribute(dustPos, 3));
-    this.faceDust = new THREE.Points(dustGeo, mkPointsMat(0.28, 1.1));
-    group.add(this.faceDust);
+    // Face features live on the +z hemisphere (front). `front` gates the
+    // sculpting so the back of the head stays a smooth cranium.
+    const verts = [];
+    for (let i = 0; i <= US; i++) {
+      const phi = (i / US) * Math.PI;          // 0 crown → PI chin
+      const sp = Math.sin(phi), cp = Math.cos(phi);
+      for (let j = 0; j < VS; j++) {
+        const theta = (j / VS) * Math.PI * 2;  // around; +z front at PI/2
+        const ct = Math.cos(theta), st = Math.sin(theta);
+        let x = sp * ct * HW;
+        let y = cp * HH;
+        let z = sp * st * HD;
+        const front = Math.max(0, st);
 
-    // 3) Eyes — each a ring of points plus a bright pupil. Openness is the
-    //    group's y-scale (blink + fear widening).
+        // Jaw / chin taper on the lower head.
+        const lower = Math.max(0, (phi - Math.PI * 0.52) / (Math.PI * 0.48));
+        if (lower > 0) {
+          const tt = lower * lower;
+          x *= 1 - 0.42 * tt;
+          z *= 1 - 0.26 * tt;
+          y -= tt * 3.0;                        // pull the chin down a touch
+        }
+        // Flatten the back of the skull.
+        if (st < 0) z *= 0.82;
+
+        const bump = (p0, t0, sphi, sth, amp) =>
+          amp * Math.exp(-(Math.pow(phi - p0, 2) / sphi +
+                           Math.pow(theta - t0, 2) / sth));
+        const H = Math.PI / 2;                  // front meridian
+        // Brow ridge, nose, lips (protrude); eye sockets (indent).
+        z += front * bump(0.47 * Math.PI, H, 0.02, 0.5, 2.6);   // brow
+        z += front * bump(0.60 * Math.PI, H, 0.012, 0.05, 7.5); // nose
+        z += front * bump(0.72 * Math.PI, H, 0.008, 0.09, 2.2); // lips
+        z -= front * bump(0.53 * Math.PI, H - 0.34, 0.010, 0.03, 2.6); // eyeL
+        z -= front * bump(0.53 * Math.PI, H + 0.34, 0.010, 0.03, 2.6); // eyeR
+        x *= 1 + front * bump(0.63 * Math.PI, H, 0.06, 0.06, 0.06);    // cheeks
+
+        verts.push(x, y, z);
+      }
+    }
+    const idx = (i, j) => i * cols + (j % cols);
+
+    // Skin: a see-through, lit surface so the head reads as solid 3-D.
+    const skinPos = new Float32Array(verts);
+    const tris = [];
+    for (let i = 0; i < US; i++) {
+      for (let j = 0; j < VS; j++) {
+        const a = idx(i, j), b = idx(i, j + 1);
+        const c = idx(i + 1, j), d = idx(i + 1, j + 1);
+        tris.push(a, c, b, b, c, d);
+      }
+    }
+    const skinGeo = new THREE.BufferGeometry();
+    skinGeo.setAttribute("position", new THREE.BufferAttribute(skinPos, 3));
+    skinGeo.setIndex(tris);
+    skinGeo.computeVertexNormals();
+    this._faceSkinMat = new THREE.MeshStandardMaterial({
+      color: 0x2f6fb0, transparent: true, opacity: 0.28,
+      roughness: 0.72, metalness: 0.04, side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    this.headMesh = new THREE.Mesh(skinGeo, this._faceSkinMat);
+    group.add(this.headMesh);
+
+    // Wireframe: only the quad grid lines (u & v), no triangle diagonals.
+    const linePos = [];
+    const push2 = (a, b) => {
+      linePos.push(verts[a * 3], verts[a * 3 + 1], verts[a * 3 + 2]);
+      linePos.push(verts[b * 3], verts[b * 3 + 1], verts[b * 3 + 2]);
+    };
+    for (let i = 0; i <= US; i++) {
+      for (let j = 0; j < VS; j++) {
+        push2(idx(i, j), idx(i, j + 1));                 // horizontal ring
+        if (i < US) push2(idx(i, j), idx(i + 1, j));     // vertical seam
+      }
+    }
+    const wireGeo = new THREE.BufferGeometry();
+    wireGeo.setAttribute("position",
+      new THREE.BufferAttribute(new Float32Array(linePos), 3));
+    this._faceWireMat = new THREE.LineBasicMaterial({
+      color: 0x9fd0ff, transparent: true, opacity: 0.5,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    this.headWire = new THREE.LineSegments(wireGeo, this._faceWireMat);
+    group.add(this.headWire);
+
+    // ---- Overlaid, emotive features (glow so they read over the grid) ---
+    // Eyes — a ring of points + a bright pupil, floated over the sockets.
+    const EYE_Z = 22, EYE_Y = 4.5, EYE_X = 9.5;
     const makeEye = (cx) => {
       const eye = new THREE.Group();
-      const N = 28, r = 6.5;
+      const N = 26, r = 5.2;
       const pos = new Float32Array(N * 3);
       for (let i = 0; i < N; i++) {
         const a = (i / N) * Math.PI * 2;
@@ -880,7 +945,7 @@ export class BrainScene {
       }
       const geo = new THREE.BufferGeometry();
       geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-      const ring = new THREE.Points(geo, mkPointsMat(0.85, 1.7));
+      const ring = new THREE.Points(geo, mkPointsMat(0.9, 1.6));
       eye.add(ring);
       const pupilMat = new THREE.MeshBasicMaterial({
         color: 0xffffff, transparent: true, opacity: 0.95,
@@ -888,39 +953,41 @@ export class BrainScene {
       });
       this._facePupilMats = this._facePupilMats || [];
       this._facePupilMats.push(pupilMat);
-      const pupil = new THREE.Mesh(new THREE.SphereGeometry(2.6, 12, 10), pupilMat);
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(2.1, 12, 10), pupilMat);
       pupil.position.z = 1.5;
       eye.add(pupil);
-      eye.position.set(cx, 9, 2);
+      eye.position.set(cx, EYE_Y, EYE_Z);
       group.add(eye);
       return eye;
     };
-    this.eyeL = makeEye(-13);
-    this.eyeR = makeEye(13);
+    this.eyeL = makeEye(-EYE_X);
+    this.eyeR = makeEye(EYE_X);
 
-    // 4) Brows — thin glowing bars; rotate + rise for worry/anger.
+    // Brows — thin glowing bars; rotate + rise for worry / anger.
     const browMat = new THREE.MeshBasicMaterial({
-      color: 0x6ee7ff, transparent: true, opacity: 0.8,
+      color: 0x6ee7ff, transparent: true, opacity: 0.85,
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
     this._faceBarMats = [browMat];
-    const browGeo = new THREE.BoxGeometry(15, 1.8, 1.2);
+    this._browBaseY = 12;
+    const browGeo = new THREE.BoxGeometry(11, 1.5, 1.0);
     this.browL = new THREE.Mesh(browGeo, browMat);
     this.browR = new THREE.Mesh(browGeo, browMat);
-    this.browL.position.set(-13, 20, 2);
-    this.browR.position.set(13, 20, 2);
+    this.browL.position.set(-EYE_X, this._browBaseY, EYE_Z + 1);
+    this.browR.position.set(EYE_X, this._browBaseY, EYE_Z + 1);
     group.add(this.browL);
     group.add(this.browR);
 
-    // 5) Mouth — a closed loop of points (upper + lower lip) rebuilt each
-    //    frame from curvature (smile/frown) and openness.
+    // Mouth — a closed loop of points rebuilt each frame from curvature
+    // (smile / frown) and openness, floated over the lips.
     this._mouthM = 16;
-    this._mouthHalf = 14;
-    this._mouthBaseY = -16;
+    this._mouthHalf = 10;
+    this._mouthBaseY = -12;
+    this._mouthZ = 23;
     const mouthPos = new Float32Array(this._mouthM * 2 * 3);
     const mouthGeo = new THREE.BufferGeometry();
     mouthGeo.setAttribute("position", new THREE.BufferAttribute(mouthPos, 3));
-    this.mouth = new THREE.Points(mouthGeo, mkPointsMat(0.9, 1.9));
+    this.mouth = new THREE.Points(mouthGeo, mkPointsMat(0.95, 1.8));
     this._mouthGeo = mouthGeo;
     group.add(this.mouth);
 
@@ -940,31 +1007,50 @@ export class BrainScene {
     cur.gut += (tgt.gut - cur.gut) * k;
     const v = cur.valence, a = cur.arousal, f = cur.fear;
 
-    // Keep the face pinned to the right of the view and gazing at us.
+    // Keep the head pinned to the right of the view and gazing at us.
     const camDir = this.camera.position.clone().normalize();
     const right = new THREE.Vector3(0, 1, 0).cross(camDir).normalize();
     const up = camDir.clone().cross(right).normalize();
-    const offset = this._isMobile ? 96 : 120;
-    this.face.position.copy(right.multiplyScalar(offset)).addScaledVector(up, 6);
+    const offset = this._isMobile ? 104 : 128;
+    this.face.position.copy(right.multiplyScalar(offset)).addScaledVector(up, 4);
     // Gentle float.
     this.face.position.addScaledVector(up, Math.sin(t * 0.8) * 2.5);
     this.face.lookAt(this.camera.position);
+    // Subtle "alive" motion — a slow look-around + nod, stronger when aroused.
+    this.face.rotateY(Math.sin(t * 0.35) * (0.10 + a * 0.12));
+    this.face.rotateX(Math.sin(t * 0.27 + 1.3) * (0.05 + f * 0.06));
 
-    // ---- Colour from feeling: cyan calm → red fear, green joy, violet gloom.
-    const col = new THREE.Color(0x6ee7ff);
-    if (v > 0) col.lerp(new THREE.Color(0x5ef0a0), Math.min(1, v));
-    else col.lerp(new THREE.Color(0xa78bfa), Math.min(1, -v) * 0.85);
-    col.lerp(new THREE.Color(0xff4a5e), Math.min(1, f));
-    for (const m of this._faceMats) m.color.copy(col);
-    for (const m of this._faceBarMats) m.color.copy(col);
-
-    // ---- Shimmer scales with arousal.
-    const shimmer = 0.5 + 0.5 * Math.sin(t * (1.4 + a * 4));
-    if (this.faceHalo) this.faceHalo.material.opacity = 0.35 + 0.25 * shimmer + a * 0.15;
-    if (this.faceDust) {
-      this.faceDust.material.opacity = 0.18 + 0.18 * shimmer;
-      this.faceDust.rotation.z = Math.sin(t * 0.3) * 0.05;
+    // ---- Colour from feeling. The skin/wire stay in the blue family (like
+    //      the reference scan) but drift toward green joy / violet gloom /
+    //      red fear; the glowing features pick up a brighter accent.
+    const skin = new THREE.Color(0x2f6fb0);
+    const wire = new THREE.Color(0x9fd0ff);
+    if (v > 0) {
+      skin.lerp(new THREE.Color(0x2fa06e), Math.min(1, v) * 0.7);
+      wire.lerp(new THREE.Color(0x8ff0c0), Math.min(1, v) * 0.6);
+    } else {
+      skin.lerp(new THREE.Color(0x6a5fb0), Math.min(1, -v) * 0.6);
+      wire.lerp(new THREE.Color(0xc9b8ff), Math.min(1, -v) * 0.55);
     }
+    skin.lerp(new THREE.Color(0xb0344a), Math.min(1, f) * 0.8);
+    wire.lerp(new THREE.Color(0xff8a97), Math.min(1, f) * 0.75);
+    if (this._faceSkinMat) {
+      this._faceSkinMat.color.copy(skin);
+      this._faceSkinMat.opacity = 0.24 + 0.10 * f + 0.05 * a;
+    }
+    if (this._faceWireMat) {
+      this._faceWireMat.color.copy(wire);
+      this._faceWireMat.opacity = 0.42 + 0.20 * (0.5 + 0.5 * Math.sin(t * (1.2 + a * 3)));
+    }
+
+    // Bright accent for the glowing features (eyes / brows / mouth).
+    const acc = new THREE.Color(0x6ee7ff);
+    if (v > 0) acc.lerp(new THREE.Color(0x5ef0a0), Math.min(1, v));
+    else acc.lerp(new THREE.Color(0xa78bfa), Math.min(1, -v) * 0.85);
+    acc.lerp(new THREE.Color(0xff4a5e), Math.min(1, f));
+    for (const m of this._faceMats) m.color.copy(acc);
+    for (const m of this._faceBarMats) m.color.copy(acc);
+    const shimmer = 0.5 + 0.5 * Math.sin(t * (1.4 + a * 4));
 
     // ---- Blink timing.
     this._faceBlinkAt -= dt;
@@ -990,8 +1076,8 @@ export class BrainScene {
     const inner = f * 0.5 - anger * 0.5;         // >0 worried, <0 angry
     const rise = f * 5 - Math.max(0, -v) * 2.5;  // fear raises brows
     if (this.browL && this.browR) {
-      this.browL.position.y = 20 + rise;
-      this.browR.position.y = 20 + rise;
+      this.browL.position.y = this._browBaseY + rise;
+      this.browR.position.y = this._browBaseY + rise;
       this.browL.rotation.z = -inner * 0.6;      // left inner end (+x) up
       this.browR.rotation.z = inner * 0.6;       // right inner end (−x) up
     }
@@ -1010,12 +1096,12 @@ export class BrainScene {
       // upper lip
       pos[i * 3] = x;
       pos[i * 3 + 1] = cy + openHalf;
-      pos[i * 3 + 2] = 0;
+      pos[i * 3 + 2] = this._mouthZ;
       // lower lip (reversed index so it forms a loop)
       const j = M + (M - 1 - i);
       pos[j * 3] = x;
       pos[j * 3 + 1] = cy - openHalf;
-      pos[j * 3 + 2] = 0;
+      pos[j * 3 + 2] = this._mouthZ;
     }
     this._mouthGeo.attributes.position.needsUpdate = true;
 
