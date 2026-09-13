@@ -10,6 +10,7 @@ import { ThoughtStream } from "/static/js/thoughtstream.js";
 import { loadKnowledge, setActiveConcept, categoryColor, mergeLearnedConcepts } from "/static/js/knowledge.js";
 import { initTrading, updateTrading } from "/static/js/trading.js";
 import { initWebView, updateWebView, updateWebTopbarStrip } from "/static/js/web_view.js";
+import { initVoice, updateVoice } from "/static/js/voice.js";
 import { AmbientMesh } from "/static/js/ambient.js";
 
 // ---------- DOM refs ----------
@@ -36,6 +37,7 @@ const specimenDecision = document.getElementById("specimen-decision");
 const knowledgePanel = document.getElementById("knowledge-panel");
 const tradingPanel = document.getElementById("trading-panel");
 const webPanel = document.getElementById("web-panel");
+const voicePanel = document.getElementById("voice-panel");
 const detailTabs = document.getElementById("detail-tabs");
 
 // Hero panel — main-view focus: what he's thinking + what he's about to do
@@ -137,6 +139,7 @@ let modeInitialized = false;
 loadKnowledge(knowledgePanel);
 initTrading(tradingPanel, { onCommand: (cmd, extra) => send(cmd, extra) });
 initWebView(webPanel);
+initVoice(voicePanel);
 
 // Contract-address copy-to-clipboard on the brand plate.
 (function wireCaCopy() {
@@ -172,7 +175,7 @@ detailTabs.addEventListener("click", (e) => {
 });
 
 function switchDetailView(view) {
-  if (!["region", "knowledge", "trading", "web"].includes(view)) return;
+  if (!["region", "knowledge", "trading", "web", "voice"].includes(view)) return;
   detailView = view;
   document.querySelectorAll("#detail-tabs .tab").forEach((el) => {
     el.classList.toggle("active", el.dataset.view === view);
@@ -181,6 +184,7 @@ function switchDetailView(view) {
   document.getElementById("knowledge-panel").style.display = view === "knowledge" ? "flex" : "none";
   document.getElementById("trading-panel").style.display  = view === "trading"  ? "flex" : "none";
   document.getElementById("web-panel").style.display      = view === "web"      ? "flex" : "none";
+  document.getElementById("voice-panel").style.display    = view === "voice"    ? "flex" : "none";
 }
 
 // ---------- WebSocket ----------
@@ -324,6 +328,10 @@ function handlePayload(data) {
   if (data.web !== undefined) {
     updateWebView(data.web);
     updateWebTopbarStrip(data.web);
+  }
+
+  if (data.twitter !== undefined) {
+    updateVoice(data.twitter);
   }
 
   brainScene.updateRegions(brain.regions, buildRegionLiveMetrics(brain, data));

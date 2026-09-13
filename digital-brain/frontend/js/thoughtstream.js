@@ -27,6 +27,7 @@ const REGION_LABELS = {
   entorhinal_cortex: "Entorhinal cortex",
   posterior_parietal: "Posterior parietal",
   raphe_nuclei: "Raphe nuclei",
+  broca: "Broca's area",
 };
 
 export class ThoughtStream {
