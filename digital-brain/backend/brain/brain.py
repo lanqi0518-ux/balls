@@ -36,6 +36,7 @@ from .regions import (
     Amygdala,
     AnteriorCingulate,
     BasalGanglia,
+    BrocaArea,
     CentralComplex,
     Cerebellum,
     DefaultModeNetwork,
@@ -189,6 +190,13 @@ class Brain:
         self.posterior_parietal = PosteriorParietal(num_actions=num_actions)
         self.raphe_nuclei = RapheNuclei()
 
+        # --- Language production (batch 3) ---
+        # Broca's area: serialises the brain's live internal state into
+        # first-person speech (Broca 1861; Hickok-Poeppel 2007). Pure
+        # template composer — no LLM — driving the autonomous X/Twitter
+        # voice in backend/twitter_voice.py.
+        self.broca = BrocaArea()
+
         self.regions: List = [
             self.visual_cortex,
             self.thalamus,
@@ -210,6 +218,7 @@ class Brain:
             self.entorhinal_cortex,
             self.posterior_parietal,
             self.raphe_nuclei,
+            self.broca,
         ]
 
         # Running state used for online learning.
@@ -265,6 +274,16 @@ class Brain:
         self.learned_concepts: List[dict] = []
         # Cap so the knowledge bank doesn't explode after months of running.
         self.max_learned_concepts = 400
+        # When the brain isn't trading, its old market memories (fresh
+        # tokens, launchpads, trade outcomes) should stop bubbling up into
+        # the "NOW THINKING" hero and the associate thought stream — they're
+        # crypto noise now, not what the brain is about. We keep them in the
+        # knowledge bank (history) but never surface them as associations.
+        self.suppress_market_concepts = os.getenv(
+            "TRADING_ENABLED", "0") in ("0", "false", "False", "")
+        self._market_concept_categories = {
+            "learned_token", "learned_pattern", "learned_event",
+        }
         if self.config.knowledge_enabled:
             for concept, emb in all_concepts_with_embeddings(dim=feature_dim):
                 self.hippocampus.store_knowledge(
@@ -580,6 +599,9 @@ class Brain:
             + self.anterior_cingulate.control_boost()
             + self.hypothalamus.engagement_boost(),
         )
+        # Broca's area hums along with engagement — language-readiness idles
+        # low and spikes only when the Twitter voice articulates an utterance.
+        self.broca.tick(self.engagement)
         replayed = self.default_mode.tick(self.engagement, self.hippocampus, self.step_count)
         if replayed is not None:
             self._add_thought("default_mode",
@@ -622,6 +644,12 @@ class Brain:
         ep, sim = assoc
         concept = self._concepts_by_id.get(ep.label)
         if concept is None:
+            return
+        # In learning mode, never surface leftover market memories (fresh
+        # tokens like "$VOID · fresh launch", launchpads, trade outcomes) —
+        # the brain has moved on from trading.
+        if (self.suppress_market_concepts
+                and (getattr(concept, "category", "") or "") in self._market_concept_categories):
             return
         self.active_concept = {
             "id": concept.id,
@@ -714,6 +742,48 @@ class Brain:
                 torch.tensor([self.nucleus_accumbens.baseline], dtype=torch.float32),
             ])
 
+    def emotion_state(self) -> dict:
+        """A compact summary of how the brain 'feels' right now.
+
+        This is the single source of truth for the face beside the 3D
+        brain, the on-screen expression caption, and Broca's mood-flavoured
+        tweets — so all three always agree. Everything is derived from real
+        region scalars; nothing here is invented.
+
+        Returns valence ∈ [-1, +1] (unhappy…happy), arousal ∈ [0, 1]
+        (calm…activated), the raw drivers, and a one-word mood label.
+        """
+        fear = float(max(0.0, min(1.0, getattr(self.amygdala, "fear", 0.0))))
+        gut = float(max(-1.0, min(1.0, getattr(self.insular_cortex, "gut_feeling", 0.0))))
+        patience = float(max(0.0, min(1.0, getattr(self.raphe_nuclei, "patience", 0.5))))
+        lc_gain = float(getattr(self.locus_coeruleus, "gain_scalar", 1.0))
+        eng = float(max(0.0, min(1.0, getattr(self, "engagement", 0.0))))
+
+        valence = max(-1.0, min(1.0, gut - 0.5 * fear + 0.25 * (patience - 0.5)))
+        arousal = max(0.0, min(1.0, 0.6 * eng + 0.5 * fear + (lc_gain - 1.0)))
+
+        if fear >= 0.6:
+            mood = "FEARFUL"
+        elif valence >= 0.35:
+            mood = "EUPHORIC" if arousal >= 0.55 else "CONTENT"
+        elif valence <= -0.35:
+            mood = "ANXIOUS" if fear >= 0.4 else "GLOOMY"
+        elif arousal >= 0.6:
+            mood = "ALERT"
+        else:
+            mood = "CALM"
+
+        return {
+            "fear": round(fear, 3),
+            "gut_feeling": round(gut, 3),
+            "patience": round(patience, 3),
+            "lc_gain": round(lc_gain, 3),
+            "engagement": round(eng, 3),
+            "valence": round(valence, 3),
+            "arousal": round(arousal, 3),
+            "mood": mood,
+        }
+
     def snapshot(self) -> dict:
         """Everything the UI needs about the current brain state."""
         now = time.time()
@@ -738,6 +808,9 @@ class Brain:
             "reward_stats": self.nucleus_accumbens.stats(),
             "motor_stats": self.motor_cortex.stats(),
             "central_complex_stats": self.central_complex.stats(),
+            "broca_stats": self.broca.stats(),
+            "broca_utterances": self.broca.utterances_public(limit=12),
+            "emotion": self.emotion_state(),
             "active_concept": self.active_concept,
             "learned_concepts_count": len(self.learned_concepts),
             "learned_concepts": [
@@ -785,6 +858,7 @@ class Brain:
             "entorhinal_cortex": self.entorhinal_cortex.state_dict_serializable(),
             "posterior_parietal": self.posterior_parietal.state_dict_serializable(),
             "raphe_nuclei": self.raphe_nuclei.state_dict_serializable(),
+            "broca": self.broca.state_dict_serializable(),
             "learned_concepts": list(self.learned_concepts),
         }
 
@@ -826,6 +900,8 @@ class Brain:
                 self.posterior_parietal.load_state_dict_safe(sd["posterior_parietal"])
             if "raphe_nuclei" in sd:
                 self.raphe_nuclei.load_state_dict_safe(sd["raphe_nuclei"])
+            if "broca" in sd:
+                self.broca.load_state_dict_safe(sd["broca"])
             # Restore learned concepts (added at runtime, e.g. fresh tokens
             # the brain has seen). Each entry becomes a permanent knowledge
             # memory again so associations continue to work.

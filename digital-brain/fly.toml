@@ -31,6 +31,11 @@ swap_size_mb = 512
   PYTHONUNBUFFERED = "1"
   DATA_DIR = "/data"
   BRAIN_MODE = "einstein"
+  # Purpose: the brain no longer trades. It reads the live web (news +
+  # social), teaches itself, grows its knowledge, and tweets its own
+  # thoughts. Flip TRADING_ENABLED back to "1" to re-arm the trader.
+  TRADING_ENABLED = "0"
+  LEARNING = "1"
 
 [http_service]
   internal_port = 8080

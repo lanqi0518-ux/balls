@@ -833,6 +833,17 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   text-overflow: ellipsis;
   max-width: 100%;
 }
+.specimen-meta-emotion {
+  color: var(--accent);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  transition: color 0.6s ease;
+}
 .brain-figcaption {
   display: grid;
   grid-template-columns: max-content 1fr;
@@ -2884,3 +2895,400 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
 }
 #playbook-body .pos { color: #6EE7B7; }
 #playbook-body .neg { color: #FCA5A5; }
+
+/* ------------------------------------------------------------------ */
+/* Voice panel — Broca's area · autonomous X/Twitter feed             */
+/* ------------------------------------------------------------------ */
+.voice-panel {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+  padding-top: 6px;
+}
+.voice-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.voice-head-l { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.voice-title {
+  font-weight: 700;
+  color: #FDBA74;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+.voice-sub { color: var(--text-muted); font-size: 11px; }
+.voice-head-r { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.voice-pill {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+  white-space: nowrap;
+}
+.voice-pill.live {
+  color: #FDBA74;
+  border-color: rgba(251, 146, 60, 0.45);
+  background: rgba(251, 146, 60, 0.12);
+}
+.voice-pill.draft { color: var(--text-muted); }
+
+.voice-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+}
+.voice-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 18px 4px;
+  text-align: center;
+}
+.voice-item {
+  border: 1px solid var(--border);
+  border-left: 2px solid rgba(251, 146, 60, 0.5);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--bg-glass);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.voice-item.is-draft { border-left-color: rgba(255, 255, 255, 0.18); }
+.voice-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.voice-kind {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(251, 146, 60, 0.14);
+  border: 1px solid rgba(251, 146, 60, 0.35);
+  color: #FDBA74;
+}
+.voice-kind-daily {
+  background: rgba(110, 231, 255, 0.12);
+  border-color: rgba(110, 231, 255, 0.35);
+  color: var(--accent);
+}
+.voice-kind-weekly {
+  background: rgba(167, 139, 250, 0.14);
+  border-color: rgba(167, 139, 250, 0.4);
+  color: #C4B5FD;
+}
+.voice-kind-spontaneous {
+  background: rgba(255, 74, 94, 0.14);
+  border-color: rgba(255, 74, 94, 0.4);
+  color: #FF8DA0;
+}
+.voice-when { color: var(--text-muted); font-size: 10px; }
+.voice-chars { color: var(--text-muted); font-size: 10px; margin-left: auto; }
+.voice-text {
+  color: var(--text-primary);
+  font-size: 13.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.voice-item-foot { display: flex; align-items: center; gap: 8px; }
+.voice-link { font-family: var(--font-mono); font-size: 10.5px; color: var(--accent); }
+.voice-flag {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.voice-flag.err { color: var(--bad); }
+
+/* ======================================================================
+   LEARNING PANEL — "what is the brain reading / learning right now"
+   The primary, plain-language view in learning mode. Built for clarity
+   first: one big headline, four numbers, a recent-reads list.
+   ====================================================================== */
+.learning-panel {
+  display: none;              /* toggled to flex by main.js */
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 6px;
+}
+
+.learn-hero {
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  border-left: 3px solid rgba(125, 211, 252, 0.8);
+  border-radius: 12px;
+  padding: 16px 18px;
+  background:
+    linear-gradient(180deg, rgba(125, 211, 252, 0.08), rgba(10, 14, 30, 0.35));
+  transition: border-color 0.4s, background 0.4s;
+}
+.learn-hero.lit { animation: learnPulse 1.1s ease-out; }
+@keyframes learnPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(125, 211, 252, 0.45); }
+  100% { box-shadow: 0 0 0 22px rgba(125, 211, 252, 0); }
+}
+.learn-hero-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7DD3FC;
+  margin-bottom: 8px;
+}
+.learn-live-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #7DD3FC;
+  box-shadow: 0 0 8px #7DD3FC, 0 0 14px #7DD3FC;
+  animation: learnBlink 1.8s ease-in-out infinite;
+}
+@keyframes learnBlink { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+.learn-hero-title {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(18px, 2.4vw, 26px);
+  font-weight: 600;
+  line-height: 1.28;
+  letter-spacing: -0.02em;
+  color: #F4F8FF;
+  text-decoration: none;
+  text-wrap: balance;
+}
+a.learn-hero-title:hover { color: #BAE6FD; text-decoration: underline; }
+
+.learn-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.learn-stat {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 10px;
+  background: var(--bg-glass);
+  text-align: center;
+}
+.learn-stat-v {
+  font-family: var(--font-display);
+  font-size: clamp(18px, 2.2vw, 24px);
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.learn-stat-k {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.learn-recent { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.learn-recent-head {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.learn-recent-list {
+  list-style: none;
+  margin: 0; padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.learn-recent-empty { color: var(--text-muted); font-size: 12px; padding: 4px 2px; }
+.learn-recent-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-left: 2px solid rgba(125, 211, 252, 0.5);
+  border-radius: 8px;
+  background: var(--bg-glass);
+}
+.learn-recent-item.learn-kind-voice { border-left-color: rgba(196, 181, 253, 0.6); }
+.learn-recent-src {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #7DD3FC;
+  max-width: 34%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.learn-kind-voice .learn-recent-src { color: #C4B5FD; }
+.learn-recent-title { color: var(--text-primary); font-size: 13px; line-height: 1.4; }
+.learn-recent-title a { color: inherit; text-decoration: none; }
+.learn-recent-title a:hover { color: var(--accent); text-decoration: underline; }
+.learn-sources {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+  padding-top: 2px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+/* ======================================================================
+   MOBILE CLARITY PASS — the dashboard was hard to parse on phones.
+   Goals: horizontally-scrollable tabs, bigger legible readouts, panels
+   that get real height, and the Learning panel front-and-centre.
+   These rules live at the end of the file so they win the cascade.
+   ====================================================================== */
+@media (max-width: 800px) {
+  /* Tabs: never wrap into an unreadable pile — scroll them sideways with
+     comfortable touch targets. */
+  .panel-title-tabs { flex-direction: column; align-items: stretch; gap: 6px; }
+  .panel-title-tabs .tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 6px;
+    padding-bottom: 4px;
+  }
+  .panel-title-tabs .tabs::-webkit-scrollbar { display: none; }
+  .panel-title-tabs .tabs .tab {
+    flex: 0 0 auto;
+    padding: 8px 14px !important;
+    font-size: 13px;
+    border-radius: 8px;
+  }
+  #region-title { display: none; }
+
+  /* The tabbed panel needs real height on phones or every list is a
+     2-line sliver. Give it a tall, self-scrolling body. */
+  .panel-region { min-height: 70vh; }
+  .learning-panel,
+  .knowledge-panel,
+  .trading-panel,
+  .web-panel,
+  .voice-panel { max-height: none; }
+
+  /* Learning stats: 2×2 grid reads far better than 4-across on a phone. */
+  .learn-stats { grid-template-columns: 1fr 1fr; }
+  .learn-hero-title { font-size: clamp(19px, 5.4vw, 26px); }
+  .learn-recent-item { flex-direction: column; gap: 3px; }
+  .learn-recent-src { max-width: 100%; }
+
+  /* Key topbar readouts: make the numbers that matter actually legible. */
+  .topbar .status-item .num { font-size: 12px; }
+  .topbar .badge-browser { display: inline-flex; max-width: 60vw; }
+  .topbar .badge-browser .num {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* Thought stream + env don't need to dominate; let the brain + the
+     learning panel lead. Reorder so region/learning sits right under the
+     brain and hero. */
+  .layout {
+    grid-template-rows: auto auto auto auto auto;
+    grid-template-areas:
+      "brain"
+      "hero"
+      "region"
+      "env"
+      "thoughts";
+  }
+
+  /* CRITICAL mobile fix: OrbitControls sets `touch-action: none` on the
+     canvas, which hijacks one-finger scroll — so you could never scroll
+     PAST the 3D brain to reach the region panel below it, and the panel
+     "didn't show". Allow vertical page scrolling over the canvas (drag
+     still rotates horizontally). !important beats the inline style
+     OrbitControls writes. */
+  #brain3d canvas { touch-action: pan-y !important; }
+
+  /* Let the brain panel be a normal, finite block so its region legend
+     flows below the canvas and the whole thing scrolls naturally. */
+  .panel-brain { overflow: visible; min-height: auto; }
+  #brain3d { flex: 0 0 auto; height: 44vh; min-height: 300px; }
+  .brain-legend { display: grid !important; }
+
+  /* The tabbed detail panel (Region / Learning / …) sits at natural
+     height and scrolls with the page rather than trapping content in a
+     zero-height inner scroller. */
+  .panel-region { min-height: auto; overflow: visible; }
+  .panel-region #region-detail,
+  .panel-region .learning-panel,
+  .panel-region .knowledge-panel,
+  .panel-region .trading-panel,
+  .panel-region .web-panel,
+  .panel-region .voice-panel { overflow: visible; max-height: none; }
+}
+
+@media (max-width: 460px) {
+  .learn-stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .brand-plate-class, .brand-plate-order { display: none; }
+}
+
+/* ======================================================================
+   THOUGHT STREAM — the brain's voice ("wants to say") folded in as speech.
+   ====================================================================== */
+.thought.thought-voice {
+  border-left: 2px solid rgba(251, 146, 60, 0.75);
+  background:
+    linear-gradient(180deg, rgba(251, 146, 60, 0.08), rgba(251, 146, 60, 0.015));
+  border-radius: 8px;
+  padding: 9px 12px;
+}
+.thought-voice .voice-speaker {
+  color: #FDBA74;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.thought-voice-text {
+  margin-top: 3px;
+  color: #FFEFDD;
+  font-size: 13.5px;
+  line-height: 1.5;
+  font-style: italic;
+}
+.thought-voice-text::before { content: "\201C"; opacity: 0.6; }
+.thought-voice-text::after  { content: "\201D"; opacity: 0.6; }
+.thought-voice .voice-flag {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.thought-voice .voice-flag.ok { color: #6EE7B7; }

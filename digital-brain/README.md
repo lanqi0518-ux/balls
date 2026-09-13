@@ -1,6 +1,6 @@
 # The Digital Human Brain
 
-**A live digital human brain — ten anatomical regions, nine deep-learning cortices plus one real LIF spiking ring-attractor, cooperating in real time. No LLM used, ever.**
+**A live digital human brain — 21 anatomical regions, 20 deep-learning cortices plus one real LIF spiking ring-attractor, cooperating in real time. It writes its own tweets. No LLM used, ever.**
 
 **Live demo**: <https://brainonchain.online> (deployed on Fly.io, `sjc`, `performance-16x` + 10 GB volume, 24/7)
 
@@ -70,6 +70,61 @@ The trader cortex is a small, well-scoped extension:
 - `LIVE_TRADING_HALT=1` — halt all Solana live trading.
 - `LIVE_TRADING_DRY_RUN=1` — sign nothing, log everything.
 - `LIVE_HOOD_ENABLED=0` — disable Robinhood Chain executor entirely.
+
+---
+
+## Broca's area — the brain speaks for itself
+
+The 21st region is **Broca's area** (`backend/brain/regions/broca.py`), the
+cortex of language production (Broca 1861; Hickok & Poeppel 2007). Just like
+every other region it uses **zero LLM** — it is a pure *template composer*
+that serialises the brain's live internal state into short, first-person
+utterances. The `TwitterVoice` service (`backend/twitter_voice.py`) then
+posts them to X/Twitter on three cadences:
+
+- **Status** — every 15-30 min: what the cortex is doing *right now*
+  (most-active region, amygdala fear, insular gut feeling, the PFC/trader's
+  current intent, locus-coeruleus gain, paper P&L, the newest token it
+  learned). Example: *"Amygdala fear 63%. Insular cortex says caution. PFC
+  just switched from BUY → HOLD on $WIF. Prediction error rising — locus
+  coeruleus gain 1.45."*
+- **Daily digest** — 00:00 UTC: ticks processed, busiest regions, best
+  trade, tokens discovered, current mood.
+- **Weekly milestone** — Sundays: ticks, trades, tokens discovered, and how
+  its raphe-nuclei serotonin baseline drifted over the week.
+
+Every tweet is auditable: the account is literally the brain talking, and
+the code that turns state into words is right here in the repo. The live
+feed is also visible on the site under the **Voice** tab.
+
+**No account attached?** The service degrades to *dry-run*: it still
+composes and logs every tweet it would have sent (visible in the Voice
+panel), so the feature works before an account exists. The moment the four
+X secrets are set and the pod restarts, it begins posting for real.
+
+### Behaviour flags (env vars)
+
+- `TWITTER_VOICE=0` — disable the voice entirely.
+- `TWITTER_DRY_RUN=1` — compose + log but never post, even when keyed.
+- `TWITTER_STATUS_MIN_MINUTES` / `TWITTER_STATUS_MAX_MINUTES` — status
+  cadence window (defaults `15` / `30`).
+
+### X/Twitter secrets (Fly)
+
+Create an X developer app with **Read + Write** permission, generate the
+consumer keys + an access token/secret for the account, then:
+
+```bash
+fly secrets set \
+  TWITTER_CONSUMER_KEY=<api_key> \
+  TWITTER_CONSUMER_SECRET=<api_secret> \
+  TWITTER_ACCESS_TOKEN=<access_token> \
+  TWITTER_ACCESS_TOKEN_SECRET=<access_token_secret>
+```
+
+(Aliases `TWITTER_API_KEY` / `X_API_KEY`, etc. are also accepted.) All four
+must be present for real posting; scheduling markers are persisted to
+`/data/twitter_voice.json` so a rolling deploy never double-posts.
 
 ---
 

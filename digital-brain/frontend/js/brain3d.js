@@ -13,6 +13,7 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
@@ -38,6 +39,7 @@ export class BrainScene {
     this._buildVasculature();
     this._buildDustMotes();
     this._buildAuraShell();
+    this._buildVoidFace();
     this._addLights();
     this._addStarfield();
     this._initPostprocessing();
@@ -801,6 +803,140 @@ export class BrainScene {
     this.scene.add(aura);
   }
 
+  // -----------------------------------------------------------------
+  //  Void face — an ethereal, hollow face of glowing particles that
+  //  floats beside the brain and emotes in real time from the backend's
+  //  emotion summary (fear / valence / arousal / mood). It billboards
+  //  toward the camera and stays pinned to one side of the view, so it
+  //  reads like a face gazing out of the void next to the cortex.
+  // -----------------------------------------------------------------
+  _buildVoidFace() {
+    this._faceEmotion = { valence: 0, arousal: 0.2, fear: 0, gut: 0 };
+    this._faceEmotionTarget = { valence: 0, arousal: 0.2, fear: 0, gut: 0 };
+    this._faceMood = "CALM";
+
+    const group = new THREE.Group();
+    this.face = group;
+    this.headModel = null;   // set once the GLB finishes loading
+
+    // ================================================================
+    //  A real, high-detail 3-D head scan (Lee Perry-Smith, CC-BY),
+    //  rendered as a see-through lit "skin" with a dense wireframe over
+    //  it — the scanned-model look from the reference. Loaded async and
+    //  baked into the app (/static/assets/head.glb) so it's reliable.
+    // ================================================================
+    this._faceSkinMat = new THREE.MeshStandardMaterial({
+      color: 0x2f6fb0, emissive: 0x1a3a6b, emissiveIntensity: 0.0,
+      transparent: true, opacity: 0.30, roughness: 0.55, metalness: 0.10,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    this._faceWireMat = new THREE.LineBasicMaterial({
+      color: 0x9fd0ff, transparent: true, opacity: 0.55,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+
+    group.visible = true;
+    this.scene.add(group);
+
+    const loader = new GLTFLoader();
+    loader.load("/static/assets/head.glb", (gltf) => {
+      let src = null;
+      gltf.scene.traverse((o) => { if (o.isMesh && !src) src = o; });
+      if (!src) return;
+
+      const geo = src.geometry.clone();
+      geo.computeVertexNormals();
+      geo.computeBoundingBox();
+      const bb = geo.boundingBox;
+      const c = new THREE.Vector3(); bb.getCenter(c);
+      geo.translate(-c.x, -c.y, -c.z);            // centre on origin
+      const size = new THREE.Vector3(); bb.getSize(size);
+      const scale = 82 / (size.y || 1);           // normalise head height
+      this._headScale = scale;
+
+      const hg = new THREE.Group();
+      const skin = new THREE.Mesh(geo, this._faceSkinMat);
+      hg.add(skin);
+      const wire = new THREE.LineSegments(
+        new THREE.WireframeGeometry(geo), this._faceWireMat);
+      hg.add(wire);
+      hg.scale.setScalar(scale);
+      // The scan faces +z; the face group aims its +z at the camera, so
+      // the head naturally looks at the viewer.
+      group.add(hg);
+      this.headModel = hg;
+      this.headSkin = skin;
+    }, undefined, (err) => {
+      console.warn("void head model failed to load:", err);
+    });
+  }
+
+  _updateVoidFace(t, dt) {
+    if (!this.face) return;
+    const cur = this._faceEmotion;
+    const tgt = this._faceEmotionTarget;
+    // Ease toward the target feeling.
+    const k = 1 - Math.pow(0.001, dt); // ~time-constant smoothing
+    cur.valence += (tgt.valence - cur.valence) * k;
+    cur.arousal += (tgt.arousal - cur.arousal) * k;
+    cur.fear += (tgt.fear - cur.fear) * k;
+    cur.gut += (tgt.gut - cur.gut) * k;
+    const v = cur.valence, a = cur.arousal, f = cur.fear;
+
+    // Keep the head pinned to the right of the view and gazing at us.
+    const camDir = this.camera.position.clone().normalize();
+    const right = new THREE.Vector3(0, 1, 0).cross(camDir).normalize();
+    const up = camDir.clone().cross(right).normalize();
+    const offset = this._isMobile ? 108 : 132;
+    this.face.position.copy(right.multiplyScalar(offset)).addScaledVector(up, 4);
+    // Gentle float.
+    this.face.position.addScaledVector(up, Math.sin(t * 0.8) * 2.5);
+    this.face.lookAt(this.camera.position);
+    // Subtle "alive" motion — a slow look-around + nod, stronger when aroused;
+    // a fast micro-tremor when frightened.
+    this.face.rotateY(Math.sin(t * 0.35) * (0.10 + a * 0.14));
+    this.face.rotateX(Math.sin(t * 0.27 + 1.3) * (0.05 + f * 0.06));
+    if (f > 0.4) this.face.rotateZ(Math.sin(t * 34) * f * 0.02);
+
+    // ---- Colour from feeling: blue calm (like the reference scan) drifting
+    //      toward green joy / violet gloom / red fear. Emissive glow rises
+    //      with arousal & fear so the head visibly "lights up" when excited.
+    const skin = new THREE.Color(0x2f6fb0);
+    const wire = new THREE.Color(0x9fd0ff);
+    const emis = new THREE.Color(0x1a3a6b);
+    if (v > 0) {
+      skin.lerp(new THREE.Color(0x2fa06e), Math.min(1, v) * 0.75);
+      wire.lerp(new THREE.Color(0x8ff0c0), Math.min(1, v) * 0.7);
+      emis.lerp(new THREE.Color(0x1f7a52), Math.min(1, v) * 0.7);
+    } else {
+      skin.lerp(new THREE.Color(0x6a5fb0), Math.min(1, -v) * 0.65);
+      wire.lerp(new THREE.Color(0xc9b8ff), Math.min(1, -v) * 0.6);
+      emis.lerp(new THREE.Color(0x3a2f70), Math.min(1, -v) * 0.6);
+    }
+    skin.lerp(new THREE.Color(0xc0304a), Math.min(1, f) * 0.85);
+    wire.lerp(new THREE.Color(0xff8a97), Math.min(1, f) * 0.8);
+    emis.lerp(new THREE.Color(0x8a1020), Math.min(1, f) * 0.85);
+
+    const shimmer = 0.5 + 0.5 * Math.sin(t * (1.2 + a * 3));
+    if (this._faceSkinMat) {
+      this._faceSkinMat.color.copy(skin);
+      this._faceSkinMat.emissive.copy(emis);
+      this._faceSkinMat.emissiveIntensity = 0.25 + 0.8 * a + 0.6 * f;
+      this._faceSkinMat.opacity = 0.26 + 0.12 * f + 0.05 * a;
+    }
+    if (this._faceWireMat) {
+      this._faceWireMat.color.copy(wire);
+      this._faceWireMat.opacity = 0.45 + 0.22 * shimmer + 0.1 * a;
+    }
+
+    // ---- Whole-head life: breathing + a small fear "flinch" pulse.
+    if (this.headModel) {
+      const flinch = f > 0.5 ? 1 - Math.max(0, Math.sin(t * 9)) * f * 0.03 : 1;
+      const breatheK = (1 + 0.02 * Math.sin(t * 1.1) + a * 0.03) * flinch;
+      this.headModel.scale.setScalar(this._headScale * breatheK);
+    }
+  }
+
   _initPostprocessing() {
     // EffectComposer chain: render → strong bloom → output tone-mapping.
     // This is what makes the vessels + region cores actually feel magical
@@ -869,6 +1005,22 @@ export class BrainScene {
     if (this.engagement == null && nAct > 0) {
       this._engagementFromRegions = sumAct / nAct;
     }
+  }
+
+  /**
+   * Drive the void face's expression from the backend emotion summary
+   * (brain.snapshot().emotion). Everything is smoothed in the animation
+   * loop so the face eases between feelings instead of snapping.
+   */
+  setEmotion(e) {
+    if (!e || !this._faceEmotionTarget) return;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const t = this._faceEmotionTarget;
+    if (Number.isFinite(e.valence)) t.valence = clamp(e.valence, -1, 1);
+    if (Number.isFinite(e.arousal)) t.arousal = clamp(e.arousal, 0, 1);
+    if (Number.isFinite(e.fear)) t.fear = clamp(e.fear, 0, 1);
+    if (Number.isFinite(e.gut_feeling)) t.gut = clamp(e.gut_feeling, -1, 1);
+    if (e.mood) this._faceMood = e.mood;
   }
 
   /** Drive the vessel heartbeat externally.  `x` is a 0..1 "thinking
@@ -1277,6 +1429,9 @@ export class BrainScene {
       this.auraShell.material.uniforms.uTime.value = t;
       this.auraShell.rotation.y = t * 0.03;
     }
+
+    // The void face beside the brain — emotes in real time.
+    this._updateVoidFace(t, dt);
     if (this.cerebrumInner) {
       this.cerebrumInner.material.uniforms.uTime.value = t;
     }
