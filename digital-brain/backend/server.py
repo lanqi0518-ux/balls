@@ -45,9 +45,10 @@ from fastapi.staticfiles import StaticFiles
 from .brain import Brain
 from .env import GridWorld
 from .knowledge import categories_public, concepts_public
+from .learning_service import LearningService
 from .trading_service import TradingService
 from .twitter_voice import TwitterVoice
-from .web_embodiment import WebEmbodiment
+from .web_embodiment import NEWS_TOUR, WebEmbodiment
 
 
 LOG = logging.getLogger("server")
@@ -69,16 +70,39 @@ class Simulation:
         self.running: bool = True
         self.tick_hz: float = 6.0  # frames per second the brain "lives" at
         self._current_obs = self.env.reset()
-        self.trading: TradingService = TradingService(self.brain)
+
+        # --- Purpose switch --------------------------------------------
+        # The brain used to trade crypto. It now spends its life reading
+        # the live web (news + social) and growing its own knowledge,
+        # then tweeting whatever it wants. Trading is off by default and
+        # can be re-armed with TRADING_ENABLED=1. Learning is on by
+        # default and can be turned off with LEARNING=0.
+        self.trading_enabled: bool = os.getenv("TRADING_ENABLED", "0") not in ("0", "false", "False", "")
+        self.learning_enabled: bool = os.getenv("LEARNING", "1") not in ("0", "false", "False", "")
+
+        self.trading: TradingService = TradingService(self.brain, enabled=self.trading_enabled)
+        # The autodidact loop — reads news/social over HTTP and files each
+        # fresh headline into the brain's knowledge bank so it grows.
+        self.learning: LearningService | None = (
+            LearningService(self.brain) if self.learning_enabled else None
+        )
         # The brain's autonomous voice: Broca's area → X/Twitter. Runs its
         # own scheduler; posts real tweets when keyed, composes-only when not.
-        self.twitter: TwitterVoice = TwitterVoice(self.brain, self.trading)
+        self.twitter: TwitterVoice = TwitterVoice(
+            self.brain, self.trading, learning=self.learning,
+        )
         self.web: WebEmbodiment | None = None
         if os.getenv("WEB_EMBODIMENT", "1") != "0":
+            # In learning mode the "eyes" look at news sites, not token
+            # boards, so the on-screen browser matches what the brain is
+            # actually reading.
+            tour = None if self.trading_enabled else NEWS_TOUR
             self.web = WebEmbodiment(
                 interval_s=float(os.getenv("WEB_TOUR_INTERVAL_S", "22.0")),
+                tour=tour,
             )
-            self.trading.attach_web_embodiment(self.web)
+            if self.trading_enabled:
+                self.trading.attach_web_embodiment(self.web)
         # Watchdog / liveness state:
         # * _last_tick_at_s — wall-clock time of the last successful brain
         #   step. Health-check flags the pod unhealthy if this stalls.
@@ -156,6 +180,8 @@ class Simulation:
             "trading": self.trading.snapshot(),
             "twitter": self.twitter.snapshot(),
             "web": self.web.snapshot() if self.web else {"enabled": False},
+            "learning": self.learning.snapshot() if self.learning else {"enabled": False},
+            "mode": "trade" if self.trading_enabled else "learn",
         }
 
     async def _broadcast(self, payload: dict) -> None:
@@ -267,6 +293,8 @@ async def lifespan(app: FastAPI):
     _install_signal_handlers(loop)
     task = asyncio.create_task(sim.run_forever(), name="brain-supervisor")
     await sim.trading.start()
+    if sim.learning is not None:
+        await sim.learning.start()
     await sim.twitter.start()
     if sim.web is not None:
         # Launching headless Chromium takes several seconds. Do it in the
@@ -287,6 +315,8 @@ async def lifespan(app: FastAPI):
         # stops before we save, we lose the very-latest trader state.
         await sim.emergency_save()
         await sim.twitter.stop()
+        if sim.learning is not None:
+            await sim.learning.stop()
         await sim.trading.stop()
         if sim.web is not None:
             await sim.web.stop()

@@ -312,6 +312,15 @@ async def _generic_extractor(page) -> List[WebToken]:
     return await _merge_extractors(page, r"/(?:solana|token|coin|currencies)/([A-Za-z0-9\\-]{2,60})")
 
 
+async def _news_extractor(page) -> List[WebToken]:
+    """In learning mode the browser is the brain's *eyes* on the news —
+    we only need the live screenshot of what it's reading, not any
+    structured token extraction. The actual headline reading + knowledge
+    growth is done reliably over HTTP by the LearningService. Returning
+    no tokens keeps the token pipeline (and the trader) untouched."""
+    return []
+
+
 # ----------------------------------------------------------------------
 # The tour
 # ----------------------------------------------------------------------
@@ -371,6 +380,21 @@ DEFAULT_TOUR: List[Tuple[str, str, Extractor]] = [
     ("DexScreener gems",
      "https://dexscreener.com/gainers/5m?chain=robinhood",
      _dexscreener_extractor),
+]
+
+
+# The learning-mode tour: the brain's eyes browse live news + reference
+# sites so the on-screen browser matches what it is actually reading and
+# filing into its knowledge bank. Display names describe the *kind* of
+# page, not the outlet brand. Token extraction is a no-op here.
+NEWS_TOUR: List[Tuple[str, str, Extractor]] = [
+    ("world headlines", "https://www.bbc.com/news/world", _news_extractor),
+    ("tech & science", "https://arstechnica.com/", _news_extractor),
+    ("what hackers are reading", "https://news.ycombinator.com/", _news_extractor),
+    ("new technology", "https://www.theverge.com/tech", _news_extractor),
+    ("in-depth reporting", "https://www.npr.org/sections/news/", _news_extractor),
+    ("the sum of human knowledge",
+     "https://en.wikipedia.org/wiki/Special:Random", _news_extractor),
 ]
 
 

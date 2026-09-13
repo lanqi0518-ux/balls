@@ -87,6 +87,18 @@ CATEGORIES: dict = {
         "en": "Learned · Events",
         "color": "#FDE68A",
     },
+    # The brain reads the live web (news headlines + social posts) and
+    # files what it reads here. This is how it "grows" while not trading.
+    "learned_topic": {
+        "zh": "自学 · 新闻话题",
+        "en": "Learned · News topics",
+        "color": "#7DD3FC",
+    },
+    "learned_voice": {
+        "zh": "自学 · 社交观点",
+        "en": "Learned · Social chatter",
+        "color": "#C4B5FD",
+    },
 }
 
 

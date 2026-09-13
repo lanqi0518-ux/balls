@@ -93,8 +93,13 @@ class TradingService:
                  wallet_poll_interval: float = 25.0,
                  discovery_interval: float = 180.0,
                  target_tracked_wallets: int = 20,
-                 persistence_dir: Optional[str] = None):
+                 persistence_dir: Optional[str] = None,
+                 enabled: bool = True):
         self.brain = brain
+        # When disabled, the service still loads/persists prior state and
+        # exposes a snapshot for backward-compatible clients, but starts
+        # none of its trading loops — the brain does not trade.
+        self.enabled = enabled
         self.dexscreener = DexScreenerClient()
         self.tokens = TrendingTokenWatcher(
             client=self.dexscreener,
@@ -234,6 +239,16 @@ class TradingService:
 
     async def start(self) -> None:
         if self._tasks:
+            return
+        if not self.enabled:
+            self._push_event(
+                "info",
+                "Trading is off — the brain is in learning mode, reading "
+                "the web and growing its knowledge instead of trading.",
+                "交易已关闭 —— 大脑进入学习模式，靠阅读网络、积累知识来成长，"
+                "而不是炒币。",
+            )
+            LOG.info("trading disabled; no trading loops started")
             return
         self._stop.clear()
         await self.tokens.start()
@@ -1368,6 +1383,7 @@ class TradingService:
         for mint, pos in self.paper.positions.items():
             prices.setdefault(mint, pos.entry_price_usd)
         return {
+            "enabled": self.enabled,
             "mode": "live" if (self.live is not None or self.hood is not None) else "paper",
             "tokens_status": self.tokens.status(),
             "wallets_status": self.wallets.status(),

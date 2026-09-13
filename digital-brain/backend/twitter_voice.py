@@ -70,11 +70,15 @@ def _truthy(v: str) -> bool:
 
 class TwitterVoice:
     def __init__(self, brain, trading, *,
+                 learning=None,
                  data_dir: Optional[str] = None,
                  status_min_minutes: Optional[float] = None,
                  status_max_minutes: Optional[float] = None):
         self.brain = brain
         self.trading = trading
+        # Optional LearningService — when present the brain talks about what
+        # it is reading and how its knowledge is growing.
+        self.learning = learning
 
         self.consumer_key = _first_env(
             "TWITTER_CONSUMER_KEY", "TWITTER_API_KEY", "X_API_KEY")
@@ -112,11 +116,16 @@ class TwitterVoice:
         self.spontaneous_enabled = _truthy(os.getenv("TWITTER_SPONTANEOUS", "1"))
         self.spontaneous_gap_s = float(
             os.getenv("TWITTER_SPONTANEOUS_MIN_MINUTES", "5")) * 60.0
+        # A gentler, separate cool-down for "I just read something" reactions
+        # so the news chatter doesn't dominate the timeline.
+        self.news_react_gap_s = float(
+            os.getenv("TWITTER_NEWS_REACT_MIN_MINUTES", "20")) * 60.0
         self._spont = {
             "closed_count": self._closed_trades(),
             "last_action": {},   # symbol -> last seen action name
             "last_fear": 0.0,
             "last_mood": "",
+            "last_reading_key": "",
         }
 
         base_dir = data_dir or os.getenv("DATA_DIR", "./data")
@@ -143,11 +152,14 @@ class TwitterVoice:
             "last_weekly_key": self._utc_week_key(),   # wait until next Sunday
             "day_start_lifetime_step": self._lifetime_step(),
             "day_start_learned": self._learned_count(),
+            "day_start_read": self._read_count(),
             "week_start_lifetime_step": self._lifetime_step(),
             "week_start_trades": self._closed_trades(),
             "week_start_learned": self._learned_count(),
+            "week_start_read": self._read_count(),
             "week_start_5ht": self._tonic_5ht(),
             "last_spontaneous_at": 0.0,
+            "last_news_react_at": 0.0,
         }
         self._load_marks()
 
@@ -209,6 +221,7 @@ class TwitterVoice:
                 self._maybe_post_weekly()
                 self._maybe_post_daily()
                 self._maybe_post_spontaneous()
+                self._maybe_post_learning_reaction()
                 self._maybe_post_status()
             except Exception as e:  # noqa: BLE001
                 LOG.warning("twitter voice tick failed: %s", e)
@@ -244,6 +257,7 @@ class TwitterVoice:
         self._marks["last_daily_date"] = today
         self._marks["day_start_lifetime_step"] = self._lifetime_step()
         self._marks["day_start_learned"] = self._learned_count()
+        self._marks["day_start_read"] = self._read_count()
         self._save_marks()
 
     def _maybe_post_weekly(self) -> None:
@@ -262,6 +276,7 @@ class TwitterVoice:
         self._marks["week_start_lifetime_step"] = self._lifetime_step()
         self._marks["week_start_trades"] = self._closed_trades()
         self._marks["week_start_learned"] = self._learned_count()
+        self._marks["week_start_read"] = self._read_count()
         self._marks["week_start_5ht"] = self._tonic_5ht()
         self._save_marks()
 
@@ -330,6 +345,35 @@ class TwitterVoice:
         text = self.brain.broca.compose_spontaneous(trigger, state)
         self._emit("spontaneous", text, trigger=trigger)
         self._marks["last_spontaneous_at"] = now
+        self._save_marks()
+
+    def _maybe_post_learning_reaction(self) -> None:
+        """The brain reacts, in near real-time, to a fresh thing it just read
+        off the live web — 'say whatever it wants'. Fires only when the item
+        it's reading has actually changed, and only past a gentle cool-down."""
+        if not self.spontaneous_enabled or self.learning is None:
+            return
+        try:
+            lsnap = self.learning.snapshot()
+        except Exception:  # noqa: BLE001
+            return
+        reading = lsnap.get("reading_now") or {}
+        title = reading.get("title")
+        if not title:
+            return
+        key = reading.get("url") or title
+        if key == self._spont.get("last_reading_key"):
+            return
+        now = time.time()
+        # Always advance the marker so we react to the *latest* thing read
+        # once the cool-down clears, not to a stale headline.
+        self._spont["last_reading_key"] = key
+        if now - float(self._marks.get("last_news_react_at", 0.0)) < self.news_react_gap_s:
+            return
+        state = self._gather_state()
+        text = self.brain.broca.compose_spontaneous("learned", state)
+        self._emit("spontaneous", text, trigger="learned")
+        self._marks["last_news_react_at"] = now
         self._save_marks()
 
     # ------------------------------------------------------------------
@@ -432,6 +476,25 @@ class TwitterVoice:
             state["learned"] = {"en": last.get("en") or last.get("id"),
                                  "count": len(learned)}
 
+        # Live learning state — what it is reading + how deep the bank is.
+        if self.learning is not None:
+            try:
+                lsnap = self.learning.snapshot()
+                state["learning"] = {
+                    "reading_now": lsnap.get("reading_now"),
+                    "knowledge_total": lsnap.get("knowledge_total"),
+                    "items_read": lsnap.get("items_read"),
+                    "recent": (lsnap.get("recent") or [])[:5],
+                }
+            except Exception:  # noqa: BLE001
+                pass
+
+        # Trader intent + P&L only make sense when the brain is actually
+        # trading. In learning mode we skip them entirely so tweets never
+        # mention a book it isn't running.
+        if not getattr(self.trading, "enabled", True):
+            return state
+
         # Trader intent (+ detect a switch since last status).
         intent = getattr(self.trading, "_latest_intent", None)
         if intent:
@@ -476,7 +539,10 @@ class TwitterVoice:
     def _daily_window(self) -> dict:
         d: dict = {}
         d["steps"] = max(0, self._lifetime_step() - int(self._marks.get("day_start_lifetime_step", 0)))
-        d["new_tokens"] = max(0, self._learned_count() - int(self._marks.get("day_start_learned", 0)))
+        d["new_ideas"] = max(0, self._learned_count() - int(self._marks.get("day_start_learned", 0)))
+        d["read"] = max(0, self._read_count() - int(self._marks.get("day_start_read", 0)))
+        if self.trading.enabled:
+            d["new_tokens"] = d["new_ideas"]
         # Busiest regions right now (top 3, excluding Broca).
         regs = [r for r in getattr(self.brain, "regions", [])
                 if getattr(r, "meta", None) and r.meta.name != "broca"]
@@ -491,8 +557,11 @@ class TwitterVoice:
     def _weekly_window(self) -> dict:
         w: dict = {}
         w["ticks"] = max(0, self._lifetime_step() - int(self._marks.get("week_start_lifetime_step", 0)))
-        w["trades"] = max(0, self._closed_trades() - int(self._marks.get("week_start_trades", 0)))
-        w["new_tokens"] = max(0, self._learned_count() - int(self._marks.get("week_start_learned", 0)))
+        w["new_ideas"] = max(0, self._learned_count() - int(self._marks.get("week_start_learned", 0)))
+        w["read"] = max(0, self._read_count() - int(self._marks.get("week_start_read", 0)))
+        if self.trading.enabled:
+            w["trades"] = max(0, self._closed_trades() - int(self._marks.get("week_start_trades", 0)))
+            w["new_tokens"] = w["new_ideas"]
         w["serotonin_start"] = float(self._marks.get("week_start_5ht", self._tonic_5ht()))
         w["serotonin_now"] = self._tonic_5ht()
         return w
@@ -521,6 +590,14 @@ class TwitterVoice:
 
     def _learned_count(self) -> int:
         return len(getattr(self.brain, "learned_concepts", []) or [])
+
+    def _read_count(self) -> int:
+        if self.learning is None:
+            return 0
+        try:
+            return int(self.learning.snapshot().get("items_read", 0) or 0)
+        except Exception:  # noqa: BLE001
+            return 0
 
     def _closed_trades(self) -> int:
         try:

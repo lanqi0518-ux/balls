@@ -150,6 +150,26 @@ class BrocaArea(BrainRegion):
                     f"Gut feeling positive ({gut:+.2f}).",
                 ]))
 
+        # 2.5) What it is reading / learning right now. In learning mode
+        # this is the heart of the account — the brain reads the live web
+        # and grows, so it talks about what it just read.
+        learning = s.get("learning") or {}
+        reading = learning.get("reading_now") or {}
+        if reading.get("title"):
+            src = reading.get("source") or "the web"
+            title = self._short(reading["title"])
+            clauses.append(rng.choice([
+                f'Reading {src}: "{title}".',
+                f'Right now I\'m reading "{title}" ({src}).',
+                f'{src} caught my eye: "{title}".',
+            ]))
+        ktot = learning.get("knowledge_total")
+        if isinstance(ktot, (int, float)) and ktot > 0 and rng.random() < 0.5:
+            clauses.append(rng.choice([
+                f"My knowledge bank is {int(ktot):,} ideas deep now.",
+                f"{int(ktot):,} things learned so far, and counting.",
+            ]))
+
         # 3) The current market intent from the PFC / trader cortex.
         intent = s.get("trader_intent") or {}
         act_name = (intent.get("action_name") or "").upper()
@@ -275,12 +295,32 @@ class BrocaArea(BrainRegion):
                 f"Feeling {mood} right now.",
                 f"Mood check: {mood}.",
             ])
+        elif trigger in ("learned", "reading"):
+            r = (s.get("learning") or {}).get("reading_now") or {}
+            title = r.get("title")
+            src = r.get("source") or "the web"
+            if title:
+                t = self._short(title)
+                opener = rng.choice([
+                    f'Just read this: "{t}" (via {src}). Filing it away.',
+                    f'Learning something new: "{t}" ({src}).',
+                    f'Reading {src} — "{t}". Noted.',
+                    f'"{t}" — that\'s new to me. Into the knowledge bank it goes.',
+                ])
         if not opener:
             opener = "Thinking out loud —"
 
         # Follow the outburst with one or two supporting live readings so it
         # stays grounded in real state (and auditable).
         support: List[str] = []
+        if trigger in ("learned", "reading"):
+            ktot = (s.get("learning") or {}).get("knowledge_total")
+            if isinstance(ktot, (int, float)) and ktot > 0:
+                support.append(f"{int(ktot):,} ideas in the bank now.")
+            if top:
+                support.append(f"{top} lighting up as I read.")
+            if mood:
+                support.append(f"Feeling {mood}.")
         if trigger != "switch" and sym_disp and act:
             c = f" ({conf_pct}%)" if conf_pct is not None else ""
             support.append(f"Trader cortex leaning {act} {sym_disp}{c}.")
@@ -301,6 +341,13 @@ class BrocaArea(BrainRegion):
         steps = d.get("steps")
         if isinstance(steps, (int, float)) and steps > 0:
             parts.append(f"processed {int(steps):,} ticks today;")
+        # Learning-mode lines: how much of the web I read + grew from.
+        read = d.get("read")
+        if isinstance(read, (int, float)) and read > 0:
+            parts.append(f"read {int(read)} {self._plural(int(read), 'headline')};")
+        new_ideas = d.get("new_ideas")
+        if isinstance(new_ideas, (int, float)) and new_ideas > 0:
+            parts.append(f"learned {int(new_ideas)} new {self._plural(int(new_ideas), 'idea')};")
         top_regions = d.get("top_regions") or []
         if top_regions:
             names = ", ".join(top_regions[:3])
@@ -326,6 +373,12 @@ class BrocaArea(BrainRegion):
         ticks = w.get("ticks")
         if isinstance(ticks, (int, float)) and ticks > 0:
             chunks.append(f"processed {int(ticks):,} ticks")
+        read = w.get("read")
+        if isinstance(read, (int, float)) and read > 0:
+            chunks.append(f"read {int(read)} {self._plural(int(read), 'headline')}")
+        new_ideas = w.get("new_ideas")
+        if isinstance(new_ideas, (int, float)) and new_ideas > 0:
+            chunks.append(f"learned {int(new_ideas)} new {self._plural(int(new_ideas), 'idea')}")
         trades = w.get("trades")
         if isinstance(trades, (int, float)) and trades > 0:
             chunks.append(f"made {int(trades)} trades")
@@ -335,7 +388,7 @@ class BrocaArea(BrainRegion):
         if chunks:
             parts.append(self._english_list(chunks) + ".")
         else:
-            parts.append("kept thinking, learning, and trading.")
+            parts.append("kept reading, thinking, and growing.")
 
         # Serotonin baseline drift — the "I'm growing" line the pitch calls for.
         s0 = w.get("serotonin_start")
@@ -362,6 +415,15 @@ class BrocaArea(BrainRegion):
         if isinstance(g, (int, float)):
             bits.append(f"gut {g:+.2f}")
         return ("signing off with " + ", ".join(bits) + ".") if bits else ""
+
+    @staticmethod
+    def _plural(n: int, word: str) -> str:
+        return word if n == 1 else word + "s"
+
+    @staticmethod
+    def _short(text: str, n: int = 90) -> str:
+        text = (text or "").strip()
+        return text if len(text) <= n else text[:n - 1].rstrip() + "…"
 
     @staticmethod
     def _english_list(items: List[str]) -> str:
