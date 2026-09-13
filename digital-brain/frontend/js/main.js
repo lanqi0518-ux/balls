@@ -374,11 +374,6 @@ function handlePayload(data) {
 
   if (data.twitter !== undefined) {
     updateVoice(data.twitter);
-    // Fold the brain's voice — what it wants to say — into the thought
-    // stream so that panel shows its mind + its words.
-    if (data.twitter.utterances) {
-      thoughtStream.addUtterances(data.twitter.utterances);
-    }
   }
 
   brainScene.updateRegions(brain.regions, buildRegionLiveMetrics(brain, data));
@@ -404,8 +399,9 @@ function handlePayload(data) {
   renderEnvStats(envStatsEl, env, brain);
   thoughtStream.addFromSnapshot(brain.thoughts);
 
-  // Main-view hero: what the brain is thinking, and what it plans to do.
-  updateHeroThinking(brain);
+  // Main-view hero: the brain's own words (inner voice) take the headline,
+  // falling back to concept associations / thoughts when it's quiet.
+  updateHeroThinking(brain, data.twitter && data.twitter.inner_voice);
   updateHeroIntent(brain.motor_stats, data.trading && data.trading.latest_intent);
 
   // If the user hasn't clicked a region yet, auto-select the most active
@@ -495,11 +491,30 @@ function updateEmotionCaption(emo) {
 // Preferred source is the current "active concept" (a knowledge-bank chip
 // the hippocampus just associated to). If nothing is lit, we fall back to
 // the most recent PFC/associate/thought text so this card is never empty.
-function updateHeroThinking(brain) {
+let lastVoiceText = null;
+function updateHeroThinking(brain, innerVoice) {
   const active = brain.active_concept;
   setActiveConcept(active);
 
   const step = brain.step;
+
+  // Highest priority: the brain's own words. This is what it "wants to say"
+  // right now — a live first-person monologue.
+  if (innerVoice && innerVoice.text) {
+    heroThinking.dataset.empty = "false";
+    heroThinking.style.setProperty("--hero-color", "#fb923c");
+    heroThinkingHeadline.textContent = innerVoice.text;
+    heroThinkingDetail.textContent = "";
+    heroThinkingSrc.textContent = `Broca · thinking out loud · t=${step}`;
+    if (innerVoice.text !== lastVoiceText) {
+      heroThinking.classList.remove("lit");
+      void heroThinking.offsetWidth;
+      heroThinking.classList.add("lit");
+      lastVoiceText = innerVoice.text;
+      lastConceptId = null;
+    }
+    return;
+  }
 
   if (active) {
     const color = categoryColor(active.category);

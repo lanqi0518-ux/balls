@@ -44,9 +44,10 @@ import logging
 import os
 import random
 import time
+from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Deque, Dict, List, Optional
 
 LOG = logging.getLogger("twitter_voice")
 
@@ -120,8 +121,11 @@ class TwitterVoice:
         # thought stream every few seconds so the stream reads as the brain's
         # own words (never posted to X — this is thinking, not tweeting).
         self.inner_voice_enabled = _truthy(os.getenv("INNER_VOICE", "1"))
-        self.inner_voice_gap_s = float(os.getenv("INNER_VOICE_SECONDS", "12"))
+        self.inner_voice_gap_s = float(os.getenv("INNER_VOICE_SECONDS", "9"))
         self._last_inner_voice_at = 0.0
+        self._inner_voice: Optional[dict] = None
+        self._inner_voice_recent: Deque[dict] = deque(maxlen=20)
+        self._last_inner_voice_text = ""
         # A gentler, separate cool-down for "I just read something" reactions
         # so the news chatter doesn't dominate the timeline.
         self.news_react_gap_s = float(
@@ -359,25 +363,36 @@ class TwitterVoice:
         self._save_marks()
 
     def _maybe_inner_voice(self) -> None:
-        """Push a short first-person 'thinking out loud' line into the brain's
-        live thought stream. Never posted to X — this is the brain's inner
-        monologue, so the Thought stream reads as its own words."""
+        """Compose a short first-person 'thinking out loud' line and expose it
+        as the brain's current inner voice (surfaced in the NOW THINKING
+        hero). Never posted to X — this is thinking, not tweeting — and it is
+        deliberately NOT pushed into the cortex thought stream."""
         if not self.inner_voice_enabled:
             return
         now = time.time()
         if now - self._last_inner_voice_at < self.inner_voice_gap_s:
             return
-        self._last_inner_voice_at = now
         try:
             state = self._gather_state()
-            text = self.brain.broca.compose_inner_voice(state)
+            # Avoid repeating the exact same line back-to-back.
+            text = ""
+            for _ in range(4):
+                cand = self.brain.broca.compose_inner_voice(state)
+                if cand and cand != self._last_inner_voice_text:
+                    text = cand
+                    break
+                text = cand or text
             if not text:
                 return
-            self.brain._add_thought(
-                "broca", text, text,
-                kind="voice",
-                extra={"channel": "inner"},
-            )
+            self._last_inner_voice_at = now
+            self._last_inner_voice_text = text
+            rec = {
+                "text": text,
+                "at_s": now,
+                "step": int(getattr(self.brain, "step_count", 0)),
+            }
+            self._inner_voice = rec
+            self._inner_voice_recent.appendleft(rec)
         except Exception as e:  # noqa: BLE001
             LOG.debug("inner voice failed: %s", e)
 
@@ -704,4 +719,6 @@ class TwitterVoice:
             "status_interval_max": round(self.status_max_s / 60.0, 1),
             "utterances": self.brain.broca.utterances_public(limit=12),
             "events": list(self._events[-30:]),
+            "inner_voice": self._inner_voice,
+            "inner_voice_recent": list(self._inner_voice_recent)[:12],
         }
