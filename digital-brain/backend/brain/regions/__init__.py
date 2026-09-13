@@ -18,6 +18,7 @@ from .hypothalamus import Hypothalamus
 from .entorhinal_cortex import EntorhinalCortex
 from .posterior_parietal import PosteriorParietal
 from .raphe_nuclei import RapheNuclei
+from .broca import BrocaArea
 
 __all__ = [
     "VisualCortex",
@@ -40,6 +41,7 @@ __all__ = [
     "EntorhinalCortex",
     "PosteriorParietal",
     "RapheNuclei",
+    "BrocaArea",
     "ACTION_NAMES",
     "ACTION_NAMES_ZH",
 ]

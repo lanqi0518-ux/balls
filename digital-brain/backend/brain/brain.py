@@ -36,6 +36,7 @@ from .regions import (
     Amygdala,
     AnteriorCingulate,
     BasalGanglia,
+    BrocaArea,
     CentralComplex,
     Cerebellum,
     DefaultModeNetwork,
@@ -189,6 +190,13 @@ class Brain:
         self.posterior_parietal = PosteriorParietal(num_actions=num_actions)
         self.raphe_nuclei = RapheNuclei()
 
+        # --- Language production (batch 3) ---
+        # Broca's area: serialises the brain's live internal state into
+        # first-person speech (Broca 1861; Hickok-Poeppel 2007). Pure
+        # template composer — no LLM — driving the autonomous X/Twitter
+        # voice in backend/twitter_voice.py.
+        self.broca = BrocaArea()
+
         self.regions: List = [
             self.visual_cortex,
             self.thalamus,
@@ -210,6 +218,7 @@ class Brain:
             self.entorhinal_cortex,
             self.posterior_parietal,
             self.raphe_nuclei,
+            self.broca,
         ]
 
         # Running state used for online learning.
@@ -580,6 +589,9 @@ class Brain:
             + self.anterior_cingulate.control_boost()
             + self.hypothalamus.engagement_boost(),
         )
+        # Broca's area hums along with engagement — language-readiness idles
+        # low and spikes only when the Twitter voice articulates an utterance.
+        self.broca.tick(self.engagement)
         replayed = self.default_mode.tick(self.engagement, self.hippocampus, self.step_count)
         if replayed is not None:
             self._add_thought("default_mode",
@@ -738,6 +750,8 @@ class Brain:
             "reward_stats": self.nucleus_accumbens.stats(),
             "motor_stats": self.motor_cortex.stats(),
             "central_complex_stats": self.central_complex.stats(),
+            "broca_stats": self.broca.stats(),
+            "broca_utterances": self.broca.utterances_public(limit=12),
             "active_concept": self.active_concept,
             "learned_concepts_count": len(self.learned_concepts),
             "learned_concepts": [
@@ -785,6 +799,7 @@ class Brain:
             "entorhinal_cortex": self.entorhinal_cortex.state_dict_serializable(),
             "posterior_parietal": self.posterior_parietal.state_dict_serializable(),
             "raphe_nuclei": self.raphe_nuclei.state_dict_serializable(),
+            "broca": self.broca.state_dict_serializable(),
             "learned_concepts": list(self.learned_concepts),
         }
 
@@ -826,6 +841,8 @@ class Brain:
                 self.posterior_parietal.load_state_dict_safe(sd["posterior_parietal"])
             if "raphe_nuclei" in sd:
                 self.raphe_nuclei.load_state_dict_safe(sd["raphe_nuclei"])
+            if "broca" in sd:
+                self.broca.load_state_dict_safe(sd["broca"])
             # Restore learned concepts (added at runtime, e.g. fresh tokens
             # the brain has seen). Each entry becomes a permanent knowledge
             # memory again so associations continue to work.
