@@ -269,7 +269,17 @@ async def lifespan(app: FastAPI):
     await sim.trading.start()
     await sim.twitter.start()
     if sim.web is not None:
-        await sim.web.start()
+        # Launching headless Chromium takes several seconds. Do it in the
+        # background so the HTTP server (and /health) is available the
+        # instant the brain is up — this keeps a rolling deploy's
+        # switch-over window down to a couple of seconds instead of
+        # blocking readiness on the browser boot.
+        async def _start_web() -> None:
+            try:
+                await sim.web.start()
+            except Exception as e:  # noqa: BLE001
+                LOG.warning("web embodiment failed to start: %s", e)
+        asyncio.create_task(_start_web(), name="web-embodiment-start")
     try:
         yield
     finally:
