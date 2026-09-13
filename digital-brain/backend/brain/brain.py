@@ -34,18 +34,24 @@ import torch.nn.functional as F
 from .config import BrainConfig
 from .regions import (
     Amygdala,
+    AnteriorCingulate,
     BasalGanglia,
     CentralComplex,
     Cerebellum,
     DefaultModeNetwork,
+    EntorhinalCortex,
     Hippocampus,
+    Hypothalamus,
     InsularCortex,
     LocusCoeruleus,
     MotorCortex,
     NucleusAccumbens,
+    PosteriorParietal,
     PrefrontalCortex,
+    RapheNuclei,
     Thalamus,
     TraderCortex,
+    VentralTegmental,
     VisualCortex,
     ACTION_NAMES,
     ACTION_NAMES_ZH,
@@ -169,6 +175,20 @@ class Brain:
         self.insular_cortex = InsularCortex()
         self.locus_coeruleus = LocusCoeruleus()
 
+        # --- Deeper subcortical + cognitive-control regions (batch 2) ---
+        # ACC: conflict monitoring (Botvinick 2001).
+        # VTA: dopamine burst source (Schultz 1997).
+        # Hypothalamus: homeostatic drives (Sternson 2013).
+        # Entorhinal cortex: grid-cell state code (Moser 2008, Nobel 2014).
+        # Posterior parietal: evidence accumulator (Shadlen 2001).
+        # Raphe nuclei: serotonin, patience (Doya 2002, Miyazaki 2011).
+        self.anterior_cingulate = AnteriorCingulate()
+        self.ventral_tegmental = VentralTegmental()
+        self.hypothalamus = Hypothalamus()
+        self.entorhinal_cortex = EntorhinalCortex()
+        self.posterior_parietal = PosteriorParietal(num_actions=num_actions)
+        self.raphe_nuclei = RapheNuclei()
+
         self.regions: List = [
             self.visual_cortex,
             self.thalamus,
@@ -184,6 +204,12 @@ class Brain:
             self.basal_ganglia,
             self.insular_cortex,
             self.locus_coeruleus,
+            self.anterior_cingulate,
+            self.ventral_tegmental,
+            self.hypothalamus,
+            self.entorhinal_cortex,
+            self.posterior_parietal,
+            self.raphe_nuclei,
         ]
 
         # Running state used for online learning.
@@ -372,6 +398,10 @@ class Brain:
             self.basal_ganglia.credit(self._last_reported_action, reward)
         # Locus coeruleus: track running |prediction error| → NA gain scalar.
         lc_gain = self.locus_coeruleus.observe(pred_error)
+        # VTA: phasic dopamine burst tracker — sources the teaching signal.
+        vta_burst = self.ventral_tegmental.observe(pred_error)
+        # Raphe: serotonin / patience from reward reliability.
+        raphe_patience = self.raphe_nuclei.observe(reward, pred_error)
         if reward > 0.5:
             self._add_thought("nucleus_accumbens",
                               f"Reward received ({reward:+.1f}). Prediction error {pred_error:+.2f}.",
@@ -449,11 +479,27 @@ class Brain:
             logits[4] -= 1.5  # discourage freezing when scared
 
         # Basal-ganglia Go/NoGo gate: shift each action's logit by its
-        # rolling reward baseline before the motor cortex samples.
+        # rolling reward baseline before the motor cortex samples. Raphe
+        # 5-HT dampens the Go bias when the brain has learned to be
+        # patient (avoids impulsive chasing).
         logits = self.basal_ganglia.gate(logits)
+        raphe_scale = self.raphe_nuclei.impulse_dampen()
+        if raphe_scale != 1.0:
+            # Pull each action's bias toward the mean (only the deviation
+            # from the mean is dampened, not the absolute logit).
+            logits_mean = logits.mean()
+            logits = logits_mean + (logits - logits_mean) * raphe_scale
 
         # ---- 8. Motor: sample action ----
         action, log_prob, probs = self.motor_cortex.act(logits)
+        # ACC: conflict = entropy(probs) × recent |RPE|. Boosts engagement.
+        acc_conflict = self.anterior_cingulate.observe(probs, pred_error)
+        # PPC: drift-diffusion accumulator over the same action distribution.
+        ppc_commit = self.posterior_parietal.observe(probs)
+        # Hypothalamus: homeostatic drives (energy / arousal set-points).
+        hypo_drive = self.hypothalamus.observe(reward, fear, abs(pred_error))
+        # Entorhinal cortex: grid-code the current position (state index).
+        self.entorhinal_cortex.observe(position)
         self._last_log_prob = log_prob
         self._last_value = value
 
@@ -524,9 +570,16 @@ class Brain:
                                location=position, step=self.step_count)
 
         # ---- 10. DMN ticks (may replay a memory in the background) ----
-        # LC noradrenergic gain scales overall engagement — under
-        # uncertainty the brain runs "hot".
-        self.engagement = min(1.0, (abs(pred_error) * 1.5 + fear * 0.5 + 0.15) * lc_gain)
+        # Engagement = surprise + fear + baseline, scaled by LC (NA gain),
+        # boosted by ACC (conflict → control), boosted by hypothalamic
+        # drive (homeostatic imbalance keeps exploration alive).
+        base_eng = abs(pred_error) * 1.5 + fear * 0.5 + 0.15
+        self.engagement = min(
+            1.0,
+            base_eng * lc_gain
+            + self.anterior_cingulate.control_boost()
+            + self.hypothalamus.engagement_boost(),
+        )
         replayed = self.default_mode.tick(self.engagement, self.hippocampus, self.step_count)
         if replayed is not None:
             self._add_thought("default_mode",
@@ -726,6 +779,12 @@ class Brain:
             "basal_ganglia": self.basal_ganglia.state_dict_serializable(),
             "insular_cortex": self.insular_cortex.state_dict_serializable(),
             "locus_coeruleus": self.locus_coeruleus.state_dict_serializable(),
+            "anterior_cingulate": self.anterior_cingulate.state_dict_serializable(),
+            "ventral_tegmental": self.ventral_tegmental.state_dict_serializable(),
+            "hypothalamus": self.hypothalamus.state_dict_serializable(),
+            "entorhinal_cortex": self.entorhinal_cortex.state_dict_serializable(),
+            "posterior_parietal": self.posterior_parietal.state_dict_serializable(),
+            "raphe_nuclei": self.raphe_nuclei.state_dict_serializable(),
             "learned_concepts": list(self.learned_concepts),
         }
 
@@ -755,6 +814,18 @@ class Brain:
                 self.insular_cortex.load_state_dict_safe(sd["insular_cortex"])
             if "locus_coeruleus" in sd:
                 self.locus_coeruleus.load_state_dict_safe(sd["locus_coeruleus"])
+            if "anterior_cingulate" in sd:
+                self.anterior_cingulate.load_state_dict_safe(sd["anterior_cingulate"])
+            if "ventral_tegmental" in sd:
+                self.ventral_tegmental.load_state_dict_safe(sd["ventral_tegmental"])
+            if "hypothalamus" in sd:
+                self.hypothalamus.load_state_dict_safe(sd["hypothalamus"])
+            if "entorhinal_cortex" in sd:
+                self.entorhinal_cortex.load_state_dict_safe(sd["entorhinal_cortex"])
+            if "posterior_parietal" in sd:
+                self.posterior_parietal.load_state_dict_safe(sd["posterior_parietal"])
+            if "raphe_nuclei" in sd:
+                self.raphe_nuclei.load_state_dict_safe(sd["raphe_nuclei"])
             # Restore learned concepts (added at runtime, e.g. fresh tokens
             # the brain has seen). Each entry becomes a permanent knowledge
             # memory again so associations continue to work.

@@ -12,6 +12,12 @@ from .cerebellum import Cerebellum
 from .basal_ganglia import BasalGanglia
 from .insular_cortex import InsularCortex
 from .locus_coeruleus import LocusCoeruleus
+from .anterior_cingulate import AnteriorCingulate
+from .ventral_tegmental import VentralTegmental
+from .hypothalamus import Hypothalamus
+from .entorhinal_cortex import EntorhinalCortex
+from .posterior_parietal import PosteriorParietal
+from .raphe_nuclei import RapheNuclei
 
 __all__ = [
     "VisualCortex",
@@ -28,6 +34,12 @@ __all__ = [
     "BasalGanglia",
     "InsularCortex",
     "LocusCoeruleus",
+    "AnteriorCingulate",
+    "VentralTegmental",
+    "Hypothalamus",
+    "EntorhinalCortex",
+    "PosteriorParietal",
+    "RapheNuclei",
     "ACTION_NAMES",
     "ACTION_NAMES_ZH",
 ]

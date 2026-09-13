@@ -21,6 +21,12 @@ const REGION_LABELS = {
   basal_ganglia: "Basal ganglia",
   insular_cortex: "Insular cortex",
   locus_coeruleus: "Locus coeruleus",
+  anterior_cingulate: "Anterior cingulate",
+  ventral_tegmental: "Ventral tegmental area",
+  hypothalamus: "Hypothalamus",
+  entorhinal_cortex: "Entorhinal cortex",
+  posterior_parietal: "Posterior parietal",
+  raphe_nuclei: "Raphe nuclei",
 };
 
 export class ThoughtStream {
