@@ -6,7 +6,7 @@
 
 import { BrainScene } from "/static/js/brain3d.js?v=20260913g";
 import { EnvironmentView, renderEnvStats } from "/static/js/environment.js";
-import { ThoughtStream } from "/static/js/thoughtstream.js";
+import { ThoughtStream } from "/static/js/thoughtstream.js?v=20260913learn2";
 import { loadKnowledge, setActiveConcept, categoryColor, mergeLearnedConcepts } from "/static/js/knowledge.js";
 import { initTrading, updateTrading } from "/static/js/trading.js";
 import { initWebView, updateWebView, updateWebTopbarStrip } from "/static/js/web_view.js";
@@ -374,6 +374,11 @@ function handlePayload(data) {
 
   if (data.twitter !== undefined) {
     updateVoice(data.twitter);
+    // Fold the brain's voice — what it wants to say — into the thought
+    // stream so that panel shows its mind + its words.
+    if (data.twitter.utterances) {
+      thoughtStream.addUtterances(data.twitter.utterances);
+    }
   }
 
   brainScene.updateRegions(brain.regions, buildRegionLiveMetrics(brain, data));

@@ -274,6 +274,16 @@ class Brain:
         self.learned_concepts: List[dict] = []
         # Cap so the knowledge bank doesn't explode after months of running.
         self.max_learned_concepts = 400
+        # When the brain isn't trading, its old market memories (fresh
+        # tokens, launchpads, trade outcomes) should stop bubbling up into
+        # the "NOW THINKING" hero and the associate thought stream — they're
+        # crypto noise now, not what the brain is about. We keep them in the
+        # knowledge bank (history) but never surface them as associations.
+        self.suppress_market_concepts = os.getenv(
+            "TRADING_ENABLED", "0") in ("0", "false", "False", "")
+        self._market_concept_categories = {
+            "learned_token", "learned_pattern", "learned_event",
+        }
         if self.config.knowledge_enabled:
             for concept, emb in all_concepts_with_embeddings(dim=feature_dim):
                 self.hippocampus.store_knowledge(
@@ -634,6 +644,12 @@ class Brain:
         ep, sim = assoc
         concept = self._concepts_by_id.get(ep.label)
         if concept is None:
+            return
+        # In learning mode, never surface leftover market memories (fresh
+        # tokens like "$VOID · fresh launch", launchpads, trade outcomes) —
+        # the brain has moved on from trading.
+        if (self.suppress_market_concepts
+                and (getattr(concept, "category", "") or "") in self._market_concept_categories):
             return
         self.active_concept = {
             "id": concept.id,

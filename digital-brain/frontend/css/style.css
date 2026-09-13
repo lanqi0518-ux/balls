@@ -3234,3 +3234,37 @@ a.learn-hero-title:hover { color: #BAE6FD; text-decoration: underline; }
   .learn-stats { grid-template-columns: 1fr 1fr; gap: 8px; }
   .brand-plate-class, .brand-plate-order { display: none; }
 }
+
+/* ======================================================================
+   THOUGHT STREAM — the brain's voice ("wants to say") folded in as speech.
+   ====================================================================== */
+.thought.thought-voice {
+  border-left: 2px solid rgba(251, 146, 60, 0.75);
+  background:
+    linear-gradient(180deg, rgba(251, 146, 60, 0.08), rgba(251, 146, 60, 0.015));
+  border-radius: 8px;
+  padding: 9px 12px;
+}
+.thought-voice .voice-speaker {
+  color: #FDBA74;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.thought-voice-text {
+  margin-top: 3px;
+  color: #FFEFDD;
+  font-size: 13.5px;
+  line-height: 1.5;
+  font-style: italic;
+}
+.thought-voice-text::before { content: "\201C"; opacity: 0.6; }
+.thought-voice-text::after  { content: "\201D"; opacity: 0.6; }
+.thought-voice .voice-flag {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.thought-voice .voice-flag.ok { color: #6EE7B7; }
