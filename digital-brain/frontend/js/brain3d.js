@@ -42,6 +42,7 @@ export class BrainScene {
     this._addStarfield();
     this._initPostprocessing();
     this._addInteraction();
+    this._applyMobileTweaks();
     this._resize();
     window.addEventListener("resize", () => this._resize());
     window.addEventListener("orientationchange", () => setTimeout(() => this._resize(), 100));
@@ -85,6 +86,35 @@ export class BrainScene {
     this.tooltip.className = "brain-tooltip";
     this.tooltip.style.display = "none";
     this.container.appendChild(this.tooltip);
+  }
+
+  /**
+   * On phones the translucent cerebrum shell hides the region cores
+   * inside it, and the cores themselves are too small to read at ~360px
+   * width.  Make the shell thinner, bump the core base size, and pull
+   * the camera in so the anatomy fills the panel.
+   */
+  _applyMobileTweaks() {
+    if (!this._isMobile) return;
+    try {
+      if (this.cerebrum && this.cerebrum.material) {
+        this.cerebrum.material.opacity = 0.22;
+        this.cerebrum.material.transmission = 0.35;
+        this.cerebrum.material.emissiveIntensity = 0.28;
+        this.cerebrum.material.needsUpdate = true;
+      }
+      if (this.cerebrumWireframe && this.cerebrumWireframe.material) {
+        this.cerebrumWireframe.material.opacity = 0.18;
+      }
+      this._regionBaseSize = 6;
+      this._regionSizeGain = 4.5;
+      this.camera.position.set(150, 70, 180);
+      this.camera.lookAt(0, 0, 0);
+      if (this.controls) {
+        this.controls.minDistance = 90;
+        this.controls.autoRotateSpeed = 0.5;
+      }
+    } catch {}
   }
 
   _addLights() {
@@ -818,12 +848,15 @@ export class BrainScene {
       entry.data = r;
       // Region cores sit INSIDE the cerebrum as small luminous cortex
       // markers, not as giant spheres that eclipse the anatomy. Scale
-      // range is now roughly 3-6 units against a ~100-unit brain.
-      const size = 3.0 + Math.pow(r.activation, 0.7) * 3.0;
+      // range is now roughly 3-6 units against a ~100-unit brain
+      // (bigger on mobile so 14 dots are all readable at 360px).
+      const baseUnits = this._isMobile ? 4.5 : 3.0;
+      const gainUnits = this._isMobile ? 4.0 : 3.0;
+      const size = baseUnits + Math.pow(r.activation, 0.7) * gainUnits;
       entry.core.scale.setScalar(size / entry.baseSize);
       entry.core.material.opacity = 0.9 + r.activation * 0.1;
-      entry.glow.material.opacity = 0.20 + r.activation * 0.35;
-      entry.glow.scale.setScalar((size * 2.2) / entry.baseSize);
+      entry.glow.material.opacity = (this._isMobile ? 0.30 : 0.20) + r.activation * 0.35;
+      entry.glow.scale.setScalar((size * (this._isMobile ? 2.6 : 2.2)) / entry.baseSize);
       entry.pulseTarget = r.activation;
       sumAct += r.activation;
       nAct++;
