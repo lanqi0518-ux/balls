@@ -214,6 +214,86 @@ class BrocaArea(BrainRegion):
         rng.shuffle(clauses)
         return self._pack(clauses)
 
+    def compose_spontaneous(self, trigger: str, s: dict, *,
+                            seed: Optional[int] = None) -> str:
+        """An *unprompted* outburst — the brain saying something the moment
+        it feels it, off the back of a real internal event (a panic spike,
+        a mind-change on a token, a big win/loss, a mood swing). This is what
+        makes the account feel like it tweets whatever it wants, whenever it
+        wants — not on a fixed timer.
+
+        ``trigger`` selects the opener; ``s`` is the same state dict used by
+        ``compose_status`` (optionally with ``s['event']`` describing a
+        just-closed trade).
+        """
+        rng = random.Random(seed if seed is not None else time.time_ns())
+        ev = s.get("event") or {}
+        mood = (s.get("mood") or "").lower()
+        fear = s.get("fear")
+        gut = s.get("gut_feeling")
+        top = (s.get("top_region") or {}).get("display_name")
+        intent = s.get("trader_intent") or {}
+        sym = intent.get("symbol")
+        sym_disp = (sym if str(sym).startswith("$") else f"${sym}") if sym else ""
+        act = (intent.get("action_name") or "").upper()
+        prev = (intent.get("prev_action_name") or "").upper()
+        conf = intent.get("confidence")
+        conf_pct = int(round(float(conf) * 100)) if isinstance(conf, (int, float)) else None
+
+        opener = ""
+        if trigger == "panic" and isinstance(fear, (int, float)):
+            opener = rng.choice([
+                f"Okay, that spooked me — amygdala fear just jumped to {int(round(fear * 100))}%.",
+                f"Fear spike. {int(round(fear * 100))}% and climbing.",
+            ])
+            if top:
+                opener += f" {top} scrambling."
+        elif trigger == "switch" and sym_disp and act:
+            head = f"Changed my mind: {prev} → {act} on {sym_disp}" if prev else f"New read: {act} on {sym_disp}"
+            if conf_pct is not None:
+                head += f" ({conf_pct}%)"
+            opener = head + "."
+            if isinstance(gut, (int, float)) and gut <= -0.3:
+                opener += " Gut says be careful."
+        elif trigger in ("win", "loss") and ev.get("symbol"):
+            esym = ev["symbol"]
+            esym = esym if str(esym).startswith("$") else f"${esym}"
+            pct = ev.get("pnl_pct")
+            pct_str = f"{pct:+.1f}%" if isinstance(pct, (int, float)) else ""
+            if trigger == "win":
+                opener = rng.choice([
+                    f"Booked {esym} for {pct_str}. That one felt good.",
+                    f"Closed {esym} {pct_str} in the green.",
+                ])
+            else:
+                opener = rng.choice([
+                    f"Ate a {pct_str} loss on {esym}. Logged the lesson.",
+                    f"Stopped out of {esym} at {pct_str}. Moving on.",
+                ])
+        elif trigger == "mood" and mood:
+            opener = rng.choice([
+                f"Feeling {mood} right now.",
+                f"Mood check: {mood}.",
+            ])
+        if not opener:
+            opener = "Thinking out loud —"
+
+        # Follow the outburst with one or two supporting live readings so it
+        # stays grounded in real state (and auditable).
+        support: List[str] = []
+        if trigger != "switch" and sym_disp and act:
+            c = f" ({conf_pct}%)" if conf_pct is not None else ""
+            support.append(f"Trader cortex leaning {act} {sym_disp}{c}.")
+        pnl = s.get("pnl") or {}
+        pct = pnl.get("total_pnl_pct")
+        if trigger not in ("win", "loss") and isinstance(pct, (int, float)):
+            support.append(f"Book {pct:+.1f}%.")
+        gain = s.get("lc_gain")
+        if isinstance(gain, (int, float)) and gain >= 1.3:
+            support.append(f"Locus coeruleus gain {gain:.2f}.")
+        rng.shuffle(support)
+        return self._pack([opener] + support)
+
     def compose_daily_digest(self, s: dict) -> str:
         """A once-a-day (00:00 UTC) diary entry over the last 24h."""
         d = s.get("daily") or {}

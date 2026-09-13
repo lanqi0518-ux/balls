@@ -726,6 +726,48 @@ class Brain:
                 torch.tensor([self.nucleus_accumbens.baseline], dtype=torch.float32),
             ])
 
+    def emotion_state(self) -> dict:
+        """A compact summary of how the brain 'feels' right now.
+
+        This is the single source of truth for the face beside the 3D
+        brain, the on-screen expression caption, and Broca's mood-flavoured
+        tweets — so all three always agree. Everything is derived from real
+        region scalars; nothing here is invented.
+
+        Returns valence ∈ [-1, +1] (unhappy…happy), arousal ∈ [0, 1]
+        (calm…activated), the raw drivers, and a one-word mood label.
+        """
+        fear = float(max(0.0, min(1.0, getattr(self.amygdala, "fear", 0.0))))
+        gut = float(max(-1.0, min(1.0, getattr(self.insular_cortex, "gut_feeling", 0.0))))
+        patience = float(max(0.0, min(1.0, getattr(self.raphe_nuclei, "patience", 0.5))))
+        lc_gain = float(getattr(self.locus_coeruleus, "gain_scalar", 1.0))
+        eng = float(max(0.0, min(1.0, getattr(self, "engagement", 0.0))))
+
+        valence = max(-1.0, min(1.0, gut - 0.5 * fear + 0.25 * (patience - 0.5)))
+        arousal = max(0.0, min(1.0, 0.6 * eng + 0.5 * fear + (lc_gain - 1.0)))
+
+        if fear >= 0.6:
+            mood = "FEARFUL"
+        elif valence >= 0.35:
+            mood = "EUPHORIC" if arousal >= 0.55 else "CONTENT"
+        elif valence <= -0.35:
+            mood = "ANXIOUS" if fear >= 0.4 else "GLOOMY"
+        elif arousal >= 0.6:
+            mood = "ALERT"
+        else:
+            mood = "CALM"
+
+        return {
+            "fear": round(fear, 3),
+            "gut_feeling": round(gut, 3),
+            "patience": round(patience, 3),
+            "lc_gain": round(lc_gain, 3),
+            "engagement": round(eng, 3),
+            "valence": round(valence, 3),
+            "arousal": round(arousal, 3),
+            "mood": mood,
+        }
+
     def snapshot(self) -> dict:
         """Everything the UI needs about the current brain state."""
         now = time.time()
@@ -752,6 +794,7 @@ class Brain:
             "central_complex_stats": self.central_complex.stats(),
             "broca_stats": self.broca.stats(),
             "broca_utterances": self.broca.utterances_public(limit=12),
+            "emotion": self.emotion_state(),
             "active_concept": self.active_concept,
             "learned_concepts_count": len(self.learned_concepts),
             "learned_concepts": [

@@ -99,6 +99,19 @@ def main() -> int:
     w = b.broca.compose_weekly_milestone(state)
     print(f"[{len(w):>3}c] {w}")
 
+    print("\n--- emotion_state ---")
+    emo = b.emotion_state()
+    print(" ", emo)
+
+    print("\n--- SPONTANEOUS tweets (per trigger) ---")
+    st = voice._gather_state()
+    st["event"] = {"symbol": "POPCAT", "pnl_pct": 42.0, "reason": "take_profit_42%"}
+    st.setdefault("trader_intent", {})["prev_action_name"] = "BUY"
+    for trig in ("panic", "switch", "win", "loss", "mood"):
+        t = b.broca.compose_spontaneous(trig, st, seed=7)
+        print(f"[{trig:>6}] [{len(t):>3}c] {t}")
+        assert len(t) <= 279, f"spontaneous {trig} too long: {len(t)}"
+
     # Exercise the emit path (dry-run) + persistence markers.
     voice._emit("status", b.broca.compose_status(state, seed=99))
     vs = voice.snapshot()

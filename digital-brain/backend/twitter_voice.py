@@ -106,6 +106,19 @@ class TwitterVoice:
         if self.status_max_s < self.status_min_s:
             self.status_max_s = self.status_min_s
 
+        # Spontaneous ("say what it wants, when it wants") posting: fires off
+        # the back of real internal events, gated only by a short cool-down
+        # so the brain can react in near real-time without spamming.
+        self.spontaneous_enabled = _truthy(os.getenv("TWITTER_SPONTANEOUS", "1"))
+        self.spontaneous_gap_s = float(
+            os.getenv("TWITTER_SPONTANEOUS_MIN_MINUTES", "5")) * 60.0
+        self._spont = {
+            "closed_count": self._closed_trades(),
+            "last_action": {},   # symbol -> last seen action name
+            "last_fear": 0.0,
+            "last_mood": "",
+        }
+
         base_dir = data_dir or os.getenv("DATA_DIR", "./data")
         self.state_path = Path(base_dir) / "twitter_voice.json"
 
@@ -134,6 +147,7 @@ class TwitterVoice:
             "week_start_trades": self._closed_trades(),
             "week_start_learned": self._learned_count(),
             "week_start_5ht": self._tonic_5ht(),
+            "last_spontaneous_at": 0.0,
         }
         self._load_marks()
 
@@ -194,6 +208,7 @@ class TwitterVoice:
             try:
                 self._maybe_post_weekly()
                 self._maybe_post_daily()
+                self._maybe_post_spontaneous()
                 self._maybe_post_status()
             except Exception as e:  # noqa: BLE001
                 LOG.warning("twitter voice tick failed: %s", e)
@@ -250,10 +265,77 @@ class TwitterVoice:
         self._marks["week_start_5ht"] = self._tonic_5ht()
         self._save_marks()
 
+    def _maybe_post_spontaneous(self) -> None:
+        """Detect a notable internal event and, if past the cool-down, let
+        the brain blurt out a reaction. Trackers are updated every tick so a
+        trigger only ever fires on a genuinely fresh change."""
+        if not self.spontaneous_enabled:
+            return
+        trigger: Optional[str] = None
+        event: Optional[dict] = None
+        prev_action: Optional[str] = None
+
+        # 1) A trade just closed with a material P&L.
+        cc = self._closed_trades()
+        if cc > int(self._spont.get("closed_count", 0)):
+            try:
+                newest = self.trading.paper.closed[-1]
+                if abs(float(newest.pnl_pct)) >= 0.15:
+                    trigger = "win" if newest.pnl_pct > 0 else "loss"
+                    event = {
+                        "symbol": newest.token_symbol,
+                        "pnl_pct": round(float(newest.pnl_pct) * 100, 2),
+                        "reason": newest.reason,
+                    }
+            except Exception:  # noqa: BLE001
+                pass
+        self._spont["closed_count"] = cc
+
+        # 2) The trader cortex flipped its mind on the hottest token.
+        intent = getattr(self.trading, "_latest_intent", None)
+        if intent:
+            sym = intent.get("symbol")
+            actn = intent.get("action_name")
+            if sym and actn:
+                prev = self._spont["last_action"].get(sym)
+                if (trigger is None and prev and prev != actn
+                        and actn in ("buy", "sell")):
+                    trigger = "switch"
+                    prev_action = prev
+                self._spont["last_action"][sym] = actn
+
+        # 3) A fear spike, or 4) a swing into a strong mood.
+        emo = self.brain.emotion_state()
+        fear = emo.get("fear", 0.0)
+        mood = emo.get("mood", "")
+        if trigger is None and fear >= 0.75 and float(self._spont.get("last_fear", 0.0)) < 0.75:
+            trigger = "panic"
+        if (trigger is None and mood in ("EUPHORIC", "FEARFUL")
+                and mood != self._spont.get("last_mood", "")):
+            trigger = "mood"
+        self._spont["last_fear"] = fear
+        self._spont["last_mood"] = mood
+
+        if trigger is None:
+            return
+        now = time.time()
+        if now - float(self._marks.get("last_spontaneous_at", 0.0)) < self.spontaneous_gap_s:
+            return
+
+        state = self._gather_state()
+        if event:
+            state["event"] = event
+        if trigger == "switch" and prev_action and state.get("trader_intent"):
+            state["trader_intent"]["prev_action_name"] = prev_action
+        text = self.brain.broca.compose_spontaneous(trigger, state)
+        self._emit("spontaneous", text, trigger=trigger)
+        self._marks["last_spontaneous_at"] = now
+        self._save_marks()
+
     # ------------------------------------------------------------------
     # Emit (compose already done) → post or dry-run, then log everywhere.
     # ------------------------------------------------------------------
-    def _emit(self, kind: str, text: str) -> None:
+    def _emit(self, kind: str, text: str, *, trigger: str = "") -> None:
         text = (text or "").strip()
         if not text:
             return
@@ -281,21 +363,25 @@ class TwitterVoice:
         rec["posted"] = posted
         rec["dry_run"] = self.dry_run
         rec["url"] = url
+        if trigger:
+            rec["trigger"] = trigger
         if error:
             rec["error"] = error
 
         status = ("posted" if posted else ("dry-run" if self.dry_run else "failed"))
+        label = f"{kind}:{trigger}" if trigger else kind
         self._push_event(kind, f"[{status}] {text}", extra={
             "posted": posted, "dry_run": self.dry_run, "url": url,
-            "error": error, "chars": len(text),
+            "error": error, "chars": len(text), "trigger": trigger,
         })
         try:
             self.brain._add_thought(
                 "broca",
-                f"spoke ({kind}, {status}): {text}",
-                f"发声（{kind}，{status}）：{text}",
+                f"spoke ({label}, {status}): {text}",
+                f"发声（{label}，{status}）：{text}",
                 kind="speak",
-                extra={"posted": posted, "url": url, "channel": kind},
+                extra={"posted": posted, "url": url, "channel": kind,
+                       "trigger": trigger},
             )
         except Exception:  # noqa: BLE001
             pass
@@ -317,6 +403,12 @@ class TwitterVoice:
             "patience": round(float(getattr(b.raphe_nuclei, "patience", 0.5)), 3),
             "tonic_5ht": round(float(getattr(b.raphe_nuclei, "tonic_5ht", 0.5)), 3),
         }
+        # Fold in the shared emotion summary (mood/valence/arousal) so the
+        # tweets agree with the face beside the 3D brain.
+        try:
+            state.update(self.brain.emotion_state())
+        except Exception:  # noqa: BLE001
+            pass
 
         # Most-active region (excluding Broca itself, so it never just talks
         # about talking).
