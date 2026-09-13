@@ -11,6 +11,7 @@ import { loadKnowledge, setActiveConcept, categoryColor, mergeLearnedConcepts } 
 import { initTrading, updateTrading } from "/static/js/trading.js";
 import { initWebView, updateWebView, updateWebTopbarStrip } from "/static/js/web_view.js";
 import { initVoice, updateVoice } from "/static/js/voice.js";
+import { initLearning, updateLearning } from "/static/js/learning.js";
 import { AmbientMesh } from "/static/js/ambient.js";
 
 // ---------- DOM refs ----------
@@ -39,7 +40,11 @@ const knowledgePanel = document.getElementById("knowledge-panel");
 const tradingPanel = document.getElementById("trading-panel");
 const webPanel = document.getElementById("web-panel");
 const voicePanel = document.getElementById("voice-panel");
+const learningPanel = document.getElementById("learning-panel");
 const detailTabs = document.getElementById("detail-tabs");
+const walletStrip = document.getElementById("wallet-strip");
+const tabTrading = document.getElementById("tab-trading");
+const intentRowTrader = document.getElementById("intent-row-trader");
 
 // Hero panel — main-view focus: what he's thinking + what he's about to do
 const heroThinking          = document.getElementById("hero-thinking");
@@ -141,6 +146,7 @@ loadKnowledge(knowledgePanel);
 initTrading(tradingPanel, { onCommand: (cmd, extra) => send(cmd, extra) });
 initWebView(webPanel);
 initVoice(voicePanel);
+initLearning(learningPanel);
 
 // Contract-address copy-to-clipboard on the brand plate.
 (function wireCaCopy() {
@@ -169,18 +175,21 @@ initVoice(voicePanel);
   });
 })();
 
+let _userPickedTab = false;
 detailTabs.addEventListener("click", (e) => {
   const btn = e.target.closest(".tab[data-view]");
   if (!btn) return;
+  _userPickedTab = true;
   switchDetailView(btn.dataset.view);
 });
 
 function switchDetailView(view) {
-  if (!["region", "knowledge", "trading", "web", "voice"].includes(view)) return;
+  if (!["region", "knowledge", "trading", "web", "voice", "learning"].includes(view)) return;
   detailView = view;
   document.querySelectorAll("#detail-tabs .tab").forEach((el) => {
     el.classList.toggle("active", el.dataset.view === view);
   });
+  document.getElementById("learning-panel").style.display = view === "learning" ? "flex" : "none";
   document.getElementById("region-detail").style.display = view === "region"    ? "" : "none";
   document.getElementById("knowledge-panel").style.display = view === "knowledge" ? "flex" : "none";
   document.getElementById("trading-panel").style.display  = view === "trading"  ? "flex" : "none";
@@ -242,9 +251,20 @@ function handlePayload(data) {
   rewardLabel.textContent = `Σreward ${cum.toFixed(2)}`;
   rewardLabel.style.color = cum > 0 ? "var(--good)" : (cum < 0 ? "var(--bad)" : "var(--text-secondary)");
 
-  if (!modeInitialized && brain.mode) {
-    modeLabel.textContent = brain.mode === "einstein" ? "◈ PRIME" : "◇ DEFAULT";
-    modeBadge.classList.toggle("mode-default", brain.mode !== "einstein");
+  // Learning vs trading chrome. When the brain isn't trading we relabel
+  // the mode badge, hide the money/trading surfaces, and (once) drop the
+  // user onto the Learning tab so it's obvious what he's doing.
+  const tradingOff = data.trading ? data.trading.enabled === false : (data.mode === "learn");
+  applyModeChrome(tradingOff);
+
+  if (!modeInitialized) {
+    if (tradingOff) {
+      modeLabel.textContent = "✦ LEARNING";
+      modeBadge.classList.remove("mode-default");
+    } else if (brain.mode) {
+      modeLabel.textContent = brain.mode === "einstein" ? "◈ PRIME" : "◇ DEFAULT";
+      modeBadge.classList.toggle("mode-default", brain.mode !== "einstein");
+    }
     modeInitialized = true;
   }
   const knowN = brain.hippocampus_stats?.knowledge ?? 0;
@@ -298,7 +318,19 @@ function handlePayload(data) {
     renderUptime();
   }
 
-  if (data.trading) {
+  if (data.learning !== undefined) {
+    updateLearning(data.learning);
+  }
+
+  if (tradingOff) {
+    // No trading surfaces to update; footer reflects growth instead.
+    const learnedN2 = brain.learned_concepts_count ?? 0;
+    const readN = data.learning ? (data.learning.items_read ?? 0) : 0;
+    if (footerTrader) {
+      footerTrader.textContent =
+        `Learning: ${fmtCount(learnedN2)} ideas · ${fmtCount(readN)} read`;
+    }
+  } else if (data.trading) {
     updateTradingStrip(data.trading);
     updateTrading(data.trading);
     const st = data.trading.trader_cortex_stats || {};
@@ -329,6 +361,15 @@ function handlePayload(data) {
   if (data.web !== undefined) {
     updateWebView(data.web);
     updateWebTopbarStrip(data.web);
+  }
+  // In learning mode the topbar "reading" strip shows the actual headline
+  // the brain is on right now — the most direct answer to "what's it doing?".
+  if (tradingOff) {
+    const label = document.getElementById("browser-strip-label");
+    const rn = data.learning && data.learning.reading_now;
+    if (label && rn && rn.title) {
+      label.textContent = truncate(rn.title, 52);
+    }
   }
 
   if (data.twitter !== undefined) {
@@ -378,6 +419,26 @@ function handlePayload(data) {
   if (selectedRegionName) {
     const r = brain.regions.find((r) => r.name === selectedRegionName);
     if (r) renderRegionDetail(r);
+  }
+}
+
+// Toggle the whole UI between "trading brain" and "learning brain"
+// chrome. Idempotent + cheap; safe to call every frame.
+let _chromeState = null;
+let _detailAutoInit = false;
+function applyModeChrome(tradingOff) {
+  if (_chromeState !== tradingOff) {
+    if (walletStrip) walletStrip.style.display = tradingOff ? "none" : "";
+    if (tabTrading) tabTrading.hidden = tradingOff;
+    if (intentRowTrader) intentRowTrader.style.display = tradingOff ? "none" : "";
+    _chromeState = tradingOff;
+  }
+  // On the first learn-mode frame, land the user on the Learning tab so the
+  // dashboard opens on the single clearest "here's what I'm doing" view —
+  // unless they've already clicked a tab themselves.
+  if (tradingOff && !_detailAutoInit && !_userPickedTab) {
+    switchDetailView("learning");
+    _detailAutoInit = true;
   }
 }
 
