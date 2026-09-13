@@ -46,6 +46,7 @@ from .brain import Brain
 from .env import GridWorld
 from .knowledge import categories_public, concepts_public
 from .trading_service import TradingService
+from .twitter_voice import TwitterVoice
 from .web_embodiment import WebEmbodiment
 
 
@@ -69,6 +70,9 @@ class Simulation:
         self.tick_hz: float = 6.0  # frames per second the brain "lives" at
         self._current_obs = self.env.reset()
         self.trading: TradingService = TradingService(self.brain)
+        # The brain's autonomous voice: Broca's area → X/Twitter. Runs its
+        # own scheduler; posts real tweets when keyed, composes-only when not.
+        self.twitter: TwitterVoice = TwitterVoice(self.brain, self.trading)
         self.web: WebEmbodiment | None = None
         if os.getenv("WEB_EMBODIMENT", "1") != "0":
             self.web = WebEmbodiment(
@@ -150,6 +154,7 @@ class Simulation:
             "restart_count": self._restart_count,
             "last_tick_ago_s": round(max(0.0, time.time() - self._last_tick_at_s), 2),
             "trading": self.trading.snapshot(),
+            "twitter": self.twitter.snapshot(),
             "web": self.web.snapshot() if self.web else {"enabled": False},
         }
 
@@ -262,14 +267,26 @@ async def lifespan(app: FastAPI):
     _install_signal_handlers(loop)
     task = asyncio.create_task(sim.run_forever(), name="brain-supervisor")
     await sim.trading.start()
+    await sim.twitter.start()
     if sim.web is not None:
-        await sim.web.start()
+        # Launching headless Chromium takes several seconds. Do it in the
+        # background so the HTTP server (and /health) is available the
+        # instant the brain is up — this keeps a rolling deploy's
+        # switch-over window down to a couple of seconds instead of
+        # blocking readiness on the browser boot.
+        async def _start_web() -> None:
+            try:
+                await sim.web.start()
+            except Exception as e:  # noqa: BLE001
+                LOG.warning("web embodiment failed to start: %s", e)
+        asyncio.create_task(_start_web(), name="web-embodiment-start")
     try:
         yield
     finally:
         # Save FIRST, then let subsystems stop. Order matters: if trading
         # stops before we save, we lose the very-latest trader state.
         await sim.emergency_save()
+        await sim.twitter.stop()
         await sim.trading.stop()
         if sim.web is not None:
             await sim.web.stop()
@@ -343,6 +360,11 @@ async def health():
 @app.get("/api/trading")
 async def api_trading() -> dict:
     return sim.trading.snapshot()
+
+
+@app.get("/api/twitter")
+async def api_twitter() -> dict:
+    return sim.twitter.snapshot()
 
 
 @app.get("/api/knowledge")

@@ -833,6 +833,17 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
   text-overflow: ellipsis;
   max-width: 100%;
 }
+.specimen-meta-emotion {
+  color: var(--accent);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  transition: color 0.6s ease;
+}
 .brain-figcaption {
   display: grid;
   grid-template-columns: max-content 1fr;
@@ -2884,3 +2895,128 @@ a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
 }
 #playbook-body .pos { color: #6EE7B7; }
 #playbook-body .neg { color: #FCA5A5; }
+
+/* ------------------------------------------------------------------ */
+/* Voice panel — Broca's area · autonomous X/Twitter feed             */
+/* ------------------------------------------------------------------ */
+.voice-panel {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+  padding-top: 6px;
+}
+.voice-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.voice-head-l { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.voice-title {
+  font-weight: 700;
+  color: #FDBA74;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+.voice-sub { color: var(--text-muted); font-size: 11px; }
+.voice-head-r { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.voice-pill {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+  white-space: nowrap;
+}
+.voice-pill.live {
+  color: #FDBA74;
+  border-color: rgba(251, 146, 60, 0.45);
+  background: rgba(251, 146, 60, 0.12);
+}
+.voice-pill.draft { color: var(--text-muted); }
+
+.voice-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+}
+.voice-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 18px 4px;
+  text-align: center;
+}
+.voice-item {
+  border: 1px solid var(--border);
+  border-left: 2px solid rgba(251, 146, 60, 0.5);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--bg-glass);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.voice-item.is-draft { border-left-color: rgba(255, 255, 255, 0.18); }
+.voice-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.voice-kind {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(251, 146, 60, 0.14);
+  border: 1px solid rgba(251, 146, 60, 0.35);
+  color: #FDBA74;
+}
+.voice-kind-daily {
+  background: rgba(110, 231, 255, 0.12);
+  border-color: rgba(110, 231, 255, 0.35);
+  color: var(--accent);
+}
+.voice-kind-weekly {
+  background: rgba(167, 139, 250, 0.14);
+  border-color: rgba(167, 139, 250, 0.4);
+  color: #C4B5FD;
+}
+.voice-kind-spontaneous {
+  background: rgba(255, 74, 94, 0.14);
+  border-color: rgba(255, 74, 94, 0.4);
+  color: #FF8DA0;
+}
+.voice-when { color: var(--text-muted); font-size: 10px; }
+.voice-chars { color: var(--text-muted); font-size: 10px; margin-left: auto; }
+.voice-text {
+  color: var(--text-primary);
+  font-size: 13.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.voice-item-foot { display: flex; align-items: center; gap: 8px; }
+.voice-link { font-family: var(--font-mono); font-size: 10.5px; color: var(--accent); }
+.voice-flag {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.voice-flag.err { color: var(--bad); }
